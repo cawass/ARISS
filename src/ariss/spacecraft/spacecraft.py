@@ -65,9 +65,7 @@ class SpacecraftState:
     """
     Immutable representation of a spacecraft's state at a given iteration.
     
-    Being strictly immutable (frozen=True) prevents accidental modification
-    of the state during iterative loops. Instead of changing a property directly, 
-    use the `update()` method to create a new instance with the new values.
+    Use the `update()` method to create a new instance with the new values.
     """
     total_mass: float = 0.0
     drag_coeff: float = 0.0 # Convenience property mapped at top level
@@ -108,8 +106,7 @@ class SpacecraftState:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'SpacecraftState':
         """
-        Instantiates a SpacecraftState object from a dictionary, correctly
-        initializing any nested dataclasses inside it.
+        Instantiates a SpacecraftState object from a dictionary
         """
         data_copy = data.copy()
         
