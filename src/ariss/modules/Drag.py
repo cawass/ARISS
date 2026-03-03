@@ -5,8 +5,6 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from iteration.SpacecraftClass import SpacecraftClass
-
 
 def get_friction_drag(S, epsilon, alpha, N_surf):
     return N_surf * (1 - epsilon * np.cos(2 * alpha)) / (np.sqrt(np.pi) * S) * np.exp(- S ** 2 * np.sin(alpha) ** 2)
@@ -28,7 +26,7 @@ def get_drag_coefficient(S, epsilon, alpha, N_surf, T_orb, T_r):
     return CD_friction + CD_pressure + CD_thermal
 
 
-def drag_model(sc: SpacecraftClass) -> None:
+def drag_model(V_orb) -> None:
     S = sc.V_orb * np.sqrt(sc._M / (2 * sc._R * sc.T_orb))
 
     # solar panels, assuming a zero angle of attack
