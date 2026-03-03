@@ -20,10 +20,24 @@ class OrbitState:
 @dataclass(frozen=True)
 class GeometryState:
     """Holds the geometric parameters and aerodynamic properties."""
-    drag_coeff: float = 2.2       # Coefficient of drag (CD)
-    reference_area: float = 1.0   # Area for drag/solar calculations
-    diameter: float = 1.0         # Main body diameter
-    length: float = 2.0           # Main body length
+    S_in: str = "c"
+    S_body: str = "c"
+
+    AR_in: float = 2.2       
+    AR_body: float = 1.0   
+    AR_solar: float = 0.5  
+    AR_rad: float = 0.3    
+
+    A_in: float = 1.0         
+    A_body: float = 2.0          
+    A_solar: float = 4.0        
+    A_rad: float = 0.3    
+
+    L_in: float = 1.0         
+    L_body: float = 2.0          
+    L_solar: float = 1.0        
+    L_rad: float = 0.5    
+
     
     def update(self, **kwargs: Any) -> 'GeometryState':
         return replace(self, **kwargs)
