@@ -27,11 +27,10 @@ from ariss.core.spacecraft import SpacecraftState
 from ariss.utils.constants import *
 
 def intake_model(sc: SpacecraftState) -> None:
-    pass
-    
-    # Calculate the intake area for drag compensation
 
-    # IF active refuelling,
-    #      calculate the intake area for storage
-    # ELSE
-    #      intake area only for drag compensation
+    if sc.refueling.active_refuel:
+        # Calculate the intake area for storage
+        pass
+    else:
+        # Calculate the intake area for drag compensation
+        pass

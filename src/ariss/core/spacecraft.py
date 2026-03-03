@@ -75,6 +75,18 @@ class MassBudgetState:
 
 
 @dataclass(frozen=True)
+class RefuelingState:
+    """Holds the refueling parameters."""
+    active_refuel: bool = False # Is the spacecraft active ABEP?
+
+    e
+    eta_refuel: float = 0.7 # Refueling efficiency (Power_out / Power_in)
+    
+    def update(self, **kwargs: Any) -> 'RefuelingState':
+        return replace(self, **kwargs)
+
+
+@dataclass(frozen=True)
 class SpacecraftState:
     """
     Immutable representation of a spacecraft's state at a given iteration.
@@ -89,6 +101,7 @@ class SpacecraftState:
     geometry: GeometryState = field(default_factory=GeometryState)
     thruster: ThrusterState = field(default_factory=ThrusterState)
     mass_budget: MassBudgetState = field(default_factory=MassBudgetState)
+    refueling: RefuelingState = field(default_factory=RefuelingState)
 
     def update(self, **kwargs: Any) -> 'SpacecraftState':
         """
