@@ -8,10 +8,10 @@ from typing import Any, Dict
 @dataclass(frozen=True)
 class OrbitState:
     """Represents the orbital parameters and environment of the spacecraft."""
-    altitude: float = 400e3       # Altitude in meters
-    velocity: float = 7800.0      # Orbital velocity in m/s
-    density: float = 0.0          # Atmospheric density
-    temperature: float = 0.0      # Local temperature
+    h_orb: float = 400e3       # Altitude in meters
+    V_orb: float = 7800.0      # Orbital velocity in m/s
+    rho_orb: float = 0.0          # Atmospheric density
+    T_orb: float = 0.0          # Orbital temperature
     
     def update(self, **kwargs: Any) -> 'OrbitState':
         return replace(self, **kwargs)

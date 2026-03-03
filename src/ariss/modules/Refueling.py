@@ -22,3 +22,16 @@ def refueling_model(sc: SpacecraftClass) -> None:
 
     # Sum both powers
     sc.P_dict['ref'] = sc._P1 + P2
+
+from ariss.core.spacecraft import SpacecraftState
+from ariss.utils.constants import *
+
+def intake_model(sc: SpacecraftState) -> None:
+    pass
+    
+    # Calculate the intake area for drag compensation
+
+    # IF active refuelling,
+    #      calculate the intake area for storage
+    # ELSE
+    #      intake area only for drag compensation
