@@ -2,7 +2,7 @@ import copy
 import logging
 from typing import Tuple, List
 
-from ariss.spacecraft.spacecraft import SpacecraftState
+from ariss.core.spacecraft import SpacecraftState
 
 # logging tool
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
