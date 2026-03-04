@@ -45,11 +45,6 @@ def run_sizing_loop(
         # env_density = atmosphere_model(current_sc.orbit.altitude)
         # drag_results = drag_model(current_sc.geometry, env_density, current_sc.orbit.velocity)
         
-        # Placeholder calculations
-        new_density = 1e-12 
-        new_drag_force = 0.05
-        new_cd = current_sc.geometry.drag_coeff
-        
         
         # ---------------------------------------------------------
         # 2. SUBSYSTEM SIZING & BUDGETS
@@ -58,15 +53,9 @@ def run_sizing_loop(
         # req_power = propulsion_model(current_sc.thruster, new_drag_force)
         # solar_mass = power_system_sizing(req_power)
         # struct_mass = structural_sizing(current_sc.mass_budget)
-
-        # Placeholder calculations (replace with your modules)
-        new_structure_mass = 150.0
-        new_payload_mass = 50.0
         
         # Calculate new total mass based on sized components
-        calculated_dry_mass = new_structure_mass + new_payload_mass # + ...
-        new_total_mass = calculated_dry_mass + current_sc.thruster.propellant_mass
-        
+
         
         # ---------------------------------------------------------
         # 3. STATE UPDATE (Creating the next iteration)
@@ -75,19 +64,19 @@ def run_sizing_loop(
         # This keeps the history completely immutable and traceable.
         
         next_sc = current_sc.update(
-            total_mass=new_total_mass,
+            # total_mass=new_total_mass,
             
-            # Update nested subsystems via dictionary syntax
-            orbit={
-                "density": new_density
-            },
-            geometry={
-                "drag_coeff": new_cd
-            },
-            mass_budget={
-                "structure": new_structure_mass,
-                "payload": new_payload_mass
-            }
+            # # Update nested subsystems via dictionary syntax
+            # orbit={
+            #     "density": new_density
+            # },
+            # geometry={
+            #     "drag_coeff": new_cd
+            # },
+            # mass_budget={
+            #     "structure": new_structure_mass,
+            #     "payload": new_payload_mass
+            # }
         )
         
         history.append(next_sc)
