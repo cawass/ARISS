@@ -15,6 +15,8 @@ from typing import Final
 # ==========================================
 STEFAN_BOLTZMANN: Final[float] = 5.670374419e-8    # [W/(m^2 * K^4)]
 UNIVERSAL_GAS: Final[float] = 8.31446261815324     # [J/(mol * K)]
+AVOGADRO_NUMBER: Final[float] = 6.02214076e23      # [1/mol]
+BOLTZMANN_CONSTANT: Final[float] = 1.3806452e-23   # [J/K]
 
 # ==========================================
 # Air / Atmospheric Properties (Default assumed values)

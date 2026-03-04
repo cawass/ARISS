@@ -8,10 +8,12 @@ from typing import Any, Dict
 @dataclass(frozen=True)
 class OrbitState:
     """Represents the orbital parameters and environment of the spacecraft."""
-    altitude: float = 400e3       # Altitude in meters
-    velocity: float = 7800.0      # Orbital velocity in m/s
-    density: float = 0.0          # Atmospheric density
+    altitude: float = 188.0151e3       # Altitude in meters
+    velocity: float = 7791.44      # Orbital velocity in m/s
+    density: float = 2.09e-10          # Atmospheric density
     temperature: float = 0.0      # Local temperature
+    molar_mass: float = 0.0         # Molar mass of the atmosphere
+    alpha: float = 0.0             # Angle of attack in radians
     
     def update(self, **kwargs: Any) -> 'OrbitState':
         return replace(self, **kwargs)
@@ -23,19 +25,24 @@ class GeometryState:
     S_in: str = "c"
     S_body: str = "c"
 
-    AR_in: float = 2.2       
+    AR_in: float = 1     
     AR_body: float = 1.0   
     AR_solar: float = 0.5  
     AR_rad: float = 0.3    
 
-    A_in: float = 1.0         
-    A_body: float = 2.0          
-    A_solar: float = 4.0        
-    A_rad: float = 0.3    
+    epsilon_in: float = 0.6
+    epsilon_body: float = 0.6
+    epsilon_solar: float = 0.9
+    epsilon_rad: float = 0.6
 
-    L_in: float = 1.0         
-    L_body: float = 2.0          
-    L_solar: float = 1.0        
+    A_in: float = 3        
+    A_body: float = 1.21         
+    A_solar: float = 21.3        
+    A_rad: float = 0   
+
+    L_in: float = 2.26         
+    L_body: float = 2.8        
+    L_solar: float = 3.0    
     L_rad: float = 0.5    
 
     
@@ -72,6 +79,17 @@ class MassBudgetState:
 
     def update(self, **kwargs: Any) -> 'MassBudgetState':
         return replace(self, **kwargs)
+    
+@dataclass(frozen=True)
+class Constants:
+    """Tracks sub-system mass budgets."""
+    @property
+    def dry_mass(self) -> float:
+        return (self.structure + self.payload + self.power_system + 
+                self.thermal + self.adcs + self.communications)
+
+    def update(self, **kwargs: Any) -> 'MassBudgetState':
+        return replace(self, **kwargs)
 
 
 @dataclass(frozen=True)
@@ -84,7 +102,7 @@ class SpacecraftState:
     total_mass: float = 0.0
     drag_coeff: float = 0.0 # Convenience property mapped at top level
     
-    # Nested subsystems
+    temperature_sc: float = 0.0   # Spacecraft temperature
     orbit: OrbitState = field(default_factory=OrbitState)
     geometry: GeometryState = field(default_factory=GeometryState)
     thruster: ThrusterState = field(default_factory=ThrusterState)
