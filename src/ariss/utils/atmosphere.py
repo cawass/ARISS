@@ -121,9 +121,46 @@ def orbit_updates_from_height(height_km: float) -> dict[str, float]:
     """Build orbit-state update payload from mission height in km."""
     sample = sample_atmosphere_at_height(height_km)
     return {
-        "altitude": sample.height_km * 1000.0,
+        "altitude": sample.height_km,
         "density": sample.density,
         "temperature": sample.temperature,
         "molar_mass": sample.molar_mass,
         "velocity": sample.orbital_velocity,
     }
+
+
+def height_from_density(
+    target_density: float,
+    height_min_km: float = 80.0,
+    height_max_km: float = 1000.0,
+    samples: int = 5000,
+) -> float:
+    """Estimate altitude [km] for a target density [kg/m^3] via interpolation."""
+    _require_pymsis()
+    target = max(float(target_density), 1.0e-30)
+
+    height_array = np.linspace(height_min_km, height_max_km, samples)
+    density, _, _, _, _, _ = atmos(height_array)
+    density = np.maximum(np.asarray(density, dtype=float), 1.0e-30)
+
+    # Build monotonic interpolation domain in log-density space.
+    sort_idx = np.argsort(density)
+    density_sorted = density[sort_idx]
+    height_sorted = height_array[sort_idx]
+
+    target = float(np.clip(target, density_sorted[0], density_sorted[-1]))
+    return float(
+        np.interp(
+            np.log(target),
+            np.log(density_sorted),
+            height_sorted,
+        )
+    )
+
+
+def orbit_updates_from_density(target_density: float) -> dict[str, float]:
+    """Build orbit-state update payload from target density [kg/m^3]."""
+    height_km = height_from_density(target_density)
+    updates = orbit_updates_from_height(height_km)
+    updates["density"] = float(target_density)
+    return updates
