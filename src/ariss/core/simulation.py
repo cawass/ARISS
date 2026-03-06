@@ -1,119 +1,146 @@
-import copy
+"""Main ARISS sizing loop and post-processing."""
+
 import logging
-from typing import Tuple, List
+import sys
+from pathlib import Path
+from typing import List, Tuple
 
-from ariss.spacecraft.spacecraft import SpacecraftState
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-# logging tool
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+from ariss.core.spacecraft import SpacecraftState
+from ariss.modules.Budjects import BudgetIdx, budjet_model
+from ariss.modules.DeltaV import delta_v_model
+from ariss.modules.Drag import drag_model
+from ariss.modules.Power import power_model
+from ariss.modules.Propulsion import propulsion_model
+from ariss.utils.atmosphere import orbit_updates_from_height
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
+def _bound_capture_areas(min_refuel_area: float, prop_area_candidate: float) -> tuple[float, float, float]:
+    """Return bounded propulsion, refueling, and intake areas."""
+    prop_area = max(prop_area_candidate, 1.0e-12)
+    refuel_area = max(min_refuel_area, 1.0e-12)
+    intake_area = prop_area + refuel_area
+    return prop_area, refuel_area, intake_area
+
+
+def _apply_budget_array(sc: SpacecraftState, values: list[float]) -> SpacecraftState:
+    """Map the flat budget array into ``mass`` and ``power`` state updates."""
+    return sc.update(
+        mass={
+            "Mass_in": values[BudgetIdx.MASS_IN],
+            "Mass_body": values[BudgetIdx.MASS_BODY],
+            "Mass_solar": values[BudgetIdx.MASS_SOLAR],
+            "Mass_rad": values[BudgetIdx.MASS_RAD],
+            "Mass_prop": values[BudgetIdx.MASS_PROP],
+            "Mass_ADCS": values[BudgetIdx.MASS_ADCS],
+            "Mass_payload": values[BudgetIdx.MASS_PAYLOAD],
+            "Mass_refprop": values[BudgetIdx.MASS_REFPROP],
+            "Mass_total": values[BudgetIdx.MASS_TOTAL],
+        },
+        power={
+            "Power_in": values[BudgetIdx.POWER_IN],
+            "Power_body": values[BudgetIdx.POWER_BODY],
+            "Power_solar": values[BudgetIdx.POWER_SOLAR],
+            "Power_rad": values[BudgetIdx.POWER_RAD],
+            "Power_prop": values[BudgetIdx.POWER_PROP],
+            "Power_ADCS": values[BudgetIdx.POWER_ADCS],
+            "Power_payload": values[BudgetIdx.POWER_PAYLOAD],
+            "Power_refprop": values[BudgetIdx.POWER_REFPROP],
+            "Power_total": values[BudgetIdx.POWER_TOTAL],
+        },
+    )
+
+
 def run_sizing_loop(
-    initial_sc: SpacecraftState, 
-    max_iterations: int = 200, 
-    mass_tolerance: float = 1e-3
+    initial_sc: SpacecraftState,
+    max_iterations: int = 200,
+    mass_tolerance: float = 1e-3,
 ) -> Tuple[SpacecraftState, bool, List[SpacecraftState]]:
-    """
-    Executes the main ARISS iterative sizing and convergence loop.
-    
-    This loop iteratively recalculates the physics, geometries, and subsystem
-    masses until the total spacecraft mass converges within the given tolerance.
+    """Run iterative drag-propulsion-power-budget sizing until mass converges."""
+    if initial_sc.mission_profile.mission_height > 0.0:
+        current_sc = initial_sc.update(
+            orbit=orbit_updates_from_height(initial_sc.mission_profile.mission_height),
+        )
+    else:
+        current_sc = initial_sc
 
-    Args:
-        initial_sc: The starting SpacecraftState (often loaded from a template).
-        max_iterations: Safety limit to prevent infinite loops.
-        mass_tolerance: The acceptable difference in total mass (kg) between iterations.
-
-    Returns:
-        final_sc: The converged SpacecraftState object.
-        converged: A boolean indicating if the loop successfully converged.
-        history: A history of the spacecraft state at every iteration step.
-    """
-    
-    current_sc = initial_sc
+    configured_refuel_area = (
+        current_sc.mission_profile.refueling_area if current_sc.mission_profile.refueling_area > 0.0 else current_sc.geometry.A_ref
+    )
     history: List[SpacecraftState] = [current_sc]
     converged = False
-    
-    logger.info(f"Starting sizing loop. Initial Total Mass: {current_sc.total_mass:.2f} kg")
+    min_refuel_area = max(configured_refuel_area, 1.0e-12)
+
+    logger.info("Starting sizing loop. Initial Total Mass: %.2f kg", current_sc.total_mass)
 
     for i in range(max_iterations):
-        # ---------------------------------------------------------
-        # 1. PHYSICS & ENVIRONMENT (Read-only on current_sc)
-        # ---------------------------------------------------------
-        # Example:
-        # env_density = atmosphere_model(current_sc.orbit.altitude)
-        # drag_results = drag_model(current_sc.geometry, env_density, current_sc.orbit.velocity)
-        
-        # Placeholder calculations
-        new_density = 1e-12 
-        new_drag_force = 0.05
-        new_cd = current_sc.geometry.drag_coeff
-        
-        
-        # ---------------------------------------------------------
-        # 2. SUBSYSTEM SIZING & BUDGETS
-        # ---------------------------------------------------------
-        # Example:
-        # req_power = propulsion_model(current_sc.thruster, new_drag_force)
-        # solar_mass = power_system_sizing(req_power)
-        # struct_mass = structural_sizing(current_sc.mass_budget)
+        previous_sc = current_sc
 
-        # Placeholder calculations (replace with your modules)
-        new_structure_mass = 150.0
-        new_payload_mass = 50.0
-        
-        # Calculate new total mass based on sized components
-        calculated_dry_mass = new_structure_mass + new_payload_mass # + ...
-        new_total_mass = calculated_dry_mass + current_sc.thruster.propellant_mass
-        
-        
-        # ---------------------------------------------------------
-        # 3. STATE UPDATE (Creating the next iteration)
-        # ---------------------------------------------------------
-        # Feed all the results from steps 1 and 2 into the update method.
-        # This keeps the history completely immutable and traceable.
-        
-        next_sc = current_sc.update(
-            total_mass=new_total_mass,
-            
-            # Update nested subsystems via dictionary syntax
-            orbit={
-                "density": new_density
-            },
+        drag_force = float(sum(drag_model(previous_sc)))
+        prop_area_candidate, prop_power, required_thrust = propulsion_model(previous_sc, drag_force)
+        prop_area, refuel_area, intake_area = _bound_capture_areas(min_refuel_area, prop_area_candidate)
+
+        pre_budget_sc = previous_sc.update(
             geometry={
-                "drag_coeff": new_cd
+                "A_in": intake_area,
+                "A_ref": refuel_area,
+                "A_prop": prop_area,
             },
-            mass_budget={
-                "structure": new_structure_mass,
-                "payload": new_payload_mass
-            }
+            thruster={
+                "power_required": prop_power,
+                "thrust": required_thrust,
+            },
         )
-        
-        history.append(next_sc)
-        
-        
-        # ---------------------------------------------------------
-        # 4. CONVERGENCE CHECK
-        # ---------------------------------------------------------
-        # We check if the difference in calculated total mass is 
-        # below the acceptable tolerance.
-        residual = abs(next_sc.total_mass - current_sc.total_mass)
-        
-        logger.debug(f"Iter {i}: Mass = {next_sc.total_mass:.2f} kg | Residual = {residual:.6f}")
-        
-        if residual <= mass_tolerance:
-            logger.info(f"Convergence reached at iteration {i}! Final Mass: {next_sc.total_mass:.2f} kg")
-            converged = True
-            current_sc = next_sc
-            break
-            
-        # If not converged, step forward for the next loop
-        current_sc = next_sc
-        
-        
-    if not converged:
-        logger.warning(f"Sizing loop FAILED to converge after {max_iterations} iterations. "
-                       f"Final residual: {residual:.5f} kg")
 
+        first_budget = budjet_model(pre_budget_sc)
+        deployable_area = power_model(
+            pre_budget_sc,
+            power_required=first_budget[BudgetIdx.POWER_TOTAL],
+            efficiency=pre_budget_sc.power.eff,
+            alignment_deg=pre_budget_sc.power.alignment,
+        )
+        area_budget_sc = pre_budget_sc.update(geometry={"A_solar": deployable_area})
+
+        final_budget = budjet_model(area_budget_sc)
+        current_sc = _apply_budget_array(area_budget_sc, final_budget)
+        history.append(current_sc)
+
+        residual = abs(current_sc.total_mass - previous_sc.total_mass)
+        logger.debug("Iter %d: Mass = %.6f kg | Residual = %.6e", i, current_sc.total_mass, residual)
+        if residual <= mass_tolerance:
+            logger.info("Convergence reached at iteration %d. Final Mass: %.2f kg", i, current_sc.total_mass)
+            converged = True
+            break
+
+    if not converged:
+        logger.warning(
+            "Sizing loop FAILED to converge after %d iterations. Final residual: %.6f kg",
+            max_iterations,
+            abs(history[-1].total_mass - history[-2].total_mass) if len(history) > 1 else 0.0,
+        )
+
+    # Delta-v sizing is a post-process on the converged (or last) state, not part of convergence.
+    final_budget = budjet_model(current_sc)
+    delta_v_terms = delta_v_model(current_sc, final_budget)
+    current_sc = current_sc.update(mission_profile={"refueling_area": min_refuel_area})
+    history[-1] = current_sc
+
+    logger.info(
+        "Post-sizing delta-v result: required delta-v %.3f m/s, refueling time %.3f days",
+        delta_v_terms["delta_v_total"],
+        delta_v_terms["refueling_time_required"] / (3600.0 * 24.0),
+    )
     return current_sc, converged, history
+
+
+if __name__ == "__main__":
+    final_sc, converged, _ = run_sizing_loop(SpacecraftState())
+    if converged:
+        logger.info("Convergence achieved. Final Total Mass: %.2f kg", final_sc.total_mass)
+    else:
+        logger.warning("Maximum iterations reached without convergence.")
