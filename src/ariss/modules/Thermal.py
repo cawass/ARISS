@@ -4,13 +4,13 @@ Thermal model for ARISS
 This is a simple, 1-node thermal model which assumes a homogenous temperature across the spacecraft body.
 """
 import numpy as np
-from typing import Dict, Tuple
 from dataclasses import dataclass
+
 from ariss.core.spacecraft import SpacecraftState
 from ariss.utils import constants as const
 
 @dataclass(frozen=True)
-class DragDiagnostics:
+class ThermalDiagnostics:
     """Detailed thermal outputs for post-processing.
 
     Attributes
@@ -26,7 +26,7 @@ class DragDiagnostics:
     Q_internal : float
         Internal heating [W]
     Q_radiated : float
-        Heat radiated by spacecraft [W]
+        Heat radiated by spacecraft excluding radiators [W]
     T_max : float
         Maximum experienced temperature
     T_min : float
@@ -44,39 +44,51 @@ class DragDiagnostics:
     T_min: float = 0.0
 
 
-def thermal_model(sc: SpacecraftClass) -> Tuple[Dict[str,float]]:
+def thermal_model(sc: SpacecraftState) -> float:
     """
     Thermal model for the spacecraft
     TODO Elaborate docstring
     """
 
+    # Geometry Calculations
+    H_in = np.sqrt(sc.geometry.A_in /  sc.geometry.AR_in) # Intake height
+    W_in =  sc.geometry.A_in / H_in # Intake width
+    H_body = np.sqrt(sc.geometry.A_body /  sc.geometry.AR_body) # Body height
+    W_body =  sc.geometry.A_body / H_body # Body width
+    # Area of top of body
+    A_body_top = W_body * sc.geometry.L_body
+    # Area of side of body 
+    A_body_side = H_body * sc.geometry.L_body
+    # Projected area of the part of the body exposed to the Sun
+    A_sun_body = 0.5 * (W_in + W_body) * sc.geometry.L_in + W_body * sc.geometry.L_body
+    # Projected area of the part exposed to the Earth
+    A_earth = 0.5 * (H_in + H_body) * sc.geometry.L_in  + H_body * sc.geometry.L_body
+    # Area of top of intake
+    A_in_top = 0.5 * (W_in + W_body) * np.sqrt(np.square(H_in - H_body) + np.square(sc.geometry.L_in))
+    # Area of side of intake
+    A_in_side = 0.5 * (H_in + H_body) * np.sqrt(np.square(W_in - W_body) + np.square(sc.geometry.L_in))
+    # Total effective emissivity area
+    Ae_total = (A_in_top + A_body_top + sc.geometry.A_solar) * sc.thermal.epsilon_therm_solar + sc.geometry.A_in * sc.thermal.epsilon_therm_in + (A_in_top + 2 * A_in_side + A_body_top + 2 * A_body_side + sc.geometry.A_body) * sc.thermal.epsilon_therm_body
 
-
-    
-def thermal_model(sc: SpacecraftClass) -> None:
-
-    # Side area for earth heating
-    S_side = sc.L * sc.H + (sc.H + sc.H_in) * sc.L_in / 2
-    # Radiative area of bus - 1.5 factor for 0.5 intake emmisivity
-    S_rad_bus = sc.H * sc.D * 1.5 + sc.L * sc.H * 2 + sc.L * sc.D + np.pi * (sc.D/2 + sc.D_in/2) * np.sqrt((sc.D_in/2 - sc.D/2) ** 2 + sc.L_in**2) *3/4
-    # S_rad_bus = sc.H * sc.D + sc.L * sc.H * 1.5 + (sc.H_in+sc.H)/2*np.sqrt(sc.L_in**2 + ((sc.H_in-sc.H)/2)**2)*2 + sc.L * sc.D + (sc.D_in+sc.D)/2*np.sqrt(sc.L_in**2 + ((sc.D_in-sc.D)/2)**2)
-    # Radiative area of solar panels
-    S_rad_solar = sc.S_dict['pow'] - (sc.D_in+sc.D)/2*sc.L_in + np.pi * (sc.D/2 + sc.D_in/2) * np.sqrt((sc.D_in/2 - sc.D/2) ** 2 + sc.L_in**2) /4
 
     # Heat input
-    #  Drag - it's assumed the incoming air transfers all its kinetic energy into heat and this is all the heating from drag
-    sc.Q_dict['Q_d'] = 1 / 2 * sc.rho_orb * sc.V_orb ** 3 * (sc.S_dict['ref'] + sc.S_dict['prop'])
-    #  Radiation - assuming the spacecraft is a box with taper with the top having the sun at 90 degrees and same for albedo and infrared
-    sc.Q_dict['Q_s'] = sc._Sc * sc.S_dict['pow'] * (sc._alpha_dict['pow'] * (1 - sc._eta_solar))
-    sc.Q_dict['Q_a'] = sc._alb_Earth * sc._Sc * S_side * sc._alpha_dict['bus']
-    sc.Q_dict['Q_r'] = sc._IR_Earth * S_side * sc._epsilon_dict['bus'] * (sc._R_Earth / (sc.h_orb + sc._R_Earth)) ** 2
-    #  Internal - due to devices on board
-    P_bus = sc.P_tot - sc.P_dict['ref'] - sc._P_prop
-    sc.Q_dict['Q_i'] = P_bus + sc._P_prop * (1 - 0.9) + sc.P_dict['ref'] * (1 - sc._eta_refuel)
+    #  Drag heating - it's assumed the incoming air transfers all its kinetic energy into heat and this is all the heating from drag
+    Q_drag = 0.5 * sc.orbit.density * np.power(sc.orbit.velocity, 3) * sc.geometry.A_in
+    #  Sun heating - assuming sun hits at 90 degrees and solar panels are producing
+    # theoretically there can be 2 cases:
+    # external solar panels: external area + projected body area + projected intake area <--- ASSUMED
+    # no external solar: (projected body + projected intake)_solar*solar+(projected body + projected intake)_body*body 
+    Q_sun = const.SOLAR_CONSTANT * (A_sun_body + sc.geometry.A_solar) * (sc.thermal.alpha_solar * (1 - sc.solar.eta_solar))
+    #  Earth albedo heating - assuming side of the spacecraft is hit at 90 degrees
+    Q_albedo = const.SOLAR_CONSTANT * const.EARTH_ALBEDO * A_earth * sc.thermal.alpha_body
+    #  Earth infrared heating - assuming side of the spacecraft is hit at 90 degrees
+    Q_ir = const.EARTH_IR_EMISSION * np.square((const.EARTH_RADIUS / (const.EARTH_RADIUS + sc.orbit.altitude))) * A_earth * sc.thermal.epsilon_therm_body
+    #  Internal heating - due to devices on board
+    Q_internal = sc.power.Power_total - sc.power.Power_prop * sc.thruster.thruster_eff - sc.power.Power_refprop * 0.5 # O.5 PLACEHOLDER UNTIL REFUELLINGSTATE IMPLEMENTED
     
-    # Heat Output
-    sc.Q_dict['Q_o'] = sc._kB * sc._T_eq ** 4 * (S_rad_solar * sc._epsilon_dict['pow'] + S_rad_bus * sc._epsilon_dict['bus'])
+    # Heat output at desired temperature excluding potential radiators
+    Q_radiated = Ae_total * np.power(sc.thermal.T_des, 4) * const.STEFAN_BOLTZMANN
 
     # Final Area - assuming radiators don't absorb anything and back of solar panels are radiators
-    sc.S_dict['therm'] = max(((sc.Q_dict['Q_d'] + sc.Q_dict['Q_s'] + sc.Q_dict['Q_a'] + sc.Q_dict['Q_r'] + sc.Q_dict['Q_i'] - sc.Q_dict['Q_o'])
-                              / (sc._kB * sc._epsilon_dict['therm'] * sc._T_eq ** 4) - sc.S_dict['solar_extended']) / 2, 0)
+    return max(((Q_drag + Q_sun + Q_albedo + Q_ir + Q_internal - Q_radiated)/ (const.STEFAN_BOLTZMANN * np.power(sc.thermal.T_des, 4) * sc.thermal.epsilon_therm_body) - sc.geometry.A_solar)/2, 0)
+
