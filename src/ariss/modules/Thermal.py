@@ -1,12 +1,58 @@
-import os
-import sys
+"""
+Thermal model for ARISS
+
+This is a simple, 1-node thermal model which assumes a homogenous temperature across the spacecraft body.
+"""
 import numpy as np
+from typing import Dict, Tuple
+from dataclasses import dataclass
+from ariss.core.spacecraft import SpacecraftState
+from ariss.utils import constants as const
 
-from iteration.SpacecraftClass import SpacecraftClass
+@dataclass(frozen=True)
+class DragDiagnostics:
+    """Detailed thermal outputs for post-processing.
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    Attributes
+    ----------
+    Q_drag : float
+        Drag heating [W]
+    Q_sun : float
+        Sun radiation heating [W]
+    Q_albedo : float
+        Earth albedo heating [W]
+    Q_ir : float
+        Earth infrared heating [W]
+    Q_internal : float
+        Internal heating [W]
+    Q_radiated : float
+        Heat radiated by spacecraft [W]
+    T_max : float
+        Maximum experienced temperature
+    T_min : float
+        Minimum experienced temperature
+    """
+
+    Q_drag: float = 0.0
+    Q_sun: float = 0.0
+    Q_albedo: float = 0.0
+    Q_ir: float = 0.0
+    Q_internal: float = 0.0
+    Q_radiated: float = 0.0
+
+    T_max: float = 0.0
+    T_min: float = 0.0
 
 
+def thermal_model(sc: SpacecraftClass) -> Tuple[Dict[str,float]]:
+    """
+    Thermal model for the spacecraft
+    TODO Elaborate docstring
+    """
+
+
+
+    
 def thermal_model(sc: SpacecraftClass) -> None:
 
     # Side area for earth heating
