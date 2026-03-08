@@ -10,7 +10,6 @@ class MissionProfileState:
     delta_v: float = 1157.8
     refueling_time: float = 12000960.0
     required_fuel: float = 0
-    mission_height: float = 188
 
     def update(self, **kwargs: Any) -> "MissionProfileState":
         return replace(self, **kwargs)
@@ -132,9 +131,10 @@ class PowerState:
 @dataclass(frozen=True)
 class RefuelingState:
 
-    epsilon_refuel: float = 0.7 # Mass intake efficiency of the refueling process
+    coll_eff: float = 0.7 # Mass intake efficiency
     t_refuel: float = 20*24*3600 # time to refuel in seconds
     eta_refuel: float = 0.1 # Power efficiency of the refueling process
+    m_dot_ref: float = 0 # mass flow going into the tanks
 
     p_tank: float = 100000 # Pressure of the tank in Pascals
     V_prop: float = 0.7 # Volume of the propellant in m^3
@@ -164,11 +164,6 @@ class ThermalState:
 
     def update(self, **kwargs: Any) -> "ThermalState":
         return replace(self, **kwargs)
-    
-@dataclass(frozen=False)
-class RefuelingState:
-    m_flow: float = 2*10**(-6)
-    coll_eff: float = 0.35
 
 @dataclass(frozen=True)
 class SpacecraftState:
