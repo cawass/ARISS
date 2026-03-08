@@ -6,7 +6,7 @@ from typing import Any
 
 @dataclass(frozen=False)
 class MissionProfileState:
-    active_refueling : bool = False
+    active_refueling : bool = True
     delta_v: float = 1157.8
     refueling_time: float = 12000960.0
     required_fuel: float = 0
@@ -17,12 +17,15 @@ class MissionProfileState:
 
 @dataclass(frozen=False)
 class OrbitState:
-    altitude: float = 0
-    velocity: float = 0
-    density: float = 0
-    temperature: float = 0
-    molar_mass: float = 0
+    altitude: float = 0 # [km] Orbital altitude of the spacecraft
+    velocity: float = 0 # [m/s] Orbital velocity
+    density: float = 0 # [kg/m3] Density of the atmosphere at orbital height
+    p_orb: float = 1e-5 # [Pa] Pressure of the atmosphere at orbital height
+    temperature: float = 0 # [K] Temperature of the atmosphere at orbital height
+    molar_mass: float = 0 # 
     alpha: float = 0
+    gamma: float = 1.4 # Specific heat ratio of the air at altitude
+    R_spec:float = 287.0 # Specific gas constant R_universal / molar_mass
 
 @dataclass(frozen=False)
 class DragState:
@@ -79,6 +82,7 @@ class ThrusterState:
     thruster_eff: float = 0.53
     power_required: float = 5000*thruster_eff
     propellant_mass: float = 0.0
+    m_flow: float = 1e-3 # Mass flow going through the thruster
     def update(self, **kwargs: Any) -> "ThrusterState":
         return replace(self, **kwargs)
     
@@ -128,13 +132,13 @@ class PowerState:
         return replace(self, **payload)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=False)
 class RefuelingState:
 
     coll_eff: float = 0.7 # Mass intake efficiency
     t_refuel: float = 20*24*3600 # time to refuel in seconds
     eta_refuel: float = 0.1 # Power efficiency of the refueling process
-    m_dot_ref: float = 0 # mass flow going into the tanks
+    m_flow: float =  1e-3 # mass flow going into the tankse
 
     p_tank: float = 100000 # Pressure of the tank in Pascals
     V_prop: float = 0.7 # Volume of the propellant in m^3
