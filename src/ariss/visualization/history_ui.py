@@ -26,7 +26,7 @@ except Exception:  # pragma: no cover
     ttk = None
 
 from ariss.core.spacecraft import GeometryState, SpacecraftState
-from ariss.modules.Budjects import sizing_model
+from ariss.modules.Budgets import sizing_model
 from ariss.modules.Drag import drag_model
 from ariss.modules.Power import power_model
 from ariss.modules.Propulsion import propulsion_model

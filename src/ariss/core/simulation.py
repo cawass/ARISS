@@ -11,7 +11,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from ariss.core.spacecraft import SpacecraftState
-from ariss.modules.Budjects import sizing_model
+from ariss.modules.Budgets import sizing_model
 from ariss.modules.DeltaV import delta_v_model
 from ariss.modules.Drag import drag_model
 from ariss.modules.Power import power_model
