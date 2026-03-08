@@ -19,7 +19,6 @@ class PropulsionDiagnostics:
 def propulsion_model(sc):
 
     exhaust_velocity = const.EARTH_GRAVITY * sc.thruster.specific_impulse
-    epsilon = sc.refueling.coll_eff
     h_in = np.sqrt(sc.geometry.A_in / sc.geometry.AR_in)
     w_in = sc.geometry.A_in / h_in
     h_body = np.sqrt(sc.geometry.A_body / sc.geometry.AR_body)

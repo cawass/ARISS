@@ -588,7 +588,9 @@ def _style_3d_axis(axis, title: str) -> None:
 
 
 def _drag_x_spacecraft_frame(total_length: float, x_values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    x_spacecraft = np.clip(total_length - np.asarray(x_values, dtype=float), 0.0, total_length)
+    # Diagnostics already provide axial coordinates in the spacecraft frame.
+    # Keep that orientation and only clip/sort for robust interpolation/plotting.
+    x_spacecraft = np.clip(np.asarray(x_values, dtype=float), 0.0, total_length)
     order = np.argsort(x_spacecraft)
     return x_spacecraft[order], order
 
