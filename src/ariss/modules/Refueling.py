@@ -16,7 +16,7 @@ def refueling_model(sc: SpacecraftState) -> float:
     # Calculate area needed for refuelling
     A_ref = sc.mass.M_prop / (sc.refueling.t_refuel * sc.orbit.density * sc.orbit.velocity * sc.refueling.epsilon_refuel)
 
-    if sc.refueling.active_refuel:
+    if sc.mission_profile.active_refueling:
 
         # Calculate the work done on the fluid
         m_dot_b = sc.orbit.rho_orb * sc.orbit.V_orb * sc.geometry.A_ref * sc.refueling.epsilon_refuel # Mass flow rate after the intake

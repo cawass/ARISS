@@ -6,7 +6,7 @@ from typing import Any
 
 @dataclass(frozen=False)
 class MissionProfileState:
-    refueling_mission : bool = False
+    active_refueling : bool = False
     delta_v: float = 1157.8
     refueling_time: float = 12000960.0
     required_fuel: float = 0
@@ -131,7 +131,6 @@ class PowerState:
 
 @dataclass(frozen=True)
 class RefuelingState:
-    active_refuel: bool = False
 
     epsilon_refuel: float = 0.7 # Mass intake efficiency of the refueling process
     t_refuel: float = 20*24*3600 # time to refuel in seconds
