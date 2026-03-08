@@ -59,13 +59,13 @@ class GeometryState:
     epsilon_rad: float = 0.1
     epsilon_in_norm: float = 0.1
 
-    A_in: float = 4.0387
-    A_body: float = 0.5
-    A_solar: float = 5
-    A_rad: float = 0.0
-    A_ref: float =  2
-    A_prop: float = 2
-    A_in_drag: float = 2
+    A_in: float = 4.0387 # [m2] Total area of the intake
+    A_body: float = 0.5 # [m2] Cross sectional area of the body
+    A_solar: float = 5 # [m2] Solar panel area (Extended solar panel shadow)
+    A_rad: float = 0.0 # [m2] Radiator area
+    A_ref: float =  2 # [m2] Area of the intake corresponding to the massflow that goes into the tanks
+    A_prop: float = 2  # [m2] Area of the intake corresponding to the massflow that goes towards drag compensation
+    A_in_drag: float = 2 # [m2] Area of the intake * (1 - collection efficiency)
 
     L_in: float = 2.26
     L_body: float = 2.80
