@@ -31,7 +31,7 @@ def run_sizing_loop(
     relaxation_factor: float = 0.3,
 ) -> Tuple[SpacecraftState, bool, List[SpacecraftState]]:
 
-    orbit_updates = orbit_updates_from_height(loop_sc.mission_profile.mission_height)
+    orbit_updates = orbit_updates_from_height(loop_sc.orbit.altitude)
     loop_sc = replace(loop_sc, orbit=replace(loop_sc.orbit, **orbit_updates))
     relaxation_factor = min(max(float(relaxation_factor), 0.0), 1.0)
 

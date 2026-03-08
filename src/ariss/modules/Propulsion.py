@@ -43,7 +43,7 @@ def propulsion_model(sc):
     sc.orbit.velocity = orbit_updates_from_density(sc.orbit.density)["velocity"]
     sc.thruster.m_flow = sc.geometry.A_prop*sc.orbit.velocity*sc.orbit.density
 
-    if sc.mission_profile.refueling_mission:
+    if sc.mission_profile.active_refueling:
         sc.mission_profile.required_fuel = sc.mass.Mass_total*(np.exp((sc.mission_profile.delta_v)/(exhaust_velocity))-1)
         sc.refueling.m_flow = sc.mission_profile.required_fuel/sc.mission_profile.refueling_time
         sc.geometry.A_ref = sc.refueling.m_flow/(sc.orbit.density*sc.orbit.velocity)
