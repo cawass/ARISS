@@ -39,6 +39,7 @@ def propulsion_model(sc, drag_force: float, return_diagnostics: bool = False):
     mass_flow_rate = sc.orbit.density * sc.orbit.velocity * required_prop_area
     required_thrust = mass_flow_rate * exhaust_velocity
     required_prop_power = 1/2 * mass_flow_rate * (exhaust_velocity ** 2)
+    sc.thruster.m_dot = mass_flow_rate
 
     if return_diagnostics:
         diagnostics = PropulsionDiagnostics(

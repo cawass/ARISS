@@ -52,6 +52,8 @@ class OrbitState:
     temperature: float = 1000.0
     molar_mass: float = 0.02897
     alpha: float = 0.0
+    gamma: float = 1.4
+    R_spec: float = 287.058
 
     @property
     def h_orb(self) -> float:
@@ -71,7 +73,6 @@ class OrbitState:
 
     def update(self, **kwargs: Any) -> "OrbitState":
         return replace(self, **_normalize_orbit_kwargs(dict(kwargs)))
-
 
 @dataclass(frozen=True)
 class GeometryState:
@@ -134,6 +135,7 @@ class ThrusterState:
     specific_impulse: float = 3500.0
     power_required: float = 0.0
     propellant_mass: float = 0.0
+    m_dot: float = 0.0
 
     def update(self, **kwargs: Any) -> "ThrusterState":
         return replace(self, **kwargs)
@@ -184,7 +186,12 @@ class PowerState:
 @dataclass(frozen=True)
 class RefuelingState:
     active_refuel: bool = False
-    eta_refuel: float = 0.7
+
+    epsilon_refuel: float = 0.7 # Mass intake efficiency of the refueling process
+    t_refuel: float = 20*24*3600 # time to refuel in seconds
+    eta_refuel: float = 0.1 # Power efficiency of the refueling process
+
+    p_tank: float = 100000 # Pressure of the tank in Pascals
 
     def update(self, **kwargs: Any) -> "RefuelingState":
         return replace(self, **kwargs)
