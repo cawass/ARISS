@@ -1,5 +1,6 @@
 """Main ARISS sizing loop and post-processing."""
 
+from ariss.modules.Refueling import refueling_model
 import logging
 import sys
 from dataclasses import replace
@@ -45,6 +46,8 @@ def run_sizing_loop(
         loop_sc = deepcopy(loop_sc)        
         sizing_model(loop_sc)
         propulsion_model(loop_sc)
+        sizing_model(loop_sc)
+        refueling_model(loop_sc)
         sizing_model(loop_sc)
         drag_model(loop_sc)
         sizing_model(loop_sc)
