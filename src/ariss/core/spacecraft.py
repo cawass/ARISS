@@ -4,11 +4,13 @@ import tomli_w
 from dataclasses import asdict, dataclass, field, fields, is_dataclass, replace
 from typing import Any
 
-@dataclass(frozen=True)
+@dataclass(frozen=False)
 class MissionProfileState:
-    delta_v: float = 2000.0
-    refueling_area: float = 1.0
-    mission_height: float = 120
+    refueling_mission : bool = False
+    delta_v: float = 1157.8
+    refueling_time: float = 12000960.0
+    required_fuel: float = 0
+    mission_height: float = 188
 
     def update(self, **kwargs: Any) -> "MissionProfileState":
         return replace(self, **kwargs)
@@ -16,20 +18,28 @@ class MissionProfileState:
 
 @dataclass(frozen=False)
 class OrbitState:
-    altitude: float = 0
-    velocity: float = 0
-    density: float = 0
-    temperature: float = 0
+    altitude: float = 188
+    velocity: float = 7700
+    density: float = 2*10**(-10)
+    temperature: float = 300
     molar_mass: float = 0
     alpha: float = 0
 
 @dataclass(frozen=False)
 class DragState:
-    drag_total: float = 0.0
-    drag_solar: float = 0.0
-    drag_rad: float = 0.0
-    drag_body: float = 0.0
-    drag_inlet: float = 0.0
+    cd_solar: float = 0.2
+    cd_rad: float = 0.2
+    cd_body_side: float = 0.2
+    cd_inlet_side: float = 0.2
+    cd_inlet_front: float = 0.2
+
+
+    drag_total: float = 1
+    drag_solar: float = 0.2
+    drag_rad: float = 0.2
+    drag_body_side: float = 0.2
+    drag_inlet_side: float = 0.2
+    drag_inlet_front: float = 0.2
 
 @dataclass(frozen=False)
 class GeometryState:
@@ -41,17 +51,19 @@ class GeometryState:
     AR_solar: float = 0.5
     AR_rad: float = 0.3
 
-    epsilon_in: float = 0.6
-    epsilon_body: float = 0.6
-    epsilon_solar: float = 0.6
-    epsilon_rad: float = 0.6
+    epsilon_in: float = 0.1
+    epsilon_body: float = 0.1
+    epsilon_solar: float = 0.1
+    epsilon_rad: float = 0.1
+    epsilon_in_norm: float = 0.1
 
     A_in: float = 4.0387
-    A_body: float = 1.21
-    A_solar: float = 0
+    A_body: float = 0.5
+    A_solar: float = 5
     A_rad: float = 0.0
-    A_ref: float = 2.2
-    A_prop: float = 1.0
+    A_ref: float =  2
+    A_prop: float = 2
+    A_in_drag: float = 2
 
     L_in: float = 2.26
     L_body: float = 2.80
@@ -63,11 +75,11 @@ class GeometryState:
 
 @dataclass(frozen=False)
 class ThrusterState:
-    thrust: float = 0.0
+    thrust: float = 0.1039
     specific_impulse: float = 5500 
     thruster_eff: float = 0.53
     power_required: float = 5000*thruster_eff
-    propellant_mass: float = 0.0
+    m_flow: float = 2*10**(-6)
     def update(self, **kwargs: Any) -> "ThrusterState":
         return replace(self, **kwargs)
     
@@ -75,8 +87,8 @@ class ThrusterState:
 class RateState:
     R_mass_volume_in: float = 10
     R_mass_volume_body: float = 10
-    R_mass_surface_solar: float = 10
-    R_mass_surface_rad: float = 10
+    R_mass_surface_solar: float = 5
+    R_mass_surface_rad: float = 5
 
     def update(self, **kwargs: Any) -> "RateState":
         return replace(self, **kwargs)
@@ -91,7 +103,7 @@ class MassState:
     Mass_prop: float = 61
     Mass_ADCS: float = 20
     Mass_payload: float = 24
-    Mass_refprop: float = 300
+    Mass_refprop: float = 700
     Mass_total: float = 0.0
 
     def update(self, **kwargs: Any) -> "MassState":
@@ -101,7 +113,7 @@ class MassState:
 @dataclass(frozen=False)
 class PowerState:
     Power_in: float = 0.0
-    Power_body: float = 0.0
+    Power_body: float = 3000.0
     Power_solar: float = 0.0
     Power_rad: float = 0.0
     Power_prop: float = 0.0
@@ -115,7 +127,7 @@ class PowerState:
 
 @dataclass(frozen=True)
 class SolarState:
-    av_aligment: float = 60
+    av_aligment: float = 0
     eta_solar: float = 0.3
     eta_power: float = 0.95
 
@@ -135,6 +147,11 @@ class ThermalState:
 
     def update(self, **kwargs: Any) -> "ThermalState":
         return replace(self, **kwargs)
+    
+@dataclass(frozen=False)
+class RefuelingState:
+    m_flow: float = 2*10**(-6)
+    coll_eff: float = 0.35
 
 @dataclass(frozen=True)
 class SpacecraftState:
@@ -147,6 +164,7 @@ class SpacecraftState:
     solar: SolarState = field(default_factory=SolarState)
     thermal: ThermalState = field(default_factory=ThermalState)
     drag: DragState = field(default_factory=DragState)
+    refueling: RefuelingState = field(default_factory=RefuelingState)
     mission_profile: MissionProfileState = field(default_factory=MissionProfileState)
 
     @classmethod

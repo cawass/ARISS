@@ -43,6 +43,29 @@ class AtmosphereSample:
     orbital_velocity: float
     dynamic_pressure: float
 
+    def to_orbit_updates(self) -> dict[str, float]:
+        return {
+            "altitude": self.height_km,
+            "density": self.density,
+            "temperature": self.temperature,
+            "molar_mass": self.molar_mass,
+            "velocity": self.orbital_velocity,
+        }
+
+    def to_properties(self) -> dict[str, float]:
+        return {
+            "altitude_km": self.height_km,
+            "density": self.density,
+            "temperature": self.temperature,
+            "specific_gas_constant": self.specific_gas_constant,
+            "molar_mass": self.molar_mass,
+            "o2_density": self.o2_density,
+            "n2_density": self.n2_density,
+            "o_density": self.o_density,
+            "orbital_velocity": self.orbital_velocity,
+            "dynamic_pressure": self.dynamic_pressure,
+        }
+
 def atmos(height_array_km: np.ndarray | float) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Return ``rho, T, R_specific, O2, N2, O`` for altitudes in km."""
     _require_pymsis()
@@ -120,13 +143,13 @@ def sample_atmosphere_at_height(height_km: float) -> AtmosphereSample:
 def orbit_updates_from_height(height_km: float) -> dict[str, float]:
     """Build orbit-state update payload from mission height in km."""
     sample = sample_atmosphere_at_height(height_km)
-    return {
-        "altitude": sample.height_km,
-        "density": sample.density,
-        "temperature": sample.temperature,
-        "molar_mass": sample.molar_mass,
-        "velocity": sample.orbital_velocity,
-    }
+    return sample.to_orbit_updates()
+
+
+def atmosphere_properties_from_height(height_km: float) -> dict[str, float]:
+    """Return a serializable full-property atmosphere payload for one altitude in km."""
+    sample = sample_atmosphere_at_height(height_km)
+    return sample.to_properties()
 
 
 def height_from_density(
@@ -137,7 +160,8 @@ def height_from_density(
 ) -> float:
     """Estimate altitude [km] for a target density [kg/m^3] via interpolation."""
     _require_pymsis()
-    target = max(float(target_density), 1.0e-30)
+    target = float(np.nan_to_num(float(target_density), nan=1.0e-30, posinf=1.0e30, neginf=1.0e-30))
+    target = max(target, 1.0e-30)
 
     height_array = np.linspace(height_min_km, height_max_km, samples)
     density, _, _, _, _, _ = atmos(height_array)
@@ -162,5 +186,16 @@ def orbit_updates_from_density(target_density: float) -> dict[str, float]:
     """Build orbit-state update payload from target density [kg/m^3]."""
     height_km = height_from_density(target_density)
     updates = orbit_updates_from_height(height_km)
-    updates["density"] = float(target_density)
+    target = float(target_density)
+    if np.isfinite(target) and target > 0.0:
+        updates["density"] = target
     return updates
+
+
+def atmosphere_properties_from_density(target_density: float) -> dict[str, float]:
+    """Return a full-property atmosphere payload for a target density [kg/m^3]."""
+    height_km = height_from_density(target_density)
+    properties = atmosphere_properties_from_height(height_km)
+    properties["model_density"] = properties["density"]
+    properties["density"] = float(target_density)
+    return properties

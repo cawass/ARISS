@@ -90,15 +90,22 @@ def drag_model(sc, n_points: int = 200):
 
     S = sc.orbit.velocity * np.sqrt(sc.orbit.molar_mass / (2.0 * const.UNIVERSAL_GAS * sc.orbit.temperature))
 
-    CD_solar = _drag_coefficient(S, sc.geometry.epsilon_solar, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des)
-    CD_rad = _drag_coefficient(S, sc.geometry.epsilon_rad, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des)
-    CD_body = _drag_coefficient(S, sc.geometry.epsilon_body, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des)
-    CD_in = _drag_coefficient(S, sc.geometry.epsilon_in, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des)
 
     H_in = np.sqrt( sc.geometry.A_in /  sc.geometry.AR_in)
     W_in =  sc.geometry.A_in / H_in
     H_body = np.sqrt( sc.geometry.A_body /  sc.geometry.AR_body)
     W_body =  sc.geometry.A_body / H_body
+
+    CD_solar = _drag_coefficient(S, sc.geometry.epsilon_solar, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des)
+    CD_rad = _drag_coefficient(S, sc.geometry.epsilon_rad, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des)
+    CD_body = _drag_coefficient(S, sc.geometry.epsilon_body, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des)
+    CD_in_norm = _drag_coefficient(S, sc.geometry.epsilon_in_norm, sc.orbit.alpha + np.pi/2, sc.orbit.temperature, sc.thermal.T_des)
+
+    if W_in < W_body:
+        alpha_in = np.arctan(np.abs(W_body-W_in)/sc.geometry.L_in)
+        CD_in = _drag_coefficient(S, sc.geometry.epsilon_in, alpha_in, sc.orbit.temperature, sc.thermal.T_des)
+    else:
+        CD_in = _drag_coefficient(S, sc.geometry.epsilon_in, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des)
 
     x_array: list[float] = []
     fz_array: list[float] = []
@@ -117,9 +124,14 @@ def drag_model(sc, n_points: int = 200):
         fz = _capture_fraction(hz, x, sc.orbit.velocity, sc.orbit.temperature,  sc.geometry.L_body,  sc.geometry.L_in, sc.orbit.molar_mass)
         fy = _capture_fraction(hy, x, sc.orbit.velocity, sc.orbit.temperature,  sc.geometry.L_body,  sc.geometry.L_in, sc.orbit.molar_mass)
 
+        if sc.geometry.A_in < sc.geometry.A_body:
+            fz = 1
+            fy = 1
+
         x_array.append(float(x))
         fz_array.append(float(fz))
         fy_array.append(float(fy))
+
 
        
         if x >=  sc.geometry.L_body:
@@ -140,13 +152,13 @@ def drag_model(sc, n_points: int = 200):
         D_in_cumulative.append(D_in_cumulative[-1] + inlet_increment)
 
 
-    dynamic_pressure = 0.5 * (sc.orbit.velocity ** 2)
-    sc.drag.drag_solar = float(dynamic_pressure * CD_solar * sc.geometry.A_solar)
-    sc.drag.drag_rad = float(dynamic_pressure * CD_rad * sc.geometry.A_rad)
-    sc.drag.drag_body = float(dynamic_pressure * D_body_cumulative[-1])
-    sc.drag.drag_inlet = float(dynamic_pressure * D_in_cumulative[-1])
+    sc.drag.cd_solar =  CD_solar
+    sc.drag.cd_rad = CD_rad
+    sc.drag.cd_body_side = D_body_cumulative[-1]/((2*W_body+ 2*H_body)*sc.geometry.L_body)
+    sc.drag.cd_inlet_side = D_in_cumulative[-1]/((2*W_in+ 2*H_in+2*W_body+ 2*H_body)/2*sc.geometry.L_in)
+    sc.drag.cd_inlet_front = CD_in_norm    
 
-    sc.drag.drag_total = sc.drag.drag_solar + sc.drag.drag_rad + sc.drag.drag_body + sc.drag.drag_inlet
+
     print(f"Total Drag: {sc.drag.drag_total:.6e} N")
     diagnostics = DragDiagnostics(
         x_array=x_array,

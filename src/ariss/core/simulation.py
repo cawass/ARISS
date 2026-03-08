@@ -4,6 +4,8 @@ import logging
 import sys
 from dataclasses import replace
 from copy import deepcopy
+from dataclasses import fields, is_dataclass
+from numbers import Real
 from pathlib import Path
 from typing import List, Tuple
 
@@ -12,7 +14,6 @@ if __package__ in (None, ""):
 
 from ariss.core.spacecraft import SpacecraftState
 from ariss.modules.Budjects import sizing_model
-from ariss.modules.DeltaV import delta_v_model
 from ariss.modules.Drag import drag_model
 from ariss.modules.Power import power_model
 from ariss.modules.Propulsion import propulsion_model
@@ -22,10 +23,17 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 residual = 10e10
 
-def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_tolerance: float = 1e-3) -> Tuple[SpacecraftState, bool, List[SpacecraftState]]:
+
+def run_sizing_loop(
+    loop_sc: SpacecraftState,
+    max_iterations: int = 200,
+    mass_tolerance: float = 1e-3,
+    relaxation_factor: float = 0.3,
+) -> Tuple[SpacecraftState, bool, List[SpacecraftState]]:
 
     orbit_updates = orbit_updates_from_height(loop_sc.mission_profile.mission_height)
     loop_sc = replace(loop_sc, orbit=replace(loop_sc.orbit, **orbit_updates))
+    relaxation_factor = min(max(float(relaxation_factor), 0.0), 1.0)
 
 
     logger.info("Starting sizing loop. Initial Total Mass: %.2f kg", loop_sc.mass.Mass_total)
@@ -34,8 +42,11 @@ def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_to
     converged = False
     for i in range(max_iterations):
         history.append(deepcopy(loop_sc))
-        drag_model(loop_sc)
+        loop_sc = deepcopy(loop_sc)        
+        sizing_model(loop_sc)
         propulsion_model(loop_sc)
+        sizing_model(loop_sc)
+        drag_model(loop_sc)
         sizing_model(loop_sc)
         power_model(loop_sc)
         sizing_model(loop_sc)
@@ -47,6 +58,8 @@ def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_to
             converged = True
             history.append(deepcopy(loop_sc))
             break
+        if loop_sc.orbit.altitude > 900:
+            break
 
     if not converged:
         logger.warning(
@@ -56,8 +69,8 @@ def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_to
         )
 
 
-    return loop_sc
+    return loop_sc, converged, history
 
 
 if __name__ == "__main__":
-    final_sc  = run_sizing_loop(SpacecraftState())
+    final_sc, _, _ = run_sizing_loop(SpacecraftState())
