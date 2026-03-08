@@ -138,6 +138,7 @@ class RefuelingState:
     eta_refuel: float = 0.1 # Power efficiency of the refueling process
 
     p_tank: float = 100000 # Pressure of the tank in Pascals
+    V_prop: float = 0.7 # Volume of the propellant in m^3
 
     def update(self, **kwargs: Any) -> "RefuelingState":
         return replace(self, **kwargs)
