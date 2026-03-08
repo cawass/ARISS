@@ -18,10 +18,10 @@ class MissionProfileState:
 
 @dataclass(frozen=False)
 class OrbitState:
-    altitude: float = 188
-    velocity: float = 7700
-    density: float = 2*10**(-10)
-    temperature: float = 300
+    altitude: float = 0
+    velocity: float = 0
+    density: float = 0
+    temperature: float = 0
     molar_mass: float = 0
     alpha: float = 0
 
@@ -79,7 +79,7 @@ class ThrusterState:
     specific_impulse: float = 5500 
     thruster_eff: float = 0.53
     power_required: float = 5000*thruster_eff
-    m_flow: float = 2*10**(-6)
+    propellant_mass: float = 0.0
     def update(self, **kwargs: Any) -> "ThrusterState":
         return replace(self, **kwargs)
     
@@ -123,6 +123,23 @@ class PowerState:
     Power_total: float = 300.0
 
     def update(self, **kwargs: Any) -> "PowerState":
+        payload = dict(kwargs)
+        if "aligment" in payload and "alignment" not in payload:
+            payload["alignment"] = payload.pop("aligment")
+        return replace(self, **payload)
+
+
+@dataclass(frozen=True)
+class RefuelingState:
+    active_refuel: bool = False
+
+    epsilon_refuel: float = 0.7 # Mass intake efficiency of the refueling process
+    t_refuel: float = 20*24*3600 # time to refuel in seconds
+    eta_refuel: float = 0.1 # Power efficiency of the refueling process
+
+    p_tank: float = 100000 # Pressure of the tank in Pascals
+
+    def update(self, **kwargs: Any) -> "RefuelingState":
         return replace(self, **kwargs)
 
 @dataclass(frozen=True)
