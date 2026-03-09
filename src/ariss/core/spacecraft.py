@@ -220,17 +220,6 @@ class ThermalState:
     def update(self, **kwargs: Any) -> "ThermalState":
         return replace(self, **kwargs)
 
-
-@dataclass(frozen=True)
-class RefuelingState:
-    """Holds the refueling parameters."""
-    active_refuel: bool = False # Is the spacecraft active ABEP?
-
-    eta_refuel: float = 0.7 # Refueling efficiency (Power_out / Power_in)
-    
-    def update(self, **kwargs: Any) -> 'RefuelingState':
-        return replace(self, **kwargs)
-
 @dataclass(frozen=True)
 class SpacecraftState:
     orbit: OrbitState = field(default_factory=OrbitState)  # Orbit and atmosphere state.
