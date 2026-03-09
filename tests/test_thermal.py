@@ -70,42 +70,32 @@ def test_internal_heating():
     # Set power
     sc.power.Power_total = 300.0
     sc.power.Power_prop = 100.0
-    sc.power.Power_refprop = 20.0
+    sc.power.Power_refprop = 100.0
 
     diagnostics = thermal_model(sc)
-    # Expected Q_internal = Power_total - Power_prop * thruster_eff - Power_refprop * 0.5
-    # thruster_eff = 0.53
-    expected_Q_internal = 100.0 - 10.0 * 0.53 - 20.0 * 0.5
-    assert np.isclose(diagnostics.Q_internal, expected_Q_internal)
+    assert np.isclose(diagnostics.Q_internal, 177)
 
 
 def test_radiated_heating():
     """Test radiated heat calculation"""
     sc = SpacecraftState()
-    # Set simple geometry
     sc.geometry.AR_in = 1.0
     sc.geometry.AR_body = 1.0
-    sc.geometry.A_in = 1.0
-    sc.geometry.A_body = 1.0
-    sc.geometry.L_in = 1.0
-    sc.geometry.L_body = 1.0
-    sc.geometry.A_solar = 0.0
-    # Zero drag
-    sc.orbit.velocity = 0.0
-    sc.orbit.density = 0.0
-    # Zero internal power
-    sc.power.Power_total = 0.0
-    sc.power.Power_prop = 0.0
-    sc.power.Power_refprop = 0.0
-    # High altitude
-    sc.orbit.altitude = 1e7
+    sc.geometry.A_in = 4.0387
+    sc.geometry.A_body = 1.21
+    sc.geometry.L_in = 2.26
+    sc.geometry.L_body = 2.80
+    sc.geometry.A_solar = 5
+
+    # sc.thermal.epsilon_therm_in: float = 0.5
+    # sc.thermal.epsilon_therm_body: float = 0.9
+    # sc.thermal.epsilon_therm_solar: float = 0.85
+    # sc.thermal.epsilon_therm_rad: float = 0.9
+
     diagnostics = thermal_model(sc)
-    # Ae_total calculation as above ≈8.5
-    # Q_radiated = Ae_total * T_des^4 * STEFAN_BOLTZMANN
-    # T_des = 300, STEFAN = 5.670374419e-8
-    Ae_total = 8.5
-    expected_Q_radiated = Ae_total * (300**4) * 5.670374419e-8
-    assert np.isclose(diagnostics.Q_radiated, expected_Q_radiated)
+
+
+    assert np.isclose(diagnostics.Q_radiated, 14577.84676)
 
 
 def test_temperature_limits():

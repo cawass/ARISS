@@ -87,10 +87,10 @@ def thermal_model(sc: SpacecraftState):
     Q_internal = sc.power.Power_total - sc.power.Power_prop * sc.thruster.thruster_eff - sc.power.Power_refprop * sc.refueling.eta_refuel
     
     # Heat output at desired temperature excluding potential radiators
-    Q_radiated = Ae_total * np.power(sc.thermal.T_des, 4) * const.STEFAN_BOLTZMANN
+    Q_radiated = Ae_total * sc.thermal.T_des**4 * const.STEFAN_BOLTZMANN
 
     # Final Area - assuming radiators don't absorb anything and back of solar panels are radiators
-    sc.geometry.A_rad = max(((Q_drag + Q_sun + Q_albedo + Q_ir + Q_internal - Q_radiated)/ (const.STEFAN_BOLTZMANN * np.power(sc.thermal.T_des, 4) * sc.thermal.epsilon_therm_body) - sc.geometry.A_solar)/2, 0.0)
+    sc.geometry.A_rad = max(((Q_drag + Q_sun + Q_albedo + Q_ir + Q_internal - Q_radiated)/ (const.STEFAN_BOLTZMANN * sc.thermal.T_des**4 * sc.thermal.epsilon_therm_body) - sc.geometry.A_solar)/2, 0.0)
     
     diagnostics = ThermalDiagnostics(
         Q_drag=Q_drag,
