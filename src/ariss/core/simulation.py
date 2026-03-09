@@ -88,9 +88,9 @@ def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_to
         sizing_model(loop_sc)
         power_model(loop_sc)
         sizing_model(loop_sc)
-        # thermal_model(loop_sc)
-        # sizing_model(loop_sc)
-
+        thermal_model(loop_sc)
+        sizing_model(loop_sc)
+        
         # Measure convergence by the change in total spacecraft mass between
         # consecutive saved iterations.
         if i > 0:
