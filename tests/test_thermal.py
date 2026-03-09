@@ -106,7 +106,7 @@ def test_temperature_limits():
     """Test temperature limits (currently not implemented, set to 0.0)"""
     sc = SpacecraftState()
     diagnostics = thermal_model(sc)
-    assert diagnostics.T_max == 0.0
+    assert np.isclose(diagnostics.T_max,285.6,0.001)
     assert diagnostics.T_min == 0.0
 
 
