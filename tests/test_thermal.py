@@ -2,6 +2,7 @@ import pytest
 import numpy as np
 from src.ariss.modules.Thermal import thermal_model
 from src.ariss.core.spacecraft import SpacecraftState
+from src.ariss.utils import constants as const
 from dataclasses import replace
 
 def test_drag_heating():
@@ -107,3 +108,45 @@ def test_temperature_limits():
     diagnostics = thermal_model(sc)
     assert diagnostics.T_max == 0.0
     assert diagnostics.T_min == 0.0
+
+
+def test_radiator_area_zero_cold_case():
+    """Test that radiator area is zero when heat inputs are minimal (cold case)"""
+    sc = SpacecraftState()
+    # Set minimal heat inputs
+    sc.orbit.velocity = 0.0
+    sc.orbit.density = 0.0
+    sc.power.Power_total = 0.0
+    sc.geometry.A_solar = 0.0
+    sc.orbit.altitude = 10000.0  # High altitude to minimize IR heating
+    
+    diagnostics = thermal_model(sc)
+    assert sc.geometry.A_rad == 0.0
+
+
+def test_radiator_area_positive_hot_case():
+    """Test that radiator area is positive when heat inputs exceed radiated heat"""
+    sc = SpacecraftState()
+    # Increase drag heating to exceed radiated heat
+    sc.orbit.velocity = 8000.0
+    sc.orbit.density = 1e-7
+    diagnostics = thermal_model(sc)
+    assert sc.geometry.A_rad > 0.0
+
+
+def test_thermal_balance_at_design_temperature():
+    """Test that at design temperature, heat in equals heat out with radiators"""
+    sc = SpacecraftState()
+    # Set parameters to require radiators
+    sc.orbit.velocity = 8000.0
+    sc.orbit.density = 1e-7
+    diagnostics = thermal_model(sc)
+    Q_in_total = diagnostics.Q_drag + diagnostics.Q_sun + diagnostics.Q_albedo + diagnostics.Q_ir + diagnostics.Q_internal
+    # Total radiator area includes back of solar panels + 2 * additional radiators (double-sided)
+    total_radiator_area = sc.geometry.A_solar + 2 * sc.geometry.A_rad
+    Q_out_total = diagnostics.Q_radiated + total_radiator_area * const.STEFAN_BOLTZMANN * sc.thermal.T_des**4 * sc.thermal.epsilon_therm_body
+    # Should be approximately equal
+    assert np.isclose(Q_in_total, Q_out_total, rtol=1e-6)
+
+
+
