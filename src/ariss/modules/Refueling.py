@@ -1,24 +1,31 @@
-import os
-import sys
+# ============================================================================
+#  ARISS - Atmospheric Refueling Iterative System Solver
+# ----------------------------------------------------------------------------
+#  Description:
+#      Atmospheric refueling power model based on intake mass flow and tank
+#      compression work.
+#
+#  Project:        ARISS
+#  Module:         Refueling.py
+#  Author:         Carlos Carrasco Requejo, Lucas Calderon del Rio
+# ============================================================================
 
-from iteration.SpacecraftClass import SpacecraftClass
+from ariss.core.spacecraft import SpacecraftState
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+def refueling_model(sc: SpacecraftState) -> float:
+    # Skip the compression model entirely when the mission does not require
+    # propellant replenishment.
+    sc.power.Power_refprop = 0.0
 
+    if sc.mission_profile.active_refueling:
+        # Captured atmospheric mass flow routed to the refueling tanks.
 
-def refueling_model(sc: SpacecraftClass) -> None:
+        # Total compressed stream. The thruster line is added because the
+        # architecture currently treats the intake as a single non-bypass flow.
+        m_dot_b = sc.refueling.m_flow + sc.thruster.m_flow
+        sc.power.Power_refprop = 1 / sc.refueling.eta_refuel * 1 / (sc.orbit.gamma - 1) * m_dot_b * sc.orbit.R_spec * sc.thermal.T_des * ((sc.refueling.p_tank / sc.orbit.p_orb) ** ((sc.orbit.gamma - 1) / sc.orbit.gamma) - 1)
 
-    # Calculate the intake area
-    sc.S_dict['ref'] = sc.M_prop / sc._t_refuel / (sc.rho_orb * sc.V_orb * sc._epsilon)
+        # Ideal-gas storage volume at design temperature and tank pressure.
+        sc.refueling.V_prop = sc.mass.Mass_prop * sc.orbit.R_spec * sc.thermal.T_des / sc.refueling.p_tank
 
-    Tb = sc._T_eq  # sc.T_orb * beta ** (sc._gamma - 1)
-
-    # Calculate the work done on the fluid
-    m_dot_b = sc.rho_orb * sc.V_orb * sc.S_dict['ref'] * sc._epsilon # Mass flow rate after the intake
-
-    m_dot_b += sc.m_dot_prop  # Add the propellant mass flow rate to the intake mass flow rate because there is no bypass
-    P2 = 1 / sc._eta_refuel * 1 / (sc._gamma - 1) * m_dot_b * sc._R_spec * Tb * ((sc._p2 / sc._p1) ** ((sc._gamma - 1) / sc._gamma) - 1)
-    sc.V_prop = sc.M_prop * sc._R_spec * sc._T_eq / sc._p2
-
-    # Sum both powers
-    sc.P_dict['ref'] = sc._P1 + P2
+    return sc.power.Power_refprop

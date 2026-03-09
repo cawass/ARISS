@@ -1,8 +1,21 @@
-"""
-Thermal model for ARISS
+# ============================================================================== #
+#       ___    ____  ____  _____ _____
+#      /   |  / __ \/  _// ___// ___/
+#     / /| | / /_/ // / \__ \ \__ \
+#    / ___ |/ _, _// / ___/ /___/ /
+#   /_/  |_/_/ |_/___//____//____/
+#
+#        ARISS — Atmospheric Refueling Iterative System Solver
+# ============================================================================== #
+#  Description:
+#      This is a simple, 1-node thermal model which assumes a homogenous temperature across the spacecraft body.
+#
+#  Project:        ARISS
+#  Module:         Thermal.py
+#  Author:         Jan
+# ============================================================================
 
-This is a simple, 1-node thermal model which assumes a homogenous temperature across the spacecraft body.
-"""
+
 import numpy as np
 from dataclasses import dataclass
 

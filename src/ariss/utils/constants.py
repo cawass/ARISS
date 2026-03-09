@@ -19,7 +19,7 @@ AVOGADRO_NUMBER: Final[float] = 6.02214076e23      # [1/mol]
 BOLTZMANN_CONSTANT: Final[float] = 1.3806452e-23   # [J/K]
 
 # ==========================================
-# Air / Atmospheric Properties (Default assumed values)
+# Air / Atmospheric Properties
 # ==========================================
 MOLAR_MASS_AIR: Final[float] = 21.88e-3            # [kg/mol]
 SPECIFIC_GAS_AIR: Final[float] = UNIVERSAL_GAS / MOLAR_MASS_AIR # [J/(kg * K)]

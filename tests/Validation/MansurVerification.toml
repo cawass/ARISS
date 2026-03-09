@@ -1,0 +1,136 @@
+# ============================================================================== #
+#       ___    ____  ____  _____ _____
+#      /   |  / __ \/  _// ___// ___/
+#     / /| | / /_/ // / \__ \ \__ \
+#    / ___ |/ _, _// / ___/ /___/ /
+#   /_/  |_/_/ |_/___//____//____/
+#
+#        ARISS — Atmospheric Refueling Iterative System Solver
+# ============================================================================== #
+#  Description:
+#      Core module for ARISS (Atmospheric Refueling Iterative System Solver).
+#      Provides numerical routines and simulation utilities for modeling and
+#      solving atmospheric refueling dynamics using iterative methods.
+#
+#  Project:        ARISS
+#  Module:         simulation.py
+#  Author:         Carlos Carrasco Requejo, Lucas Calderon del Rio
+#
+# ============================================================================
+
+
+# Based on the abstract of Tisaev et al. (Acta Astronautica 191, 2022):
+# altitude = 200 km, spacecraft mass = 200 kg, Isp = 5455 s, T/P = 23 mN/kW.
+# Inference for this config: thrust is set from the existing 2500 W power level
+# using T/P = 23 mN/kW, since the TOML schema has no direct T/P field.
+
+[orbit]
+altitude = 200.0
+velocity = 0
+density = 0
+p_orb = 1e-5
+temperature = 0
+molar_mass = 0
+alpha = 0
+gamma = 1.4
+R_spec = 287.0
+
+[geometry]
+S_in = "s"
+S_body = "s"
+AR_in = 1.0
+AR_body = 1.0
+AR_solar = 0.5
+AR_rad = 0.3
+epsilon_in = 0.1
+epsilon_body = 0.1
+epsilon_solar = 0.1
+epsilon_rad = 0.1
+epsilon_in_norm = 0.9
+A_in = 4.0387
+A_body = 0.5
+A_solar = 5
+A_rad = 0.0
+A_ref = 2
+A_prop = 2
+A_in_drag = 2
+L_in = 2.5
+L_body = 2.5
+L_solar = 2.0
+L_rad = 0.5
+
+[thruster]
+thrust = 0.0575
+specific_impulse = 5455.0
+thruster_eff = 0.5
+power_required = 2500.0
+propellant_mass = 0.0
+m_flow = 1e-3
+
+[rate]
+R_mass_volume_in = 10
+R_mass_volume_body = 10
+R_mass_surface_solar = 5
+R_mass_surface_rad = 5
+
+[mass]
+Mass_in = 0.0
+Mass_body = 0.0
+Mass_solar = 0.0
+Mass_rad = 0.0
+Mass_prop = 61
+Mass_ADCS = 20
+Mass_payload = 24
+Mass_refprop = 700
+Mass_total = 200.0
+
+[power]
+Power_in = 0.0
+Power_body = 0.0
+Power_solar = 0.0
+Power_rad = 0.0
+Power_prop = 0.0
+Power_ADCS = 2000.0
+Power_payload = 0.0
+Power_refprop = 0.0
+Power_total = 0.0
+
+[solar]
+av_aligment = 0
+eta_solar = 0.2
+eta_power = 1
+
+[thermal]
+T_des = 320.0
+alpha_body = 0.1
+alpha_solar = 0.9
+epsilon_therm_in = 0.5
+epsilon_therm_body = 0.9
+epsilon_therm_solar = 0.85
+epsilon_therm_rad = 0.9
+
+[drag]
+cd_solar = 0.2
+cd_rad = 0.2
+cd_body_side = 0.2
+cd_inlet_side = 0.2
+cd_inlet_front = 0.2
+drag_total = 1
+drag_solar = 0.2
+drag_rad = 0.2
+drag_body_side = 0.2
+drag_inlet_side = 0.2
+drag_inlet_front = 0.2
+
+[refueling]
+coll_eff = 0.35
+t_refuel = 864000
+eta_refuel = 0.1
+m_flow = 1e-3
+p_tank = 100000
+V_prop = 0.7
+
+[mission_profile]
+active_refueling = false
+delta_v = 1157.8
+required_fuel = 0
