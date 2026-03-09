@@ -1,13 +1,14 @@
 import os
 import sys
+from typing import Any
+
 import numpy as np
 
-from iteration.SpacecraftClass import SpacecraftClass
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
-def thermal_model(sc: SpacecraftClass) -> None:
+def thermal_model(sc: Any) -> None:
 
     # Side area for earth heating
     S_side = sc.L * sc.H + (sc.H + sc.H_in) * sc.L_in / 2

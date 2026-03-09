@@ -6,9 +6,9 @@ import io
 import sys
 import traceback
 from contextlib import redirect_stdout
-from copy import deepcopy
 from dataclasses import dataclass, fields, is_dataclass
 from math import ceil, pi, sqrt
+from os import PathLike
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
@@ -28,9 +28,8 @@ except Exception:  # pragma: no cover
     tk = None
     ttk = None
 
-from ariss.core.simulation import run_sizing_loop
-from ariss.core.spacecraft import GeometryState, SpacecraftState
-from ariss.modules.Drag import DragDiagnostics, drag_model
+from ariss.core.simulation import DragDiagnostics, compute_drag_diagnostics, run_sizing_loop
+from ariss.core.spacecraft import GeometryState, SpacecraftState, load_spacecraft
 from ariss.utils import constants as const
 from ariss.utils.atmosphere import atmosphere_properties_from_height, atmos
 
@@ -38,6 +37,16 @@ NASA_BG = "#ffffff"
 NASA_PANEL = "#f4efe2"
 NASA_GRID = "#b9b1a2"
 NASA_TEXT = "#1c2833"
+HISTORY_PLOT_COLORS = [
+    "#0f4c81",
+    "#d95d39",
+    "#2a9d8f",
+    "#d4a017",
+    "#6d597a",
+    "#457b9d",
+    "#bc4749",
+    "#5f6f52",
+]
 NASA_LINE = [
     "#1a7bc0",
     "#c44e52",
@@ -56,6 +65,7 @@ WAKE_CMAP = cm.get_cmap("RdYlGn_r")
 WAKE_NORM = colors.Normalize(vmin=0.0, vmax=1.0)
 
 PlotSpec = tuple[str | Sequence[str], str, bool]
+SpacecraftInput = SpacecraftState | str | PathLike[str]
 DEFAULT_HISTORY_SPECS: list[PlotSpec] = [
     ("orbit.altitude", "ORBITAL HEIGHT", False),
     (
@@ -236,6 +246,12 @@ def _history_series(history: list[SpacecraftState]) -> dict[str, list[float]]:
     return {key: series[key] for key in sorted(series)}
 
 
+def _resolve_spacecraft_input(sc: SpacecraftInput | None) -> SpacecraftState:
+    if sc is None:
+        return SpacecraftState()
+    return load_spacecraft(sc)
+
+
 def _normalize_paths(path: str | Sequence[str] | None, available_paths: list[str]) -> list[str]:
     if path is None:
         default_path = "mass.Mass_total" if "mass.Mass_total" in available_paths else available_paths[0]
@@ -256,6 +272,21 @@ def _default_title(selected_paths: list[str]) -> str:
     if len(selected_paths) == 2:
         return f"{selected_paths[0]} / {selected_paths[1]}"
     return f"{selected_paths[0]} + {len(selected_paths) - 1} more"
+
+
+def _history_plot_color(index: int) -> str:
+    return HISTORY_PLOT_COLORS[index % len(HISTORY_PLOT_COLORS)]
+
+
+def _selected_listbox_values(listbox) -> list[str]:
+    return [listbox.get(i) for i in listbox.curselection()]
+
+
+def _style_legend_text(legend) -> None:
+    if legend is None:
+        return
+    for text in legend.get_texts():
+        text.set_color(NASA_TEXT)
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -1105,6 +1136,8 @@ class _HistoryPlotterUI:
         if tk is None or ttk is None:
             raise RuntimeError("Tkinter is not available in this environment.")
 
+        # Store the simulation history and the flattened numeric channels used by
+        # the first tab plotting board.
         self.history = history
         self.series = series
         self.paths = list(series.keys())
@@ -1134,6 +1167,8 @@ class _HistoryPlotterUI:
         self._refresh_aux_tabs()
 
     def _build_layout(self, default_specs: list[PlotSpec]) -> None:
+        # Split the UI into a left control rail and a right notebook with the
+        # main history board plus the derived diagnostics tabs.
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_columnconfigure(1, weight=1)
 
@@ -1199,27 +1234,27 @@ class _HistoryPlotterUI:
         plot_tab = tk.Frame(self.notebook, bg=NASA_BG)
         self.notebook.add(plot_tab, text="History Plots")
         self.figure = plt.Figure(figsize=(11, 8), dpi=100, facecolor=NASA_BG)
-        self.canvas = FigureCanvasTkAgg(self.figure, master=plot_tab)
-        self.canvas.get_tk_widget().pack(fill="both", expand=True)
-        toolbar_frame = tk.Frame(plot_tab, bg=NASA_BG)
-        toolbar_frame.pack(fill="x")
-        self.plot_toolbar = NavigationToolbar2Tk(self.canvas, toolbar_frame, pack_toolbar=False)
-        self.plot_toolbar.update()
-        self.plot_toolbar.pack(fill="x")
+        self.canvas, self.plot_toolbar = self._attach_figure_canvas(plot_tab, self.figure)
 
     def _create_figure_tab(self, tab_name: str, status_var) -> dict[str, Any]:
         tab = tk.Frame(self.notebook, bg=NASA_BG)
         self.notebook.add(tab, text=tab_name)
         self._create_iteration_controls(tab, status_var)
         figure = plt.Figure(figsize=(11, 8), dpi=100, facecolor=NASA_BG)
-        canvas = FigureCanvasTkAgg(figure, master=tab)
+        canvas, toolbar = self._attach_figure_canvas(tab, figure)
+        return {"tab": tab, "figure": figure, "canvas": canvas, "toolbar": toolbar}
+
+    def _attach_figure_canvas(self, parent, figure):
+        # Reuse the same figure/canvas/toolbar construction for the main history
+        # tab and every auxiliary diagnostics tab.
+        canvas = FigureCanvasTkAgg(figure, master=parent)
         canvas.get_tk_widget().pack(fill="both", expand=True)
-        toolbar_frame = tk.Frame(tab, bg=NASA_BG)
+        toolbar_frame = tk.Frame(parent, bg=NASA_BG)
         toolbar_frame.pack(fill="x")
         toolbar = NavigationToolbar2Tk(canvas, toolbar_frame, pack_toolbar=False)
         toolbar.update()
         toolbar.pack(fill="x")
-        return {"tab": tab, "figure": figure, "canvas": canvas, "toolbar": toolbar}
+        return canvas, toolbar
 
     def _create_text_tab(self, tab_name: str, status_var) -> dict[str, Any]:
         tab = tk.Frame(self.notebook, bg=NASA_BG)
@@ -1243,6 +1278,8 @@ class _HistoryPlotterUI:
         return max(0, min(self.view_iteration.get(), len(self.history) - 1))
 
     def _refresh_aux_tabs(self) -> None:
+        # Keep the derived views synchronized with the iteration selected in the
+        # main history board.
         self.redraw_geometry()
         self.redraw_drag_3d()
         self.redraw_drag_test()
@@ -1254,10 +1291,10 @@ class _HistoryPlotterUI:
         cached = self.drag_diagnostics_cache.get(index)
         if cached is not None:
             return cached
-        state = deepcopy(self.history[index])
+        # Cache drag diagnostics because several tabs reuse the same drag model
+        # output for the selected iteration.
         with redirect_stdout(io.StringIO()):
-            diagnostics = drag_model(state)
-        cached = (state, diagnostics)
+            cached = compute_drag_diagnostics(self.history[index])
         self.drag_diagnostics_cache[index] = cached
         return cached
 
@@ -1283,6 +1320,31 @@ class _HistoryPlotterUI:
         axis.tick_params(colors=NASA_TEXT, labelsize=8)
         for spine in axis.spines.values():
             spine.set_color(NASA_TEXT)
+
+    def _draw_empty_history_axis(self, axis, title: str) -> None:
+        axis.set_title(title or "No series selected", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
+        axis.text(0.5, 0.5, "Select one or more series", transform=axis.transAxes, ha="center", va="center", color=NASA_TEXT, fontsize=9, fontfamily="Courier New")
+        axis.set_xticks([])
+        axis.set_yticks([])
+
+    def _plot_history_selection(self, axis, selected_paths: list[str], row: dict[str, Any], x_values: list[int]) -> None:
+        # Draw the chosen time histories with the dedicated first-tab palette and
+        # switch to log/symlog only when the selected data actually allow it.
+        all_positive = True
+        for line_idx, path in enumerate(selected_paths):
+            y_values = self.series.get(path, [])
+            if not y_values or any(value <= 0.0 for value in y_values):
+                all_positive = False
+            axis.plot(x_values, y_values, color=_history_plot_color(line_idx), linewidth=1.9, label=path)
+
+        axis.set_title(row["title"].get() or _default_title(selected_paths), color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
+        axis.set_xlabel("Iteration", color=NASA_TEXT, fontsize=9)
+        axis.set_ylabel(selected_paths[0] if len(selected_paths) == 1 else "Selected values", color=NASA_TEXT, fontsize=8)
+        if row["log"].get():
+            axis.set_yscale("log" if all_positive else "symlog", linthresh=1.0e-9)
+
+        legend = axis.legend(loc="best", facecolor=NASA_PANEL, edgecolor=NASA_GRID, framealpha=1.0, fontsize=7)
+        _style_legend_text(legend)
 
     def add_plot_row(
         self,
@@ -1321,6 +1383,8 @@ class _HistoryPlotterUI:
         self.rows.append(row_data)
 
     def redraw(self) -> None:
+        # Redraw the first tab as a configurable wall of history plots driven by
+        # the flattened simulation time series.
         self.figure.clear()
         if not self.rows:
             self.canvas.draw_idle()
@@ -1336,33 +1400,13 @@ class _HistoryPlotterUI:
         for idx, row in enumerate(self.rows):
             axis = axes[idx // cols][idx % cols]
             self._style_history_axis(axis)
-            selected_indices = row["paths"].curselection()
-            selected_paths = [row["paths"].get(i) for i in selected_indices]
+            selected_paths = _selected_listbox_values(row["paths"])
 
             if not selected_paths:
-                axis.set_title(row["title"].get() or "No series selected", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
-                axis.text(0.5, 0.5, "Select one or more series", transform=axis.transAxes, ha="center", va="center", color=NASA_TEXT, fontsize=9, fontfamily="Courier New")
-                axis.set_xticks([])
-                axis.set_yticks([])
+                self._draw_empty_history_axis(axis, row["title"].get())
                 continue
 
-            all_positive = True
-            for line_idx, path in enumerate(selected_paths):
-                y_values = self.series.get(path, [])
-                if not y_values or any(value <= 0.0 for value in y_values):
-                    all_positive = False
-                axis.plot(x_values, y_values, color=NASA_LINE[line_idx % len(NASA_LINE)], linewidth=1.8, label=path)
-
-            axis.set_title(row["title"].get() or _default_title(selected_paths), color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
-            axis.set_xlabel("Iteration", color=NASA_TEXT, fontsize=9)
-            axis.set_ylabel(selected_paths[0] if len(selected_paths) == 1 else "Selected values", color=NASA_TEXT, fontsize=8)
-            if row["log"].get():
-                axis.set_yscale("log" if all_positive else "symlog", linthresh=1.0e-9)
-
-            legend = axis.legend(loc="best", facecolor=NASA_PANEL, edgecolor=NASA_GRID, framealpha=1.0, fontsize=7)
-            if legend is not None:
-                for text in legend.get_texts():
-                    text.set_color(NASA_TEXT)
+            self._plot_history_selection(axis, selected_paths, row, x_values)
 
         for idx in range(plot_count, row_count * cols):
             axes[idx // cols][idx % cols].axis("off")
@@ -1561,7 +1605,7 @@ class _HistoryPlotterUI:
 
 
 def launch_history_ui(
-    sc: SpacecraftState | None = None,
+    sc: SpacecraftInput | None = None,
     max_iterations: int = 200,
     mass_tolerance: float = 1.0e-3,
     default_specs: list[PlotSpec] | None = None,
@@ -1569,7 +1613,7 @@ def launch_history_ui(
     show: bool = True,
 ):
     """Run the sizing history and open the interactive visualization UI."""
-    sc = sc or SpacecraftState()
+    sc = _resolve_spacecraft_input(sc)
     _, _, history = run_sizing_with_history(sc, max_iterations=max_iterations, mass_tolerance=mass_tolerance)
     series = _history_series(history)
     default_specs = default_specs or DEFAULT_HISTORY_SPECS
@@ -1590,13 +1634,13 @@ def launch_history_ui(
 def _launch_with_specs(
     specs: list[PlotSpec],
     title: str,
-    sc: SpacecraftState | None = None,
+    sc: SpacecraftInput | None = None,
     max_iterations: int = 200,
     mass_tolerance: float = 1.0e-3,
     show: bool = True,
 ):
     return launch_history_ui(
-        sc=sc or SpacecraftState(),
+        sc=sc,
         max_iterations=max_iterations,
         mass_tolerance=mass_tolerance,
         default_specs=specs,
@@ -1616,7 +1660,7 @@ def plot_atmosphere_profiles(
 
 
 def plot_budgets_total(
-    sc: SpacecraftState | None = None,
+    sc: SpacecraftInput | None = None,
     max_iterations: int = 20,
     mass_tolerance: float = 1.0e-8,
     show: bool = True,
@@ -1632,7 +1676,7 @@ def plot_budgets_total(
 
 
 def plot_dimension_evolution(
-    sc: SpacecraftState | None = None,
+    sc: SpacecraftInput | None = None,
     max_iterations: int = 20,
     mass_tolerance: float = 1.0e-8,
     show: bool = True,
@@ -1648,7 +1692,7 @@ def plot_dimension_evolution(
 
 
 def plot_drag_diagnostics(
-    sc: SpacecraftState | None = None,
+    sc: SpacecraftInput | None = None,
     n_points: int = 64,
     show: bool = True,
 ):
@@ -1657,7 +1701,7 @@ def plot_drag_diagnostics(
 
 
 def plot_power_diagnostics(
-    sc: SpacecraftState | None = None,
+    sc: SpacecraftInput | None = None,
     efficiency: float = 0.2,
     alignment_deg: float = 0.0,
     baseline_power: float = 2000.0,
@@ -1668,7 +1712,7 @@ def plot_power_diagnostics(
 
 
 def plot_propulsion_diagnostics(
-    sc: SpacecraftState | None = None,
+    sc: SpacecraftInput | None = None,
     baseline_drag: float = 0.2,
     show: bool = True,
 ):
@@ -1677,7 +1721,7 @@ def plot_propulsion_diagnostics(
 
 
 def plot_simulation_budgets(
-    sc: SpacecraftState | None = None,
+    sc: SpacecraftInput | None = None,
     max_iterations: int = 50,
     mass_tolerance: float = 1.0e-9,
     show: bool = True,
@@ -1693,7 +1737,7 @@ def plot_simulation_budgets(
 
 
 def plot_simulation_history(
-    sc: SpacecraftState | None = None,
+    sc: SpacecraftInput | None = None,
     max_iterations: int = 200,
     mass_tolerance: float = 1.0e-3,
     show: bool = True,

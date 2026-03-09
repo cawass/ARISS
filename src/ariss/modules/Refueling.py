@@ -1,34 +1,31 @@
+# ============================================================================
+#  ARISS - Atmospheric Refueling Iterative System Solver
+# ----------------------------------------------------------------------------
+#  Description:
+#      Atmospheric refueling power model based on intake mass flow and tank
+#      compression work.
+#
+#  Project:        ARISS
+#  Module:         Refueling.py
+#  Author:         Carlos Carrasco Requejo, Lucas Calderon del Rio
+# ============================================================================
+
 from ariss.core.spacecraft import SpacecraftState
 
 def refueling_model(sc: SpacecraftState) -> float:
-    """
-    Calculate the refueling power required.
-    It calculates the power required by an active refuelling system if applicable.
-    Skips the calculation otherwise.
-    
-    Args:
-        sc (SpacecraftState): Spacecraft state.
-    
-    Returns:
-        float: Refueling power required.
-        float: Refueling area.
-    """
-    # Calculate area needed for refuelling
+    # Skip the compression model entirely when the mission does not require
+    # propellant replenishment.
+    sc.power.Power_refprop = 0.0
+
     if sc.mission_profile.active_refueling:
+        # Captured atmospheric mass flow routed to the refueling tanks.
 
-        # Calculate the work done on the fluid
-        m_flow = sc.orbit.density * sc.orbit.velocity * sc.geometry.A_ref # Mass flow rate after the intake
+        # Total compressed stream. The thruster line is added because the
+        # architecture currently treats the intake as a single non-bypass flow.
+        m_dot_b = sc.refueling.m_flow + sc.thruster.m_flow
+        sc.power.Power_refprop = 1 / sc.refueling.eta_refuel * 1 / (sc.orbit.gamma - 1) * m_dot_b * sc.orbit.R_spec * sc.thermal.T_des * ((sc.refueling.p_tank / sc.orbit.p_orb) ** ((sc.orbit.gamma - 1) / sc.orbit.gamma) - 1)
 
-        m_dot_b = m_flow +  sc.thruster.m_flow  # Add the propellant mass flow rate to the intake mass flow rate because there is no bypass
-        P_ref = 1 / sc.refueling.eta_refuel * 1 / (sc.orbit.gamma - 1) * m_dot_b * sc.orbit.R_spec * sc.thermal.T_des * ((sc.refueling.p_tank / sc.orbit.p_orb) ** ((sc.orbit.gamma - 1) / sc.orbit.gamma) - 1)
-
+        # Ideal-gas storage volume at design temperature and tank pressure.
         sc.refueling.V_prop = sc.mass.Mass_prop * sc.orbit.R_spec * sc.thermal.T_des / sc.refueling.p_tank
-        sc.refueling.m_flow = m_flow
-        
-    else:
-        P_ref = 0
 
-    # Save to spacecraft
-    sc.power.P_ref = P_ref
-        
-    return P_ref
+    return sc.power.Power_refprop
