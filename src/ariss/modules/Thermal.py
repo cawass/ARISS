@@ -102,8 +102,18 @@ def thermal_model(sc: SpacecraftState):
     # Heat output at desired temperature excluding potential radiators
     Q_radiated = Ae_total * sc.thermal.T_des**4 * const.STEFAN_BOLTZMANN
 
+    Q_in_total = Q_drag + Q_sun + Q_albedo + Q_ir + Q_internal
     # Final Area - assuming radiators don't absorb anything and back of solar panels are radiators
-    sc.geometry.A_rad = max(((Q_drag + Q_sun + Q_albedo + Q_ir + Q_internal - Q_radiated)/ (const.STEFAN_BOLTZMANN * sc.thermal.T_des**4 * sc.thermal.epsilon_therm_body) - sc.geometry.A_solar)/2, 0.0)
+    sc.geometry.A_rad = max(((Q_in_total - Q_radiated)/ (const.STEFAN_BOLTZMANN * sc.thermal.T_des**4 * sc.thermal.epsilon_therm_body) - sc.geometry.A_solar)/2, 0.0)
+    
+    # Calculate equilibrium temperature
+    if sc.geometry.A_rad == 0.0:
+        # No external radiators needed, calculate actual equilibrium temperature
+        T_eq = (Q_in_total / (Ae_total * const.STEFAN_BOLTZMANN)) ** (1/4) if Q_in_total > 0 else 0.0
+        T_max = T_eq
+    else:
+        # Radiators are used, temperature is maintained at design temperature
+        T_max = sc.thermal.T_des
     
     diagnostics = ThermalDiagnostics(
         Q_drag=Q_drag,
@@ -112,7 +122,7 @@ def thermal_model(sc: SpacecraftState):
         Q_ir=Q_ir,
         Q_internal=Q_internal,
         Q_radiated=Q_radiated,
-        T_max=0.0,
+        T_max=T_max,
         T_min=0.0,
     )
     return diagnostics
