@@ -29,7 +29,7 @@ SPECIFIC_HEAT_RATIO: Final[float] = 1.5404         # []
 # ==========================================
 # Earth Constants
 # ==========================================
-EARTH_RADIUS: Final[float] = 6371e3                # [m]
+EARTH_RADIUS: Final[float] = 6371                  # [km]
 EARTH_GRAVITY: Final[float] = 9.80665              # [m/s^2]
 EARTH_MU: Final[float] = 3.986004418e14            # [m^3/s^2] Standard gravitational parameter
 EARTH_ALBEDO: Final[float] = 0.3                   # []
