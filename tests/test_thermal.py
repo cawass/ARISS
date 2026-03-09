@@ -72,8 +72,11 @@ def test_internal_heating():
     sc.power.Power_prop = 100.0
     sc.power.Power_refprop = 100.0
 
+    sc.thruster.thruster_thermal_eff = 0.8 
+    sc.refueling.eta_refuel = 0.1
+
     diagnostics = thermal_model(sc)
-    assert np.isclose(diagnostics.Q_internal, 177)
+    assert np.isclose(diagnostics.Q_internal, 210)
 
 
 def test_radiated_heating():
@@ -91,9 +94,9 @@ def test_radiated_heating():
     # sc.thermal.epsilon_therm_body: float = 0.9
     # sc.thermal.epsilon_therm_solar: float = 0.85
     # sc.thermal.epsilon_therm_rad: float = 0.9
+    # sc.thermal.T_des = 300
 
     diagnostics = thermal_model(sc)
-
 
     assert np.isclose(diagnostics.Q_radiated, 14577.84676)
 
