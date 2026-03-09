@@ -134,12 +134,14 @@ def test_radiator_area_positive_hot_case():
     assert sc.geometry.A_rad > 0.0
 
 
-def test_thermal_balance_at_design_temperature():
-    """Test that at design temperature, heat in equals heat out with radiators"""
+@pytest.mark.parametrize("velocity", [7000, 8000, 9000])
+@pytest.mark.parametrize("density", [1e-7, 2e-7])
+def test_thermal_balance_at_design_temperature(velocity, density):
+    """Test that at design temperature, heat in equals heat out with radiators for various inputs"""
     sc = SpacecraftState()
     # Set parameters to require radiators
-    sc.orbit.velocity = 8000.0
-    sc.orbit.density = 1e-7
+    sc.orbit.velocity = velocity
+    sc.orbit.density = density
     diagnostics = thermal_model(sc)
     Q_in_total = diagnostics.Q_drag + diagnostics.Q_sun + diagnostics.Q_albedo + diagnostics.Q_ir + diagnostics.Q_internal
     # Total radiator area includes back of solar panels + 2 * additional radiators (double-sided)
