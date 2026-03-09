@@ -44,7 +44,7 @@ class ThermalDiagnostics:
     T_min: float = 0.0
 
 
-def thermal_model(sc: SpacecraftState) -> float:
+def thermal_model(sc: SpacecraftState):
     """
     Thermal model for the spacecraft
     TODO Elaborate docstring
@@ -59,8 +59,8 @@ def thermal_model(sc: SpacecraftState) -> float:
     A_body_top = W_body * sc.geometry.L_body
     # Area of side of body 
     A_body_side = H_body * sc.geometry.L_body
-    # Projected area of the part of the body exposed to the Sun
-    A_sun_body = 0.5 * (W_in + W_body) * sc.geometry.L_in + W_body * sc.geometry.L_body
+    # Projected area of the part of the spacecraft exposed to the Sun
+    A_sun_sc = 0.5 * (W_in + W_body) * sc.geometry.L_in + W_body * sc.geometry.L_body
     # Projected area of the part exposed to the Earth
     A_earth = 0.5 * (H_in + H_body) * sc.geometry.L_in  + H_body * sc.geometry.L_body
     # Area of top of intake
@@ -73,22 +73,33 @@ def thermal_model(sc: SpacecraftState) -> float:
 
     # Heat input
     #  Drag heating - it's assumed the incoming air transfers all its kinetic energy into heat and this is all the heating from drag
-    Q_drag = 0.5 * sc.orbit.density * np.power(sc.orbit.velocity, 3) * sc.geometry.A_in
+    Q_drag = 0.5 * sc.orbit.density * sc.orbit.velocity**3 * sc.geometry.A_in
     #  Sun heating - assuming sun hits at 90 degrees and solar panels are producing
     # theoretically there can be 2 cases:
     # external solar panels: external area + projected body area + projected intake area <--- ASSUMED
     # no external solar: (projected body + projected intake)_solar*solar+(projected body + projected intake)_body*body 
-    Q_sun = const.SOLAR_CONSTANT * (A_sun_body + sc.geometry.A_solar) * (sc.thermal.alpha_solar * (1 - sc.solar.eta_solar))
+    Q_sun = const.SOLAR_CONSTANT * (A_sun_sc + sc.geometry.A_solar) * (sc.thermal.alpha_solar * (1 - sc.solar.eta_solar))
     #  Earth albedo heating - assuming side of the spacecraft is hit at 90 degrees
     Q_albedo = const.SOLAR_CONSTANT * const.EARTH_ALBEDO * A_earth * sc.thermal.alpha_body
     #  Earth infrared heating - assuming side of the spacecraft is hit at 90 degrees
     Q_ir = const.EARTH_IR_EMISSION * np.square((const.EARTH_RADIUS / (const.EARTH_RADIUS + sc.orbit.altitude))) * A_earth * sc.thermal.epsilon_therm_body
     #  Internal heating - due to devices on board
-    Q_internal = sc.power.Power_total - sc.power.Power_prop * sc.thruster.thruster_eff - sc.power.Power_refprop * 0.5 # O.5 PLACEHOLDER UNTIL REFUELLINGSTATE IMPLEMENTED
+    Q_internal = sc.power.Power_total - sc.power.Power_prop * sc.thruster.thruster_eff - sc.power.Power_refprop * sc.refueling.eta_refuel
     
     # Heat output at desired temperature excluding potential radiators
     Q_radiated = Ae_total * np.power(sc.thermal.T_des, 4) * const.STEFAN_BOLTZMANN
 
     # Final Area - assuming radiators don't absorb anything and back of solar panels are radiators
-    return max(((Q_drag + Q_sun + Q_albedo + Q_ir + Q_internal - Q_radiated)/ (const.STEFAN_BOLTZMANN * np.power(sc.thermal.T_des, 4) * sc.thermal.epsilon_therm_body) - sc.geometry.A_solar)/2, 0)
-
+    sc.geometry.A_rad = max(((Q_drag + Q_sun + Q_albedo + Q_ir + Q_internal - Q_radiated)/ (const.STEFAN_BOLTZMANN * np.power(sc.thermal.T_des, 4) * sc.thermal.epsilon_therm_body) - sc.geometry.A_solar)/2, 0.0)
+    
+    diagnostics = ThermalDiagnostics(
+        Q_drag=Q_drag,
+        Q_sun=Q_sun,
+        Q_albedo=Q_albedo,
+        Q_ir=Q_ir,
+        Q_internal=Q_internal,
+        Q_radiated=Q_radiated,
+        T_max=0.0,
+        T_min=0.0,
+    )
+    return diagnostics
