@@ -6,7 +6,7 @@ from typing import Any
 
 @dataclass(frozen=False)
 class MissionProfileState:
-    active_refueling : bool = True
+    active_refueling : bool = False
     delta_v: float = 1157.8
     refueling_time: float = 12000960.0
     required_fuel: float = 0
@@ -22,7 +22,7 @@ class OrbitState:
     density: float = 0 # [kg/m3] Density of the atmosphere at orbital height
     p_orb: float = 1e-5 # [Pa] Pressure of the atmosphere at orbital height
     temperature: float = 0 # [K] Temperature of the atmosphere at orbital height
-    molar_mass: float = 0 # 
+    molar_mass: float = 0  
     alpha: float = 0
     gamma: float = 1.4 # Specific heat ratio of the air at altitude
     R_spec:float = 287.0 # Specific gas constant R_universal / molar_mass
@@ -57,7 +57,7 @@ class GeometryState:
     epsilon_body: float = 0.1
     epsilon_solar: float = 0.1
     epsilon_rad: float = 0.1
-    epsilon_in_norm: float = 0.1
+    epsilon_in_norm: float = 0.9
 
     A_in: float = 4.0387 # [m2] Total area of the intake
     A_body: float = 0.5 # [m2] Cross sectional area of the body
@@ -67,9 +67,9 @@ class GeometryState:
     A_prop: float = 2  # [m2] Area of the intake corresponding to the massflow that goes towards drag compensation
     A_in_drag: float = 2 # [m2] Area of the intake * (1 - collection efficiency)
 
-    L_in: float = 2.26
-    L_body: float = 2.80
-    L_solar: float = 3.0
+    L_in: float = 2.5
+    L_body: float = 2.5
+    L_solar: float = 2.0
     L_rad: float = 0.5
 
     def update(self, **kwargs: Any) -> "GeometryState":
@@ -78,8 +78,8 @@ class GeometryState:
 @dataclass(frozen=False)
 class ThrusterState:
     thrust: float = 0.1039
-    specific_impulse: float = 5500 
-    thruster_eff: float = 0.53
+    specific_impulse: float = 4500 
+    thruster_eff: float = 0.5
     power_required: float = 5000*thruster_eff
     propellant_mass: float = 0.0
     m_flow: float = 1e-3 # Mass flow going through the thruster
@@ -116,14 +116,14 @@ class MassState:
 @dataclass(frozen=False)
 class PowerState:
     Power_in: float = 0.0
-    Power_body: float = 3000.0
+    Power_body: float = 0.0
     Power_solar: float = 0.0
     Power_rad: float = 0.0
     Power_prop: float = 0.0
-    Power_ADCS: float =  160.0
-    Power_payload: float = 300.0
-    Power_refprop: float = 300.0
-    Power_total: float = 300.0
+    Power_ADCS: float =  2000.0
+    Power_payload: float = 0.0
+    Power_refprop: float = 0.0
+    Power_total: float = 0.0
 
     def update(self, **kwargs: Any) -> "PowerState":
         payload = dict(kwargs)
@@ -135,8 +135,8 @@ class PowerState:
 @dataclass(frozen=False)
 class RefuelingState:
 
-    coll_eff: float = 0.7 # Mass intake efficiency
-    t_refuel: float = 20*24*3600 # time to refuel in seconds
+    coll_eff: float = 0.35 # Mass intake efficiency
+    t_refuel: float = 10*24*3600 # time to refuel in seconds
     eta_refuel: float = 0.1 # Power efficiency of the refueling process
     m_flow: float =  1e-3 # mass flow going into the tankse
 
@@ -150,23 +150,23 @@ class RefuelingState:
 class SolarState:
     av_aligment: float = 0
     eta_solar: float = 0.3
-    eta_power: float = 0.95
+    eta_power: float = 0.9
 
     def update(self, **kwargs: Any) -> "SolarState":
         return replace(self, **kwargs)
 
 @dataclass(frozen=True)
-class ThermalState:
-    T_des: float = 300.0
-    alpha_body: float = 0.1
-    alpha_solar: float = 0.9
-
-    epsilon_therm_in: float = 0.5
-    epsilon_therm_body: float = 0.9
-    epsilon_therm_solar: float = 0.85
-    epsilon_therm_rad: float = 0.9
-
-    def update(self, **kwargs: Any) -> "ThermalState":
+class ThermalState:                                                   
+    T_des: float = 320.0                                                   
+    alpha_body: float = 0.1                                                   
+    alpha_solar: float = 0.9                                                   
+                                                   
+    epsilon_therm_in: float = 0.5                                                   
+    epsilon_therm_body: float = 0.9                                                   
+    epsilon_therm_solar: float = 0.85                                                   
+    epsilon_therm_rad: float = 0.9                                                   
+                                                   
+    def update(self, **kwargs: Any) -> "ThermalState":                                                   
         return replace(self, **kwargs)
 
 @dataclass(frozen=True)

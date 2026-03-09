@@ -32,14 +32,14 @@ from ariss.core.simulation import run_sizing_loop
 from ariss.core.spacecraft import GeometryState, SpacecraftState
 from ariss.modules.Drag import DragDiagnostics, drag_model
 from ariss.utils import constants as const
-from ariss.utils.atmosphere import atmosphere_properties_from_height
+from ariss.utils.atmosphere import atmosphere_properties_from_height, atmos
 
 NASA_BG = "#ffffff"
 NASA_PANEL = "#f4efe2"
 NASA_GRID = "#b9b1a2"
 NASA_TEXT = "#1c2833"
 NASA_LINE = [
-    "#1f77b4",
+    "#1a7bc0",
     "#c44e52",
     "#dd8452",
     "#4c72b0",
@@ -1110,6 +1110,7 @@ class _HistoryPlotterUI:
         self.paths = list(series.keys())
         self.rows: list[dict[str, Any]] = []
         self.drag_diagnostics_cache: dict[int, tuple[SpacecraftState, DragDiagnostics]] = {}
+        self.atmosphere_profile_cache: dict[str, np.ndarray] | None = None
 
         self.root = tk.Tk()
         self.root.title(window_title)
@@ -1152,8 +1153,8 @@ class _HistoryPlotterUI:
         self.figure_tabs["drag3d"] = self._create_figure_tab("3D Drag", self.status_vars["drag3d"])
         self.figure_tabs["drag"] = self._create_figure_tab("Drag Test", self.status_vars["drag"])
         self.figure_tabs["propulsion"] = self._create_figure_tab("Propulsion", self.status_vars["propulsion"])
+        self.figure_tabs["atmosphere"] = self._create_figure_tab("Atmosphere", self.status_vars["atmosphere"])
         self.text_tabs["refueling"] = self._create_text_tab("Refueling", self.status_vars["refueling"])
-        self.text_tabs["atmosphere"] = self._create_text_tab("Atmosphere", self.status_vars["atmosphere"])
 
         for spec in default_specs:
             self.add_plot_row(*spec)
@@ -1259,6 +1260,22 @@ class _HistoryPlotterUI:
         cached = (state, diagnostics)
         self.drag_diagnostics_cache[index] = cached
         return cached
+
+    def _get_atmosphere_profile(self) -> dict[str, np.ndarray]:
+        if self.atmosphere_profile_cache is not None:
+            return self.atmosphere_profile_cache
+
+        altitude_km = np.linspace(80.0, 1000.0, 600)
+        total_density, _temperature, r_specific, o2_density, n2_density, o_density = atmos(altitude_km)
+        self.atmosphere_profile_cache = {
+            "altitude_km": np.asarray(altitude_km, dtype=float),
+            "total_density": np.maximum(np.asarray(total_density, dtype=float), 1.0e-30),
+            "r_specific": np.asarray(r_specific, dtype=float),
+            "o2_density": np.maximum(np.asarray(o2_density, dtype=float), 1.0e-30),
+            "n2_density": np.maximum(np.asarray(n2_density, dtype=float), 1.0e-30),
+            "o_density": np.maximum(np.asarray(o_density, dtype=float), 1.0e-30),
+        }
+        return self.atmosphere_profile_cache
 
     def _style_history_axis(self, axis) -> None:
         axis.set_facecolor(NASA_BG)
@@ -1466,44 +1483,78 @@ class _HistoryPlotterUI:
     def redraw_atmosphere(self) -> None:
         index = self._current_index()
         state = self.history[index]
-        self.status_vars["atmosphere"].set(
-            f"Iteration {index} / {len(self.history) - 1} | Altitude {_safe_float(state.orbit.altitude):.2f} km"
-        )
+        altitude_km = _safe_float(state.orbit.altitude)
+        tab = self.figure_tabs["atmosphere"]
+        figure = tab["figure"]
+        figure.clear()
 
         try:
-            properties = atmosphere_properties_from_height(state.orbit.altitude)
-            lines = [
-                "ATMOSPHERIC SNAPSHOT",
-                "",
-                f"Altitude [km]               : {_safe_float(state.orbit.altitude):.6f}",
-                f"State Density [kg/m^3]      : {_safe_float(state.orbit.density):.6e}",
-                f"Model Density [kg/m^3]      : {_safe_float(properties['density']):.6e}",
-                f"Temperature [K]             : {_safe_float(properties['temperature']):.6f}",
-                f"Molar Mass [kg/mol]         : {_safe_float(properties['molar_mass']):.6e}",
-                f"R_specific [J/kg/K]         : {_safe_float(properties['specific_gas_constant']):.6f}",
-                f"Orbital Velocity [m/s]      : {_safe_float(properties['orbital_velocity']):.6f}",
-                f"Dynamic Pressure [Pa]       : {_safe_float(properties['dynamic_pressure']):.6e}",
-                "",
-                "COMPOSITION",
-                "",
-                f"O2 Density [kg/m^3]         : {_safe_float(properties['o2_density']):.6e}",
-                f"N2 Density [kg/m^3]         : {_safe_float(properties['n2_density']):.6e}",
-                f"O Density [kg/m^3]          : {_safe_float(properties['o_density']):.6e}",
-            ]
-        except Exception as exc:
-            lines = [
-                "ATMOSPHERIC SNAPSHOT",
-                "",
-                f"Atmosphere helper unavailable: {exc}",
-                "",
-                f"Altitude [km]               : {_safe_float(state.orbit.altitude):.6f}",
-                f"Density [kg/m^3]            : {_safe_float(state.orbit.density):.6e}",
-                f"Temperature [K]             : {_safe_float(state.orbit.temperature):.6f}",
-                f"Molar Mass [kg/mol]         : {_safe_float(state.orbit.molar_mass):.6e}",
-                f"Orbital Velocity [m/s]      : {_safe_float(state.orbit.velocity):.6f}",
-            ]
+            properties = atmosphere_properties_from_height(altitude_km)
+            profile = self._get_atmosphere_profile()
+            axes = figure.subplots(2, 1, sharex=True, squeeze=True)
+            composition_axis = axes[0]
+            r_axis = axes[1]
+            self._style_history_axis(composition_axis)
+            self._style_history_axis(r_axis)
 
-        self._set_text_tab("atmosphere", lines)
+            altitude_profile = profile["altitude_km"]
+            total_density_profile = profile["total_density"]
+            o2_profile = profile["o2_density"]
+            n2_profile = profile["n2_density"]
+            o_profile = profile["o_density"]
+            r_profile = profile["r_specific"]
+
+            composition_axis.plot(altitude_profile, total_density_profile, color=NASA_TEXT, linewidth=1.8, linestyle="--", label="Total density")
+            composition_axis.plot(altitude_profile, o2_profile, color="#4c72b0", linewidth=1.9, label="O2 density")
+            composition_axis.plot(altitude_profile, n2_profile, color="#55a868", linewidth=1.9, label="N2 density")
+            composition_axis.plot(altitude_profile, o_profile, color="#c44e52", linewidth=1.9, label="O density")
+            composition_axis.axvline(altitude_km, color=NASA_TEXT, linestyle="--", linewidth=1.1, label=f"Current altitude = {altitude_km:.2f} km")
+            model_density = max(_safe_float(properties["density"]), 1.0e-30)
+            state_density = max(_safe_float(state.orbit.density, default=model_density), 1.0e-30)
+            composition_axis.scatter([altitude_km], [model_density], color=NASA_TEXT, s=32, zorder=5, label=f"Model density = {model_density:.3e}")
+            composition_axis.scatter([altitude_km], [state_density], color="#2f6db3", s=30, marker="D", zorder=5, label=f"State density = {state_density:.3e}")
+            composition_axis.scatter([altitude_km], [max(_safe_float(properties["o2_density"]), 1.0e-30)], color="#4c72b0", s=30, zorder=5)
+            composition_axis.scatter([altitude_km], [max(_safe_float(properties["n2_density"]), 1.0e-30)], color="#55a868", s=30, zorder=5)
+            composition_axis.scatter([altitude_km], [max(_safe_float(properties["o_density"]), 1.0e-30)], color="#c44e52", s=30, zorder=5)
+            composition_axis.set_yscale("log")
+            composition_axis.set_ylabel("Density [kg/m^3]", color=NASA_TEXT, fontsize=8)
+            composition_axis.set_title("COMPOSITION DENSITY VS ALTITUDE", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
+            composition_axis.legend(loc="best", facecolor=NASA_PANEL, edgecolor=NASA_GRID, framealpha=1.0, fontsize=7)
+
+            model_r = _safe_float(properties["specific_gas_constant"])
+            state_r = _safe_float(getattr(state.orbit, "R_spec", model_r), default=model_r)
+            r_axis.plot(altitude_profile, r_profile, color="#dd8452", linewidth=2.0, label="Model R_specific")
+            r_axis.axvline(altitude_km, color=NASA_TEXT, linestyle="--", linewidth=1.1)
+            r_axis.scatter([altitude_km], [model_r], color="#dd8452", s=34, zorder=5, label=f"Model @ altitude = {model_r:.2f}")
+            r_axis.scatter([altitude_km], [state_r], color="#2f6db3", s=34, marker="D", zorder=5, label=f"State R_spec = {state_r:.2f}")
+            r_axis.set_xlabel("Altitude [km]", color=NASA_TEXT, fontsize=9)
+            r_axis.set_ylabel("R_specific [J/kg/K]", color=NASA_TEXT, fontsize=8)
+            r_axis.set_title("R VALUES VS ALTITUDE", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
+            r_axis.legend(loc="best", facecolor=NASA_PANEL, edgecolor=NASA_GRID, framealpha=1.0, fontsize=7)
+            x_min = min(float(np.min(altitude_profile)), altitude_km)
+            x_max = max(float(np.max(altitude_profile)), altitude_km)
+            composition_axis.set_xlim(x_min, x_max)
+
+            self.status_vars["atmosphere"].set(
+                f"Iteration {index} / {len(self.history) - 1} | Altitude {altitude_km:.2f} km | "
+                f"R_model {model_r:.2f} J/kg/K | R_state {state_r:.2f} J/kg/K"
+            )
+            figure.patch.set_facecolor(NASA_BG)
+            figure.suptitle(
+                f"ATMOSPHERE DIAGNOSTICS | Iteration {index}",
+                color=NASA_TEXT,
+                fontsize=14,
+                fontfamily="Courier New",
+                fontweight="bold",
+            )
+            figure.tight_layout(rect=[0, 0, 1, 0.96])
+        except Exception as exc:
+            self._draw_error_figure(figure, f"Atmosphere diagnostics unavailable\n{exc}")
+            self.status_vars["atmosphere"].set(
+                f"Iteration {index} / {len(self.history) - 1} | Atmosphere diagnostics unavailable"
+            )
+
+        tab["canvas"].draw_idle()
 
     def run(self) -> None:
         self.root.mainloop()

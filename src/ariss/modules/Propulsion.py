@@ -49,11 +49,10 @@ def propulsion_model(sc):
         sc.geometry.A_ref = sc.refueling.m_flow/(sc.orbit.density*sc.orbit.velocity)
     else:
         sc.geometry.A_ref = 0.0
-
-    
-    
     sc.geometry.A_in_drag = (sc.geometry.A_ref + sc.geometry.A_prop)*(1/sc.refueling.coll_eff - 1)
     sc.geometry.A_in = sc.geometry.A_prop + sc.geometry.A_ref + sc.geometry.A_in_drag
+    
+
 
     h_in = np.sqrt(sc.geometry.A_in / sc.geometry.AR_in)
     w_in = sc.geometry.A_in / h_in

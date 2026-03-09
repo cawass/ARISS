@@ -20,7 +20,7 @@ class PowerDiagnostics:
 
 def power_model(sc):
     """Return required deployable solar area [m^2]."""
-    projected_flux = sc.solar.eta_power * const.SOLAR_CONSTANT * np.cos(np.radians(sc.solar.av_aligment))
+    projected_flux = sc.solar.eta_solar * const.SOLAR_CONSTANT * np.cos(np.radians(sc.solar.av_aligment))
     required_area = sc.power.Power_total / projected_flux
 
     h_in = np.sqrt(sc.geometry.A_in / sc.geometry.AR_in)

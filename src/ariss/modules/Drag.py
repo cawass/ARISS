@@ -49,14 +49,14 @@ class DragDiagnostics:
 
 
 
-def _drag_coefficient(S: float, epsilon: float, alpha: float, T_orb: float, T_r: float) -> float:
+def _drag_coefficient(S: float, epsilon: float, alpha: float, T_orb: float, T_r: float, N) -> float:
 
     friction = (1.0 - epsilon * np.cos(2.0 * alpha)) / (np.sqrt(np.pi) * S)
     friction *= np.exp(-(S ** 2) * (np.sin(alpha) ** 2))
 
     pressure = np.sin(alpha) / (S ** 2)
     pressure *= 1.0 + 2.0 * (S ** 2) + epsilon * (1.0 - 2.0 * (S ** 2) * np.cos(2.0 * alpha))
-    pressure *= erf(S * np.sin(alpha))
+    pressure *= erf(S * np.sin(alpha))* N
 
     thermal = (1.0 - epsilon) / S
     thermal *= np.sqrt(np.pi) * (np.sin(alpha) ** 2) * np.sqrt(T_r / T_orb)
@@ -96,16 +96,16 @@ def drag_model(sc, n_points: int = 200):
     H_body = np.sqrt( sc.geometry.A_body /  sc.geometry.AR_body)
     W_body =  sc.geometry.A_body / H_body
 
-    CD_solar = _drag_coefficient(S, sc.geometry.epsilon_solar, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des)
-    CD_rad = _drag_coefficient(S, sc.geometry.epsilon_rad, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des)
-    CD_body = _drag_coefficient(S, sc.geometry.epsilon_body, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des)
-    CD_in_norm = _drag_coefficient(S, sc.geometry.epsilon_in_norm, sc.orbit.alpha + np.pi/2, sc.orbit.temperature, sc.thermal.T_des)
+    CD_solar = _drag_coefficient(S, sc.geometry.epsilon_solar, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des, 2)
+    CD_rad = _drag_coefficient(S, sc.geometry.epsilon_rad, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des, 2)
+    CD_body = _drag_coefficient(S, sc.geometry.epsilon_body, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des, 1)
+    CD_in_norm = _drag_coefficient(S, sc.geometry.epsilon_in_norm, sc.orbit.alpha + np.pi/2, sc.orbit.temperature, sc.thermal.T_des, 1)
 
     if W_in < W_body:
         alpha_in = np.arctan(np.abs(W_body-W_in)/sc.geometry.L_in)
-        CD_in = _drag_coefficient(S, sc.geometry.epsilon_in, alpha_in, sc.orbit.temperature, sc.thermal.T_des)
+        CD_in = _drag_coefficient(S, sc.geometry.epsilon_in, alpha_in, sc.orbit.temperature, sc.thermal.T_des, 1)
     else:
-        CD_in = _drag_coefficient(S, sc.geometry.epsilon_in, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des)
+        CD_in = _drag_coefficient(S, sc.geometry.epsilon_in, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des, 1)
 
     x_array: list[float] = []
     fz_array: list[float] = []
@@ -127,6 +127,9 @@ def drag_model(sc, n_points: int = 200):
         if sc.geometry.A_in < sc.geometry.A_body:
             fz = 1
             fy = 1
+
+        fz = 1
+        fy = 1
 
         x_array.append(float(x))
         fz_array.append(float(fz))
