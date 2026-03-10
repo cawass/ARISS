@@ -104,7 +104,7 @@ def atmos(height_array_km: np.ndarray | float) -> tuple[np.ndarray, np.ndarray, 
 def calculate_orbital_velocity(height_array_km: np.ndarray | float) -> np.ndarray:
     """Circular-orbit velocity at altitude in km."""
     heights_km = _as_1d_float_array(height_array_km)
-    return np.sqrt(const.EARTH_MU / (const.EARTH_RADIUS + heights_km * 1000.0))
+    return np.sqrt(const.EARTH_MU / (const.EARTH_RADIUS * 1000.0 + heights_km * 1000.0))
 
 def get_atmosphere_functions(
     height_min_km: float = 80.0,

@@ -220,7 +220,6 @@ class ThermalState:
     def update(self, **kwargs: Any) -> "ThermalState":
         return replace(self, **kwargs)
 
-
 @dataclass(frozen=True)
 class SpacecraftState:
     orbit: OrbitState = field(default_factory=OrbitState)  # Orbit and atmosphere state.

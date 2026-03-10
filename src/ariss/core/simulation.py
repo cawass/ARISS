@@ -33,6 +33,7 @@ from ariss.modules.Drag import DragDiagnostics, drag_model
 from ariss.modules.Power import power_model
 from ariss.modules.Propulsion import propulsion_model
 from ariss.modules.Refueling import refueling_model
+from ariss.modules.Thermal import thermal_model
 from ariss.utils.atmosphere import orbit_updates_from_height
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -101,7 +102,9 @@ def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_to
         sizing_model(loop_sc)
         power_model(loop_sc)
         sizing_model(loop_sc)
-
+        thermal_model(loop_sc)
+        sizing_model(loop_sc)
+        
         # Measure convergence by the change in total spacecraft mass between
         # consecutive saved iterations.
         if i > 0:
