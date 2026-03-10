@@ -1,3 +1,19 @@
+# ============================================================================== #
+#       ___    ____  ____  _____ _____
+#      /   |  / __ \/  _// ___// ___/
+#     / /| | / /_/ // / \__ \ \__ \
+#    / ___ |/ _, _// / ___/ /___/ /
+#   /_/  |_/_/ |_/___//____//____/
+#
+#        ARISS - Atmospheric Refueling Iterative System Solver
+# ============================================================================== #
+#  Description:
+#      Efficiency sweep utility for Mansur-style validation curves.
+#
+#  Project:        ARISS
+#  Module:         MansurEfficiencyVerification.py
+# ============================================================================== #
+
 from __future__ import annotations
 
 import io
@@ -30,7 +46,7 @@ def sweep_mansur_efficiencies(
 ) -> dict[float, dict[str, np.ndarray]]:
     base_path = Path(config_path) if config_path is not None else Path(__file__).with_name("MansurVerification.toml")
     base_state = SpacecraftState.from_toml(base_path)
-    isp_grid = np.asarray(isp_values if isp_values is not None else np.linspace(1800.0, 7000.0, 64), dtype=float)
+    isp_grid = np.asarray(isp_values if isp_values is not None else np.linspace(1800.0, 7000.0, 20), dtype=float)
     results: dict[float, dict[str, np.ndarray]] = {}
 
     previous_level = simulation_logger.level

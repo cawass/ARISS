@@ -8,10 +8,10 @@
 #        ARISS - Atmospheric Refueling Iterative System Solver
 # ============================================================================== #
 #  Description:
-#      Validation configuration for the Mansur/Tisaev-style sweep case.
+#      Validation configuration for the IEPC 2025 reference case.
 #
 #  Project:        ARISS
-#  Module:         MansurVerification.toml
+#  Module:         IEPC2025Validation.toml
 #  Author:         Carlos Carrasco Requejo, Lucas Calderon del Rio
 # ============================================================================== #
 
@@ -25,17 +25,17 @@ molar_mass = 0.0                  # [kg/mol] Effective atmospheric molar mass.
 alpha = 0.0                       # [rad] Flow incidence angle for drag model.
 gamma = 1.4                       # [-] Ratio of specific heats.
 R_spec = 287.0                    # [J/(kg*K)] Specific gas constant.
-msis_date = "2000-01-01T00:00:00" # [ISO-8601] MSIS reference UTC date.
+msis_date = "2020-01-01T00:00:00" # [ISO-8601] MSIS reference UTC date.
 msis_f107 = 140.0                 # [sfu] MSIS daily F10.7 solar flux.
 msis_ap = 15.0                    # [-] MSIS Ap geomagnetic index.
 
 [geometry]
 S_in = "c"                        # [str] Intake shape code ("c/e" round, "s/r" rectangular).
-S_body = "c"                      # [str] Body shape code ("c/e" round, "s/r" rectangular).
-Body_match_intake = true          # [bool] If true, body cross-section equals intake area.
+S_body = "s"                      # [str] Body shape code ("c/e" round, "s/r" rectangular).
+Body_match_intake = false         # [bool] If true, body cross-section equals intake area.
 AR_in = 1.0                       # [-] Intake width/height aspect ratio.
 AR_body = 1.0                     # [-] Body width/height aspect ratio.
-AR_solar = 0.5                    # [-] Solar panel planform aspect ratio.
+AR_solar = 5.0                    # [-] Solar panel planform aspect ratio.
 AR_rad = 0.3                      # [-] Radiator planform aspect ratio.
 epsilon_in = 0.1                  # [-] Inlet side free-molecular accommodation.
 epsilon_body = 0.1                # [-] Body side free-molecular accommodation.
@@ -51,10 +51,10 @@ A_ref = 2.0                       # [m^2] Intake area allocated to refueling str
 A_prop = 2.0                      # [m^2] Intake area allocated to propulsion stream.
 A_in_drag = 2.0                   # [m^2] Intake area producing drag only (non-useful capture).
 A_body = 0.5                      # [m^2] Body cross-sectional area.
-A_solar = 5.0                     # [m^2] Deployable solar-array area.
+A_solar = 0.5                     # [m^2] Deployable solar-array area.
 A_rad = 0.0                       # [m^2] Radiator area.
-L_in = 3.575                      # [m] Intake length along spacecraft axis.
-L_body = 0.825                    # [m] Body length along spacecraft axis.
+L_in = 2.0                        # [m] Intake length along spacecraft axis.
+L_body = 2.0                      # [m] Body length along spacecraft axis.
 X_solar = 2.0                     # [m] Solar panel axial center from thruster-side butt.
 X_rad = 0.5                       # [m] Radiator axial center from thruster-side butt.
 
@@ -62,7 +62,7 @@ X_rad = 0.5                       # [m] Radiator axial center from thruster-side
 thrust = 0.0575                   # [N] Thruster force.
 specific_impulse = 5455.0         # [s] Thruster specific impulse.
 eff = 0.5                         # [-] Electrical-to-jet thruster efficiency.
-power = 2000.0                    # [W] Electrical power supplied to thruster.
+power = 5500.0                    # [W] Electrical power supplied to thruster.
 propellant_mass = 0.0             # [kg/s] Legacy propellant flow field.
 m_flow = 1e-3                     # [kg/s] Thruster mass flow rate.
 
@@ -77,10 +77,10 @@ Mass_in = 0.0                     # [kg] Intake structure mass.
 Mass_body = 0.0                   # [kg] Body structure mass.
 Mass_solar = 0.0                  # [kg] Solar-array mass.
 Mass_rad = 0.0                    # [kg] Radiator mass.
-Mass_prop = 61.0                  # [kg] Stored propulsion propellant mass.
-Mass_ADCS = 20.0                  # [kg] ADCS subsystem mass.
+Mass_prop = 65.7                  # [kg] Stored propulsion propellant mass.
+Mass_ADCS = 101.0                 # [kg] ADCS subsystem mass.
 Mass_payload = 24.0               # [kg] Payload mass.
-Mass_refprop = 700.0              # [kg] Refueling/propellant-processing subsystem mass.
+Mass_refprop = 269.5              # [kg] Refueling/propellant-processing subsystem mass.
 Mass_total = 200.0                # [kg] Total spacecraft mass.
 
 [power]
@@ -89,15 +89,15 @@ Power_body = 0.0                  # [W] Body/bus electrical load.
 Power_solar = 0.0                 # [W] Solar conversion overhead.
 Power_rad = 0.0                   # [W] Thermal/radiator electrical load.
 Power_prop = 0.0                  # [W] Propulsion electrical load.
-Power_ADCS = 0.0                  # [W] ADCS electrical load.
+Power_ADCS = 158.7                # [W] ADCS electrical load.
 Power_payload = 0.0               # [W] Payload electrical load.
-Power_refprop = 0.0               # [W] Refueling subsystem electrical load.
+Power_refprop = 920.0             # [W] Refueling subsystem electrical load.
 Power_total = 0.0                 # [W] Total electrical power demand.
 
 [solar]
-av_aligment = 0.0                 # [deg] Average panel alignment angle to Sun vector.
-eta_solar = 0.2                   # [-] Solar-cell conversion efficiency.
-eta_power = 1.0                   # [-] End-to-end power-chain efficiency.
+av_aligment = 1.0472              # [deg] Average panel alignment angle to Sun vector.
+eta_solar = 0.266                 # [-] Solar-cell conversion efficiency.
+eta_power = 0.95                  # [-] End-to-end power-chain efficiency.
 
 [thermal]
 T_des = 320.0                     # [K] Design temperature.
@@ -122,14 +122,14 @@ drag_inlet_side = 0.2             # [N] Inlet-side drag force contribution.
 drag_inlet_front = 0.2            # [N] Inlet-front drag force contribution.
 
 [refueling]
-coll_eff = 0.35                   # [-] Intake collection efficiency.
-t_refuel = 864000.0               # [s] Nominal refueling duration.
+coll_eff = 0.636                  # [-] Intake collection efficiency.
+t_refuel = 7000960.0              # [s] Nominal refueling duration.
 eta_refuel = 0.1                  # [-] Refueling compression-process efficiency.
 m_flow = 1e-3                     # [kg/s] Captured mass flow into tanks.
 p_tank = 100000.0                 # [Pa] Storage tank pressure.
 V_prop = 0.7                      # [m^3] Stored propellant tank volume.
 
 [mission_profile]
-active_refueling = false          # [bool] Enables/disables mission refueling branch.
+active_refueling = true           # [bool] Enables/disables mission refueling branch.
 delta_v = 1157.8                  # [m/s] Mission delta-v requirement.
 required_fuel = 0.0               # [kg] Required fuel from rocket equation.

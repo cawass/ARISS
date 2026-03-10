@@ -33,6 +33,10 @@ def sizing_model(sc: SpacecraftState) -> None:
     #   Power_prop = power_required / thruster_eff
     #   Power_total = sum(subsystem powers)
 
+    # Enforce matched body/intake area when requested by geometry settings.
+    if sc.geometry.Body_match_intake:
+        sc.geometry.A_body = sc.geometry.A_in
+
     # Size the structural masses from simple volumetric and areal scaling laws.
     # The intake mass uses the average of inlet and body areas to approximate a
     # tapered intake volume.
@@ -47,8 +51,9 @@ def sizing_model(sc: SpacecraftState) -> None:
     # Convert total delivered electrical demand into the extra solar-generation
     # overhead required by power-chain losses, then compute propulsion bus power
     # from the thruster efficiency.
+    sc.power.Power_prop = sc.thruster.power
     sc.power.Power_solar = sc.power.Power_total / (sc.solar.eta_power) -  sc.power.Power_total
-    sc.power.Power_prop = sc.thruster.power_required/sc.thruster.thruster_eff
+
 
     # Rebuild the total spacecraft electrical demand from all subsystem terms.
     sc.power.Power_total = sc.power.Power_in + sc.power.Power_body + sc.power.Power_solar + sc.power.Power_rad + sc.power.Power_prop + sc.power.Power_ADCS + sc.power.Power_payload + sc.power.Power_refprop

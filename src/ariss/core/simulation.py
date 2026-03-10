@@ -29,7 +29,7 @@ if __package__ in (None, ""):
 
 from ariss.core.spacecraft import SpacecraftState
 from ariss.modules.Budgets import sizing_model
-from ariss.modules.Drag import DragDiagnostics, drag_model
+from ariss.modules.Drag import drag_model
 from ariss.modules.Power import power_model
 from ariss.modules.Propulsion import propulsion_model
 from ariss.modules.Refueling import refueling_model
@@ -41,19 +41,18 @@ logger = logging.getLogger(__name__)
 
 residual = 10e10
 
-def compute_drag_diagnostics(sc: SpacecraftState) -> tuple[SpacecraftState, DragDiagnostics]:
+def compute_drag_diagnostics(sc: SpacecraftState) -> SpacecraftState:
 
     # Inputs:
     #   sc: spacecraft state at the selected iteration.
     #
     # Outputs:
     #   state: copied spacecraft state after running the drag model.
-    #   diagnostics: drag diagnostics for that copied state.
 
     # Use a copy so UI diagnostics do not mutate the saved history state.
     state = deepcopy(sc)
-    diagnostics = drag_model(state)
-    return state, diagnostics
+    drag_model(state)
+    return state
 
 def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_tolerance: float = 1e-3) -> Tuple[SpacecraftState, bool, List[SpacecraftState]]:
 
@@ -74,7 +73,12 @@ def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_to
 
     # Initialize the orbit-dependent atmospheric properties from the starting
     # mission altitude before entering the iterative sizing loop.
-    orbit_updates = orbit_updates_from_height(loop_sc.orbit.altitude)
+    orbit_updates = orbit_updates_from_height(
+        loop_sc.orbit.altitude,
+        msis_date=loop_sc.orbit.msis_date,
+        msis_f107=loop_sc.orbit.msis_f107,
+        msis_ap=loop_sc.orbit.msis_ap,
+    )
     loop_sc = replace(loop_sc, orbit=replace(loop_sc.orbit, **orbit_updates))
 
     # Prepare the iteration history and convergence trackers.
@@ -86,6 +90,7 @@ def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_to
     # Each pass updates the spacecraft state by cycling through the subsystem
     # models and re-closing the mass and power budgets between them.
     for i in range(max_iterations):
+        print(f"Iteratation Number{i}")
         # Save the pre-iteration state so convergence history can be inspected.
         history.append(deepcopy(loop_sc))
         loop_sc = deepcopy(loop_sc)

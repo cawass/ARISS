@@ -15,6 +15,10 @@ try:
 except Exception:  # pragma: no cover - optional import path
     msis = None
 
+MSIS_REFERENCE_DATE = np.datetime64("2000-01-01T00:00:00")
+MSIS_F107 = 140.0
+MSIS_AP = 15.0
+
 def _require_pymsis() -> None:
     if msis is None:
         raise ImportError(
@@ -32,6 +36,25 @@ def _as_1d_float_array(value: np.ndarray | float) -> np.ndarray:
 def _species_mass_density(number_density: np.ndarray, molar_mass: float) -> np.ndarray:
     molecule_mass = molar_mass / const.AVOGADRO_NUMBER
     return np.asarray(number_density, dtype=float) * molecule_mass
+
+
+def _resolve_msis_date(msis_date: str | np.datetime64 | None) -> np.datetime64:
+    if msis_date is None:
+        return MSIS_REFERENCE_DATE
+    try:
+        return np.datetime64(msis_date)
+    except Exception:
+        return MSIS_REFERENCE_DATE
+
+
+def _resolve_msis_scalar(value: float | None, default: float) -> float:
+    if value is None:
+        return default
+    try:
+        resolved = float(value)
+    except (TypeError, ValueError):
+        return default
+    return resolved if np.isfinite(resolved) else default
 
 @dataclass(frozen=True)
 class AtmosphereSample:
@@ -71,16 +94,28 @@ class AtmosphereSample:
             "dynamic_pressure": self.dynamic_pressure,
         }
 
-def atmos(height_array_km: np.ndarray | float) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def atmos(
+    height_array_km: np.ndarray | float,
+    msis_date: str | np.datetime64 | None = None,
+    msis_f107: float | None = None,
+    msis_ap: float | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Return ``rho, T, R_specific, O2, N2, O`` with species densities in ``kg/m^3``."""
     _require_pymsis()
     heights_km = _as_1d_float_array(height_array_km)
     n = len(heights_km)
-    et = np.array([np.datetime64("2020-01-01T00:00:00") for _ in range(n)])
+    date_value = _resolve_msis_date(msis_date)
+    f107_value = _resolve_msis_scalar(msis_f107, MSIS_F107)
+    ap_value = _resolve_msis_scalar(msis_ap, MSIS_AP)
+
+    et = np.array([date_value for _ in range(n)])
     lons = np.zeros(n)
     lats = np.zeros(n)
+    f107 = np.full(n, f107_value, dtype=float)
+    f107a = np.full(n, f107_value, dtype=float)
+    ap = np.full((n, 7), ap_value, dtype=float)
 
-    composition = msis.calculate(et, lons, lats, heights_km)
+    composition = msis.calculate(et, lons, lats, heights_km, f107s=f107, f107as=f107a, aps=ap)
     composition = np.nan_to_num(composition)
 
     rho = composition[:, msis.Variable.MASS_DENSITY]
@@ -110,10 +145,18 @@ def get_atmosphere_functions(
     height_min_km: float = 80.0,
     height_max_km: float = 1000.0,
     samples: int = 10000,
+    msis_date: str | np.datetime64 | None = None,
+    msis_f107: float | None = None,
+    msis_ap: float | None = None,
 ) -> tuple[Callable[[np.ndarray], np.ndarray], Callable[[np.ndarray], np.ndarray], Callable[[np.ndarray], np.ndarray], Callable[[np.ndarray], np.ndarray]]:
     """Return interpolation functions for density, velocity, dynamic pressure, temperature."""
     height_array = np.linspace(height_min_km, height_max_km, samples)
-    density, temperature, _, _, _, _ = atmos(height_array)
+    density, temperature, _, _, _, _ = atmos(
+        height_array,
+        msis_date=msis_date,
+        msis_f107=msis_f107,
+        msis_ap=msis_ap,
+    )
     velocity = calculate_orbital_velocity(height_array)
     dynamic_pressure = 0.5 * density * velocity**2
 
@@ -123,9 +166,19 @@ def get_atmosphere_functions(
     temperature_func = interp1d(height_array, temperature, bounds_error=False, fill_value="extrapolate")
     return density_func, velocity_func, dynamic_pressure_func, temperature_func
 
-def sample_atmosphere_at_height(height_km: float) -> AtmosphereSample:
+def sample_atmosphere_at_height(
+    height_km: float,
+    msis_date: str | np.datetime64 | None = None,
+    msis_f107: float | None = None,
+    msis_ap: float | None = None,
+) -> AtmosphereSample:
     """Return atmosphere and orbit properties for one altitude in km."""
-    density, temperature, r_specific, o2, n2, o = atmos(height_km)
+    density, temperature, r_specific, o2, n2, o = atmos(
+        height_km,
+        msis_date=msis_date,
+        msis_f107=msis_f107,
+        msis_ap=msis_ap,
+    )
     velocity = calculate_orbital_velocity(height_km)
 
     rho = float(density[0])
@@ -148,15 +201,35 @@ def sample_atmosphere_at_height(height_km: float) -> AtmosphereSample:
         dynamic_pressure=q,
     )
 
-def orbit_updates_from_height(height_km: float) -> dict[str, float]:
+def orbit_updates_from_height(
+    height_km: float,
+    msis_date: str | np.datetime64 | None = None,
+    msis_f107: float | None = None,
+    msis_ap: float | None = None,
+) -> dict[str, float]:
     """Build orbit-state update payload from mission height in km."""
-    sample = sample_atmosphere_at_height(height_km)
+    sample = sample_atmosphere_at_height(
+        height_km,
+        msis_date=msis_date,
+        msis_f107=msis_f107,
+        msis_ap=msis_ap,
+    )
     return sample.to_orbit_updates()
 
 
-def atmosphere_properties_from_height(height_km: float) -> dict[str, float]:
+def atmosphere_properties_from_height(
+    height_km: float,
+    msis_date: str | np.datetime64 | None = None,
+    msis_f107: float | None = None,
+    msis_ap: float | None = None,
+) -> dict[str, float]:
     """Return a serializable full-property atmosphere payload for one altitude in km."""
-    sample = sample_atmosphere_at_height(height_km)
+    sample = sample_atmosphere_at_height(
+        height_km,
+        msis_date=msis_date,
+        msis_f107=msis_f107,
+        msis_ap=msis_ap,
+    )
     return sample.to_properties()
 
 
@@ -165,6 +238,9 @@ def height_from_density(
     height_min_km: float = 80.0,
     height_max_km: float = 1000.0,
     samples: int = 5000,
+    msis_date: str | np.datetime64 | None = None,
+    msis_f107: float | None = None,
+    msis_ap: float | None = None,
 ) -> float:
     """Estimate altitude [km] for a target density [kg/m^3] via interpolation."""
     _require_pymsis()
@@ -172,7 +248,12 @@ def height_from_density(
     target = max(target, 1.0e-30)
 
     height_array = np.linspace(height_min_km, height_max_km, samples)
-    density, _, _, _, _, _ = atmos(height_array)
+    density, _, _, _, _, _ = atmos(
+        height_array,
+        msis_date=msis_date,
+        msis_f107=msis_f107,
+        msis_ap=msis_ap,
+    )
     density = np.maximum(np.asarray(density, dtype=float), 1.0e-30)
 
     # Build monotonic interpolation domain in log-density space.
@@ -190,20 +271,50 @@ def height_from_density(
     )
 
 
-def orbit_updates_from_density(target_density: float) -> dict[str, float]:
+def orbit_updates_from_density(
+    target_density: float,
+    msis_date: str | np.datetime64 | None = None,
+    msis_f107: float | None = None,
+    msis_ap: float | None = None,
+) -> dict[str, float]:
     """Build orbit-state update payload from target density [kg/m^3]."""
-    height_km = height_from_density(target_density)
-    updates = orbit_updates_from_height(height_km)
+    height_km = height_from_density(
+        target_density,
+        msis_date=msis_date,
+        msis_f107=msis_f107,
+        msis_ap=msis_ap,
+    )
+    updates = orbit_updates_from_height(
+        height_km,
+        msis_date=msis_date,
+        msis_f107=msis_f107,
+        msis_ap=msis_ap,
+    )
     target = float(target_density)
     if np.isfinite(target) and target > 0.0:
         updates["density"] = target
     return updates
 
 
-def atmosphere_properties_from_density(target_density: float) -> dict[str, float]:
+def atmosphere_properties_from_density(
+    target_density: float,
+    msis_date: str | np.datetime64 | None = None,
+    msis_f107: float | None = None,
+    msis_ap: float | None = None,
+) -> dict[str, float]:
     """Return a full-property atmosphere payload for a target density [kg/m^3]."""
-    height_km = height_from_density(target_density)
-    properties = atmosphere_properties_from_height(height_km)
+    height_km = height_from_density(
+        target_density,
+        msis_date=msis_date,
+        msis_f107=msis_f107,
+        msis_ap=msis_ap,
+    )
+    properties = atmosphere_properties_from_height(
+        height_km,
+        msis_date=msis_date,
+        msis_f107=msis_f107,
+        msis_ap=msis_ap,
+    )
     properties["model_density"] = properties["density"]
     properties["density"] = float(target_density)
     return properties

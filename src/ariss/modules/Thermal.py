@@ -63,6 +63,10 @@ def thermal_model(sc: SpacecraftState):
     TODO Elaborate docstring
     """
 
+    # Enforce matched body/intake area when requested by geometry settings.
+    if sc.geometry.Body_match_intake:
+        sc.geometry.A_body = sc.geometry.A_in
+
     # Geometry Calculations
     H_in = np.sqrt(sc.geometry.A_in /  sc.geometry.AR_in) # Intake height
     W_in =  sc.geometry.A_in / H_in # Intake width
@@ -97,7 +101,7 @@ def thermal_model(sc: SpacecraftState):
     #  Earth infrared heating - assuming side of the spacecraft is hit at 90 degrees
     Q_ir = const.EARTH_IR_EMISSION * np.square((const.EARTH_RADIUS / (const.EARTH_RADIUS + sc.orbit.altitude))) * A_earth * sc.thermal.epsilon_therm_body
     #  Internal heating - due to devices on board
-    Q_internal = sc.power.Power_total - sc.power.Power_prop * sc.thruster.thruster_eff - sc.power.Power_refprop * sc.refueling.eta_refuel
+    Q_internal = sc.power.Power_total - sc.power.Power_prop * sc.thruster.eff - sc.power.Power_refprop * sc.refueling.eta_refuel
     
     # Heat output at desired temperature excluding potential radiators
     Q_radiated = Ae_total * sc.thermal.T_des**4 * const.STEFAN_BOLTZMANN

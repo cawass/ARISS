@@ -8,10 +8,10 @@
 #        ARISS - Atmospheric Refueling Iterative System Solver
 # ============================================================================== #
 #  Description:
-#      Validation entry point for the Mansur reference configuration.
+#      Validation entry point for the IEPC 2025 configuration.
 #
 #  Project:        ARISS
-#  Module:         MansurVerification.py
+#  Module:         IEPC2025Validation.py
 # ============================================================================== #
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
@@ -28,4 +28,4 @@ if str(SRC) not in sys.path:
 from ariss import plot_simulation_history, run_simulation
 
 if __name__ == "__main__":
-    plot_simulation_history(Path(__file__).with_name("MansurVerification.toml"))
+    plot_simulation_history(Path(__file__).with_name("IEPC2025Validation.toml"))

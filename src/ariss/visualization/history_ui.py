@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import sys
 import traceback
+from copy import deepcopy
 from contextlib import redirect_stdout
 from dataclasses import dataclass, fields, is_dataclass
 from math import ceil, pi, sqrt
@@ -28,8 +29,9 @@ except Exception:  # pragma: no cover
     tk = None
     ttk = None
 
-from ariss.core.simulation import DragDiagnostics, compute_drag_diagnostics, run_sizing_loop
+from ariss.core.simulation import compute_drag_diagnostics, run_sizing_loop
 from ariss.core.spacecraft import GeometryState, SpacecraftState, load_spacecraft
+from ariss.modules.Thermal import ThermalDiagnostics, thermal_model
 from ariss.utils import constants as const
 from ariss.utils.atmosphere import atmosphere_properties_from_height, atmos
 
@@ -56,11 +58,12 @@ NASA_LINE = [
     "#8172b2",
     "#937860",
 ]
-GEOM_BODY = "#ffffff"
-GEOM_INTAKE = "#ffffff"
+GEOM_BODY = "#f5efe4"
+GEOM_INTAKE = "#ece6da"
 GEOM_SOLAR = "#2f6db3"
-GEOM_RAD = "#7c8da4"
+GEOM_RAD = "#f2f5f7"
 GEOM_PROP = "#c44e52"
+GEOM_EDGE = "#8f877b"
 WAKE_CMAP = cm.get_cmap("RdYlGn_r")
 WAKE_NORM = colors.Normalize(vmin=0.0, vmax=1.0)
 
@@ -164,7 +167,7 @@ PROPULSION_SPECS: list[PlotSpec] = [
     ("geometry.A_prop", "REQUIRED PROPULSIVE AREA", False),
     ("geometry.A_in", "INTAKE AREA", False),
     ("geometry.A_in_drag", "DRAG INTAKE AREA", False),
-    ("thruster.power_required", "POWER REQUIRED", True),
+    ("thruster.power", "POWER REQUIRED", True),
     ("thruster.thrust", "THRUST", True),
     ("thruster.m_flow", "PROPELLANT MASS FLOW", True),
     ("orbit.density", "INFERRED DENSITY", True),
@@ -305,6 +308,21 @@ def _rect_dims(area: float, aspect_ratio: float) -> tuple[float, float]:
     return width, height
 
 
+def _panel_planform_dims(area: float, aspect_ratio: float) -> tuple[float, float]:
+    area = _positive(area)
+    aspect_ratio = _positive(aspect_ratio)
+    length = sqrt(area / aspect_ratio)
+    width = area / length
+    return width, length
+
+
+def _mounted_axial_bounds(center_from_aft: float, length: float, mount_length: float) -> tuple[float, float]:
+    length = _positive(length)
+    half_length = 0.5 * length
+    center = float(np.clip(center_from_aft, 0.0, _positive(mount_length)))
+    return center - half_length, center + half_length
+
+
 def _ellipse_radii(area: float, aspect_ratio: float) -> tuple[float, float]:
     area = _positive(area)
     aspect_ratio = _positive(aspect_ratio)
@@ -314,7 +332,60 @@ def _ellipse_radii(area: float, aspect_ratio: float) -> tuple[float, float]:
 
 
 def _is_square(shape: str) -> bool:
-    return (shape or "").strip().lower().startswith("s")
+    normalized = (shape or "").strip().lower()
+    return normalized.startswith("s") or normalized.startswith("r")
+
+
+def _shape_power(shape_code: str, square_power: float = 24.0) -> float:
+    return square_power if _is_square(shape_code) else 2.0
+
+
+def _section_dims(area: float, aspect_ratio: float, shape_code: str) -> tuple[float, float]:
+    if area <= 0.0 or aspect_ratio <= 0.0:
+        return 0.0, 0.0
+    if _is_square(shape_code):
+        height = sqrt(area / aspect_ratio)
+        width = aspect_ratio * height
+    else:
+        height = sqrt(4.0 * area / (pi * aspect_ratio))
+        width = aspect_ratio * height
+    return float(width), float(height)
+
+
+def _local_section(
+    x: float,
+    body_length: float,
+    intake_length: float,
+    body_width: float,
+    body_height: float,
+    body_power: float,
+    intake_width: float,
+    intake_height: float,
+    intake_power: float,
+) -> tuple[float, float, float]:
+    if x <= body_length or intake_length <= 0.0:
+        return body_width, body_height, body_power
+    progress = float(np.clip((x - body_length) / intake_length, 0.0, 1.0))
+    width = body_width + progress * (intake_width - body_width)
+    height = body_height + progress * (intake_height - body_height)
+    power = body_power + progress * (intake_power - body_power)
+    return float(width), float(height), float(power)
+
+
+def _superellipse_half_span(
+    coord: np.ndarray | float,
+    semi_primary: float,
+    semi_other: float,
+    power: float,
+) -> np.ndarray:
+    coord_array = np.asarray(coord, dtype=float)
+    out = np.zeros_like(coord_array)
+    if semi_primary <= 0.0 or semi_other <= 0.0 or power <= 0.0:
+        return out
+    ratio = np.abs(coord_array) / semi_primary
+    inside = ratio <= 1.0
+    out[inside] = semi_other * np.power(1.0 - np.power(ratio[inside], power), 1.0 / power)
+    return out
 
 
 def _shape_from_geometry(area: float, aspect_ratio: float, shape: str) -> _SectionShape:
@@ -556,6 +627,72 @@ def _add_tapered_elliptic_tube(
         surface.set_sort_zpos(zorder)
 
 
+def _add_tapered_top_face(
+    axis,
+    x0: float,
+    x1: float,
+    front_width: float,
+    rear_width: float,
+    front_height: float,
+    rear_height: float,
+    color: Any,
+    alpha: float = 0.92,
+    edgecolor: str = "none",
+    linewidth: float = 0.4,
+    zorder: float | None = None,
+) -> None:
+    epsilon = 1.0e-3 * max(front_height, rear_height, 1.0)
+    front_z = 0.5 * front_height + epsilon
+    rear_z = 0.5 * rear_height + epsilon
+    face = [
+        (x0, -0.5 * front_width, front_z),
+        (x0, 0.5 * front_width, front_z),
+        (x1, 0.5 * rear_width, rear_z),
+        (x1, -0.5 * rear_width, rear_z),
+    ]
+    _add_poly3d(axis, [face], color, alpha, edgecolor, linewidth, zorder)
+
+
+def _add_tapered_elliptic_shell(
+    axis,
+    x0: float,
+    length: float,
+    front_semi_y: float,
+    front_semi_z: float,
+    rear_semi_y: float,
+    rear_semi_z: float,
+    theta_min: float,
+    theta_max: float,
+    color: Any,
+    alpha: float = 0.9,
+    edgecolor: str = "none",
+    linewidth: float = 0.0,
+    zorder: float | None = None,
+) -> None:
+    theta = np.linspace(theta_min, theta_max, 32)
+    x = np.linspace(x0, x0 + length, 20)
+    progress = np.linspace(0.0, 1.0, len(x))
+    semi_y = front_semi_y + (rear_semi_y - front_semi_y) * progress
+    semi_z = front_semi_z + (rear_semi_z - front_semi_z) * progress
+    theta_grid, x_grid = np.meshgrid(theta, x, indexing="ij")
+    y_grid = np.tile(semi_y, (len(theta), 1)) * np.cos(theta_grid)
+    z_grid = np.tile(semi_z, (len(theta), 1)) * np.sin(theta_grid)
+    surface = axis.plot_surface(
+        x_grid,
+        y_grid,
+        z_grid,
+        color=color,
+        alpha=alpha,
+        linewidth=linewidth,
+        edgecolor=edgecolor,
+        shade=False,
+    )
+    if zorder is not None:
+        surface.set_zorder(zorder)
+        surface.set_zsort("max")
+        surface.set_sort_zpos(zorder)
+
+
 def _add_rectangle_outline(
     axis,
     x: float,
@@ -619,20 +756,32 @@ def _style_3d_axis(axis, title: str) -> None:
 
 
 def _drag_x_spacecraft_frame(total_length: float, x_values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    # Diagnostics already provide axial coordinates in the spacecraft frame.
-    # Keep that orientation and only clip/sort for robust interpolation/plotting.
+    # Keep axial coordinates clipped/sorted for robust interpolation/plotting.
     x_spacecraft = np.clip(np.asarray(x_values, dtype=float), 0.0, total_length)
     order = np.argsort(x_spacecraft)
     return x_spacecraft[order], order
 
 
-def _wake_profile_arrays(total_length: float, diagnostics: DragDiagnostics) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    x_raw = np.asarray(diagnostics.x_array, dtype=float)
-    x_drag, order = _drag_x_spacecraft_frame(total_length, x_raw)
-    fy_profile = np.clip(np.nan_to_num(np.asarray(diagnostics.fy_array, dtype=float), nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)[order]
-    fz_profile = np.clip(np.nan_to_num(np.asarray(diagnostics.fz_array, dtype=float), nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)[order]
-    if x_drag.size == 0:
-        return np.array([0.0]), np.array([1.0]), np.array([1.0])
+def _wake_profile_arrays(
+    total_length: float,
+    geometry: GeometryState,
+    x_values: np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    if x_values is None or np.asarray(x_values, dtype=float).size == 0:
+        if total_length > 0.0:
+            x_drag = np.array([0.0, total_length], dtype=float)
+        else:
+            x_drag = np.array([0.0], dtype=float)
+    else:
+        x_drag, _ = _drag_x_spacecraft_frame(total_length, np.asarray(x_values, dtype=float))
+
+    body_end = float(np.clip(_safe_float(geometry.L_body), 0.0, total_length))
+    wake_body = float(getattr(geometry, "wake_body", 1.0))
+    wake_in = float(getattr(geometry, "wake_in", 1.0))
+    profile = np.where(x_drag < body_end, wake_body, wake_in).astype(float)
+    fy_profile = profile.copy()
+    fz_profile = profile.copy()
+
     return x_drag, fy_profile, fz_profile
 
 
@@ -643,7 +792,7 @@ def _wake_fraction_at_x(
     fy_profile: np.ndarray,
     fz_profile: np.ndarray,
 ) -> tuple[float, float, float]:
-    if total_length <= 0.0:
+    if total_length <= 0.0 or x_drag.size == 0:
         return 1.0, 1.0, 1.0
     x_drag_value = float(np.clip(x_geom, 0.0, total_length))
     fy = float(np.interp(x_drag_value, x_drag, fy_profile))
@@ -659,26 +808,117 @@ def _wake_color(value: float) -> tuple[float, float, float, float]:
 def _drag_geometry_samples(
     body_length: float,
     intake_length: float,
-    diagnostics: DragDiagnostics,
     max_segments: int = 80,
 ) -> np.ndarray:
     total_length = body_length + intake_length
     anchors = np.array([0.0, body_length, total_length], dtype=float)
-    x_raw = np.asarray(diagnostics.x_array, dtype=float)
-    if x_raw.size == 0 or total_length <= 0.0:
+    if total_length <= 0.0:
         return np.unique(anchors)
 
-    x_geom, _ = _drag_x_spacecraft_frame(total_length, x_raw)
-    samples = np.unique(np.concatenate([anchors, x_geom]))
+    samples = np.linspace(0.0, total_length, max_segments + 1, dtype=float)
+    samples = np.unique(np.concatenate([anchors, samples]))
     samples = samples[(samples >= 0.0) & (samples <= total_length)]
     samples.sort()
-
-    if samples.size > max_segments + 1:
-        selected = np.linspace(0, samples.size - 1, max_segments + 1, dtype=int)
-        samples = np.unique(np.concatenate([anchors, samples[selected]]))
-        samples.sort()
-
     return samples
+
+
+def _plot_drag_slice_lines(
+    axis,
+    geometry: GeometryState,
+    n_x: int = 140,
+    n_cuts: int = 7,
+) -> None:
+    total_length = max(_safe_float(geometry.L_body + geometry.L_in), 0.0)
+    if total_length <= 0.0 or n_x < 2 or n_cuts < 1:
+        return
+
+    w_in, h_in = _section_dims(geometry.A_in, geometry.AR_in, geometry.S_in)
+    w_body, h_body = _section_dims(geometry.A_body, geometry.AR_body, geometry.S_body)
+    p_body = _shape_power(geometry.S_body)
+    p_in = _shape_power(geometry.S_in)
+
+    max_half_width = 0.5 * max(w_body, w_in)
+    max_half_height = 0.5 * max(h_body, h_in)
+    if max_half_width <= 0.0 or max_half_height <= 0.0:
+        return
+
+    x_values = np.linspace(0.0, total_length, n_x, dtype=float)
+    y_cuts = np.linspace(-0.9 * max_half_width, 0.9 * max_half_width, n_cuts, dtype=float)
+    z_cuts = np.linspace(-0.9 * max_half_height, 0.9 * max_half_height, n_cuts, dtype=float)
+
+    for y_cut in y_cuts:
+        z_plus = np.full_like(x_values, np.nan)
+        z_minus = np.full_like(x_values, np.nan)
+        for i, x_value in enumerate(x_values):
+            w_loc, h_loc, p_loc = _local_section(
+                x_value,
+                geometry.L_body,
+                geometry.L_in,
+                w_body,
+                h_body,
+                p_body,
+                w_in,
+                h_in,
+                p_in,
+            )
+            half_width = 0.5 * w_loc
+            half_height = 0.5 * h_loc
+            if half_width <= 0.0 or half_height <= 0.0 or abs(y_cut) > half_width:
+                continue
+            z_value = float(_superellipse_half_span(y_cut, half_width, half_height, p_loc))
+            z_plus[i] = z_value
+            z_minus[i] = -z_value
+
+        y_values = np.full_like(x_values, y_cut)
+        for z_values in (z_plus, z_minus):
+            valid = np.isfinite(z_values)
+            if np.any(valid):
+                axis.plot(
+                    x_values[valid],
+                    y_values[valid],
+                    z_values[valid],
+                    color="#c44e52",
+                    linewidth=0.9,
+                    alpha=0.55,
+                    zorder=42.0,
+                )
+
+    for z_cut in z_cuts:
+        y_plus = np.full_like(x_values, np.nan)
+        y_minus = np.full_like(x_values, np.nan)
+        for i, x_value in enumerate(x_values):
+            w_loc, h_loc, p_loc = _local_section(
+                x_value,
+                geometry.L_body,
+                geometry.L_in,
+                w_body,
+                h_body,
+                p_body,
+                w_in,
+                h_in,
+                p_in,
+            )
+            half_width = 0.5 * w_loc
+            half_height = 0.5 * h_loc
+            if half_width <= 0.0 or half_height <= 0.0 or abs(z_cut) > half_height:
+                continue
+            y_value = float(_superellipse_half_span(z_cut, half_height, half_width, p_loc))
+            y_plus[i] = y_value
+            y_minus[i] = -y_value
+
+        z_values = np.full_like(x_values, z_cut)
+        for y_values in (y_plus, y_minus):
+            valid = np.isfinite(y_values)
+            if np.any(valid):
+                axis.plot(
+                    x_values[valid],
+                    y_values[valid],
+                    z_values[valid],
+                    color="#2a9d8f",
+                    linewidth=0.9,
+                    alpha=0.55,
+                    zorder=42.0,
+                )
 
 
 def _render_spacecraft(
@@ -686,6 +926,7 @@ def _render_spacecraft(
     geometry: GeometryState,
     color_fn: Callable[[str, float, float], Any],
     x_samples: np.ndarray | None = None,
+    core_edgecolor: str | None = None,
 ) -> dict[str, list[float]]:
     bounds = {"x": [], "y": [], "z": []}
     body_length = _positive(geometry.L_body, 0.1)
@@ -712,7 +953,10 @@ def _render_spacecraft(
         segment_color = color_fn("core", x_mid, total_length)
         zorder = 6.0 if x_mid >= body_length else 5.0
 
-        if body_shape.is_square and intake_shape.is_square:
+        in_body = x_mid <= body_length
+        segment_is_square = body_shape.is_square if in_body else intake_shape.is_square
+
+        if segment_is_square:
             _add_tapered_box(
                 axis,
                 x0,
@@ -723,8 +967,8 @@ def _render_spacecraft(
                 shape_1.height,
                 segment_color,
                 alpha=0.95,
-                edgecolor="none",
-                linewidth=0.0,
+                edgecolor=core_edgecolor or "none",
+                linewidth=0.8 if core_edgecolor else 0.0,
                 zorder=zorder,
             )
         else:
@@ -738,10 +982,46 @@ def _render_spacecraft(
                 shape_1.semi_z,
                 segment_color,
                 alpha=0.95,
-                edgecolor="none",
-                linewidth=0.0,
+                edgecolor=core_edgecolor or "none",
+                linewidth=0.35 if core_edgecolor else 0.0,
                 zorder=zorder,
             )
+
+        if geometry.A_solar > 0.0:
+            solar_cover_color = color_fn("solar", x_mid, total_length)
+            solar_zorder = zorder + 3.0
+            if segment_is_square:
+                _add_tapered_top_face(
+                    axis,
+                    x0,
+                    x1,
+                    shape_0.width,
+                    shape_1.width,
+                    shape_0.height,
+                    shape_1.height,
+                    solar_cover_color,
+                    alpha=0.95,
+                    edgecolor=GEOM_EDGE,
+                    linewidth=0.35,
+                    zorder=solar_zorder,
+                )
+            else:
+                _add_tapered_elliptic_shell(
+                    axis,
+                    x0,
+                    x1 - x0,
+                    1.002 * shape_0.semi_y,
+                    1.002 * shape_0.semi_z,
+                    1.002 * shape_1.semi_y,
+                    1.002 * shape_1.semi_z,
+                    0.0,
+                    np.pi,
+                    solar_cover_color,
+                    alpha=0.9,
+                    edgecolor="none",
+                    linewidth=0.0,
+                    zorder=solar_zorder,
+                )
 
     max_width = max(body_shape.width, intake_shape.width)
     max_height = max(body_shape.height, intake_shape.height)
@@ -755,11 +1035,10 @@ def _render_spacecraft(
 
     if geometry.A_solar > 0.0:
         solar_area_each = 0.5 * geometry.A_solar
-        solar_span, solar_chord = _rect_dims(solar_area_each, geometry.AR_solar)
+        solar_span, solar_chord = _panel_planform_dims(solar_area_each, geometry.AR_solar)
         solar_thickness = max(0.06, 0.06 * min(body_shape.width, body_shape.height))
         solar_clearance = max(0.04, 1.25 * solar_thickness)
-        solar_x0 = 0.5 * body_length - 0.5 * solar_chord
-        solar_x1 = solar_x0 + solar_chord
+        solar_x0, solar_x1 = _mounted_axial_bounds(geometry.X_solar, solar_chord, body_length)
         solar_color = color_fn("solar", 0.5 * (solar_x0 + solar_x1), total_length)
         starboard_y0 = 0.5 * body_shape.width + solar_clearance
         starboard_y1 = starboard_y0 + solar_span
@@ -774,18 +1053,24 @@ def _render_spacecraft(
 
     if geometry.A_rad > 0.0:
         rad_area_each = 0.5 * geometry.A_rad
-        rad_length, rad_span = _rect_dims(rad_area_each, geometry.AR_rad)
+        rad_span, rad_chord = _panel_planform_dims(rad_area_each, geometry.AR_rad)
         rad_thickness = max(0.02, 0.03 * min(body_shape.width, body_shape.height))
-        rad_x0 = 0.55 * body_length - 0.5 * rad_length
-        rad_x1 = rad_x0 + rad_length
+        rad_clearance = max(0.03, 1.1 * rad_thickness)
+        rad_x0, rad_x1 = _mounted_axial_bounds(geometry.X_rad, rad_chord, body_length)
         rad_color = color_fn("rad", 0.5 * (rad_x0 + rad_x1), total_length)
-        _add_box(axis, rad_x0, rad_x1, -0.5 * rad_span, 0.5 * rad_span, 0.5 * body_shape.height, 0.5 * body_shape.height + rad_thickness, rad_color, alpha=0.78, zorder=20.0)
-        _add_box(axis, rad_x0, rad_x1, -0.5 * rad_span, 0.5 * rad_span, -0.5 * body_shape.height - rad_thickness, -0.5 * body_shape.height, rad_color, alpha=0.78, zorder=20.0)
+        top_z0 = 0.5 * body_shape.height + rad_clearance
+        top_z1 = top_z0 + rad_span
+        bottom_z1 = -0.5 * body_shape.height - rad_clearance
+        bottom_z0 = bottom_z1 - rad_span
+        _add_box(axis, rad_x0, rad_x1, -0.5 * rad_thickness, 0.5 * rad_thickness, top_z0, top_z1, rad_color, alpha=0.9, zorder=20.0)
+        _add_box(axis, rad_x0, rad_x1, -0.5 * rad_thickness, 0.5 * rad_thickness, bottom_z0, bottom_z1, rad_color, alpha=0.9, zorder=20.0)
+        _add_box_edges(axis, rad_x0, rad_x1, -0.5 * rad_thickness, 0.5 * rad_thickness, top_z0, top_z1, color=GEOM_EDGE, linewidth=1.0, zorder=21.0)
+        _add_box_edges(axis, rad_x0, rad_x1, -0.5 * rad_thickness, 0.5 * rad_thickness, bottom_z0, bottom_z1, color=GEOM_EDGE, linewidth=1.0, zorder=21.0)
         _extend_bounds(
             bounds,
             [rad_x0, rad_x1],
-            [-0.5 * rad_span, 0.5 * rad_span],
-            [-0.5 * body_shape.height - rad_thickness, 0.5 * body_shape.height + rad_thickness],
+            [-0.5 * rad_thickness, 0.5 * rad_thickness],
+            [bottom_z0, top_z1],
         )
 
     return bounds
@@ -807,7 +1092,7 @@ def draw_spacecraft_geometry(axis, geometry: GeometryState, iteration: int | Non
             return GEOM_PROP
         return GEOM_BODY
 
-    bounds = _render_spacecraft(axis, geometry, _color)
+    bounds = _render_spacecraft(axis, geometry, _color, core_edgecolor=GEOM_EDGE)
     if not bounds["x"]:
         _extend_bounds(bounds, [0.0, 1.0], [-0.5, 0.5], [-0.5, 0.5])
     _style_3d_axis(axis, f"SC Geometry | Iteration {iteration if iteration is not None else 0}")
@@ -817,24 +1102,24 @@ def draw_spacecraft_geometry(axis, geometry: GeometryState, iteration: int | Non
 def draw_spacecraft_drag_geometry(
     figure,
     state: SpacecraftState,
-    diagnostics: DragDiagnostics,
     iteration: int | None = None,
 ) -> None:
-    """Render spacecraft geometry colored by local wake ratio."""
+    """Render spacecraft geometry colored by wake-factor profiles."""
     figure.clear()
     axis = figure.add_subplot(111, projection="3d")
     body_length = max(_safe_float(state.geometry.L_body), 0.0)
     intake_length = max(_safe_float(state.geometry.L_in), 0.0)
     total_length = body_length + intake_length
 
-    x_drag, fy_profile, fz_profile = _wake_profile_arrays(total_length, diagnostics)
-    x_samples = _drag_geometry_samples(body_length, intake_length, diagnostics)
+    x_samples = _drag_geometry_samples(body_length, intake_length)
+    x_drag, fy_profile, fz_profile = _wake_profile_arrays(total_length, state.geometry, x_samples)
 
-    def _color(_component: str, x_mid: float, _total: float) -> Any:
+    def _color(component: str, x_mid: float, _total: float) -> Any:
         _, _, wake_mean = _wake_fraction_at_x(x_mid, total_length, x_drag, fy_profile, fz_profile)
         return _wake_color(wake_mean)
 
     bounds = _render_spacecraft(axis, state.geometry, _color, x_samples=x_samples)
+    _plot_drag_slice_lines(axis, state.geometry)
     if not bounds["x"]:
         _extend_bounds(bounds, [0.0, 1.0], [-0.5, 0.5], [-0.5, 0.5])
     _style_3d_axis(axis, f"3D Drag Exposure | Iteration {iteration if iteration is not None else 0}")
@@ -843,7 +1128,7 @@ def draw_spacecraft_drag_geometry(
     axis.text2D(
         0.02,
         0.02,
-        "Color scale: green = 0.00, red = 1.00 | color = mean(fy, fz)",
+        "Surface color = local wake factor | red = y=c cuts | green = z=c cuts",
         transform=axis.transAxes,
         color=NASA_TEXT,
         fontsize=9,
@@ -853,7 +1138,7 @@ def draw_spacecraft_drag_geometry(
     scalar_map = cm.ScalarMappable(norm=WAKE_NORM, cmap=WAKE_CMAP)
     scalar_map.set_array([])
     colorbar = figure.colorbar(scalar_map, ax=axis, fraction=0.045, pad=0.08)
-    colorbar.set_label("Wake ratio [-]", color=NASA_TEXT, fontsize=9)
+    colorbar.set_label("Wake factor [-]", color=NASA_TEXT, fontsize=9)
     colorbar.ax.tick_params(colors=NASA_TEXT, labelsize=8)
     colorbar.outline.set_edgecolor(NASA_TEXT)
     figure.patch.set_facecolor(NASA_BG)
@@ -892,7 +1177,7 @@ def _drag_component_label(attr_name: str) -> str:
     return labels.get(attr_name, attr_name.removeprefix("drag_").replace("_", " ").title())
 
 
-def _drag_component_map(state: SpacecraftState, diagnostics: DragDiagnostics) -> dict[str, float]:
+def _drag_component_map(state: SpacecraftState) -> dict[str, float]:
     drag_values: dict[str, Any] = {}
     drag_state = state.drag
 
@@ -901,17 +1186,6 @@ def _drag_component_map(state: SpacecraftState, diagnostics: DragDiagnostics) ->
             drag_values[field_info.name] = getattr(drag_state, field_info.name)
     for name, value in vars(drag_state).items():
         drag_values[name] = value
-
-    totals_to_attr = {
-        "body": "drag_body_side",
-        "inlet": "drag_inlet_side",
-        "solar": "drag_solar",
-        "rad": "drag_rad",
-    }
-    for key, value in getattr(diagnostics, "totals", {}).items():
-        attr_name = totals_to_attr.get(key)
-        if attr_name is not None:
-            drag_values[attr_name] = value
 
     preferred_order = [
         "drag_body_side",
@@ -934,35 +1208,50 @@ def _drag_component_map(state: SpacecraftState, diagnostics: DragDiagnostics) ->
     return {name: _safe_float(drag_values[name]) for name in component_names}
 
 
+def _thermal_component_label(attr_name: str) -> str:
+    labels = {
+        "Q_drag": "Drag",
+        "Q_sun": "Sun",
+        "Q_albedo": "Albedo",
+        "Q_ir": "Earth IR",
+        "Q_internal": "Internal",
+        "Q_radiated": "Radiated",
+    }
+    return labels.get(attr_name, attr_name.removeprefix("Q_").replace("_", " ").title())
+
+
+def _thermal_component_map(diagnostics: ThermalDiagnostics) -> dict[str, float]:
+    preferred_order = ["Q_drag", "Q_sun", "Q_albedo", "Q_ir", "Q_internal", "Q_radiated"]
+    return {name: _safe_float(getattr(diagnostics, name, 0.0)) for name in preferred_order}
+
+
 def draw_drag_distribution(
     figure,
     state: SpacecraftState,
-    diagnostics: DragDiagnostics,
     iteration: int | None = None,
 ) -> None:
-    """Render drag distribution diagnostics for one spacecraft state."""
+    """Render drag diagnostics using active wake-based model quantities."""
     figure.clear()
     axes = figure.subplots(2, 2, squeeze=False)
 
-    total_length = max(_safe_float(state.geometry.L_body + state.geometry.L_in), 0.0)
-    x_raw = np.asarray(diagnostics.x_array, dtype=float)
-    x_values, order = _drag_x_spacecraft_frame(total_length, x_raw)
-    d_body = np.asarray(diagnostics.d_body_array, dtype=float)[order]
-    d_in = np.asarray(diagnostics.d_in_array, dtype=float)[order]
-    d_total = d_body + d_in
-
-    if x_values.size >= 2:
-        dx = np.diff(x_values)
-        d_body_cum = np.concatenate(([0.0], np.cumsum(0.5 * (d_body[1:] + d_body[:-1]) * dx)))
-        d_in_cum = np.concatenate(([0.0], np.cumsum(0.5 * (d_in[1:] + d_in[:-1]) * dx)))
-    else:
-        d_body_cum = np.zeros_like(d_body)
-        d_in_cum = np.zeros_like(d_in)
-
-    d_total_cum = d_body_cum + d_in_cum
-    fy_values = np.asarray(diagnostics.fy_array, dtype=float)[order]
-    fz_values = np.asarray(diagnostics.fz_array, dtype=float)[order]
+    drag_coefficients = {
+        "Body Side": _safe_float(state.drag.cd_body_side),
+        "Inlet Side": _safe_float(state.drag.cd_inlet_side),
+        "Inlet Front": _safe_float(state.drag.cd_inlet_front),
+        "Solar": _safe_float(state.drag.cd_solar),
+        "Radiator": _safe_float(state.drag.cd_rad),
+    }
+    drag_components = _drag_component_map(state)
+    wake_factors = {
+        "Body": _safe_float(getattr(state.geometry, "wake_body", 1.0)),
+        "Inlet": _safe_float(getattr(state.geometry, "wake_in", 1.0)),
+        "Solar": _safe_float(getattr(state.geometry, "wake_solar", 1.0)),
+        "Radiator": _safe_float(getattr(state.geometry, "wake_radiator", 1.0)),
+    }
     exchange_terms = _momentum_exchange_terms(state)
+    orbit_density = _safe_float(state.orbit.density)
+    orbit_velocity = _safe_float(state.orbit.velocity)
+    dynamic_pressure = 0.5 * orbit_density * orbit_velocity * orbit_velocity
 
     def _style_axis(axis) -> None:
         axis.set_facecolor(NASA_BG)
@@ -971,68 +1260,174 @@ def draw_drag_distribution(
         for spine in axis.spines.values():
             spine.set_color(NASA_TEXT)
 
-    def _shade_regions(axis) -> None:
-        body_end = max(_safe_float(state.geometry.L_body), 0.0)
-        inlet_end = max(_safe_float(state.geometry.L_body + state.geometry.L_in), body_end)
-        axis.axvspan(0.0, body_end, color="#e8dfcf", alpha=0.35)
-        axis.axvspan(body_end, inlet_end, color="#d7e3f0", alpha=0.35)
+    cd_axis = axes[0][0]
+    _style_axis(cd_axis)
+    cd_labels = list(drag_coefficients.keys())
+    cd_values = list(drag_coefficients.values())
+    cd_axis.bar(
+        cd_labels,
+        cd_values,
+        color=[NASA_LINE[i % len(NASA_LINE)] for i in range(len(cd_labels))],
+        edgecolor=NASA_TEXT,
+        linewidth=0.8,
+    )
+    cd_axis.set_title("EFFECTIVE DRAG COEFFICIENTS", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
+    cd_axis.set_ylabel("Cd [-]", color=NASA_TEXT, fontsize=8)
 
-    local_axis = axes[0][0]
-    _style_axis(local_axis)
-    if x_values.size:
-        _shade_regions(local_axis)
-    local_axis.plot(x_values, d_body, color="#c44e52", linewidth=1.9, label="Body local")
-    local_axis.plot(x_values, d_in, color="#4c72b0", linewidth=1.9, label="Intake local")
-    local_axis.plot(x_values, d_total, color="#55a868", linewidth=1.6, linestyle="--", label="Total local")
-    local_axis.set_title("LOCAL DRAG DENSITY", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
-    local_axis.set_xlabel("X from thruster plane [m]", color=NASA_TEXT, fontsize=9)
-    local_axis.set_ylabel("Unscaled drag density", color=NASA_TEXT, fontsize=8)
-    local_axis.legend(loc="best", facecolor=NASA_PANEL, edgecolor=NASA_GRID, framealpha=1.0, fontsize=7)
+    force_axis = axes[0][1]
+    _style_axis(force_axis)
+    force_labels = [_drag_component_label(name) for name in drag_components]
+    force_values = list(drag_components.values())
+    force_axis.bar(
+        force_labels,
+        force_values,
+        color=[NASA_LINE[i % len(NASA_LINE)] for i in range(len(force_labels))],
+        edgecolor=NASA_TEXT,
+        linewidth=0.8,
+    )
+    shown_drag_sum = float(np.sum(force_values))
+    total_drag = exchange_terms["total_drag"]
+    force_axis.axhline(total_drag, color="#6b7280", linestyle="--", linewidth=1.1, label=f"State total = {total_drag:.3e} N")
+    if not np.isclose(shown_drag_sum, total_drag, rtol=1.0e-6, atol=1.0e-12):
+        force_axis.axhline(shown_drag_sum, color="#2f6db3", linestyle="-.", linewidth=1.1, label=f"Shown sum = {shown_drag_sum:.3e} N")
+    force_axis.set_title("DRAG FORCE BY SURFACE", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
+    force_axis.set_ylabel("Force [N]", color=NASA_TEXT, fontsize=8)
+    force_axis.legend(loc="best", facecolor=NASA_PANEL, edgecolor=NASA_GRID, framealpha=1.0, fontsize=7)
 
-    cumulative_axis = axes[0][1]
-    _style_axis(cumulative_axis)
-    if x_values.size:
-        _shade_regions(cumulative_axis)
-    cumulative_axis.plot(x_values, d_body_cum, color="#c44e52", linewidth=1.9, label="Body cumulative")
-    cumulative_axis.plot(x_values, d_in_cum, color="#4c72b0", linewidth=1.9, label="Intake cumulative")
-    cumulative_axis.plot(x_values, d_total_cum, color="#55a868", linewidth=1.6, linestyle="--", label="Total cumulative")
-    cumulative_axis.set_title("CUMULATIVE DRAG", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
-    cumulative_axis.set_xlabel("X from thruster plane [m]", color=NASA_TEXT, fontsize=9)
-    cumulative_axis.set_ylabel("Integrated drag", color=NASA_TEXT, fontsize=8)
-    cumulative_axis.legend(loc="best", facecolor=NASA_PANEL, edgecolor=NASA_GRID, framealpha=1.0, fontsize=7)
+    wake_axis = axes[1][0]
+    _style_axis(wake_axis)
+    wake_labels = list(wake_factors.keys())
+    wake_values = list(wake_factors.values())
+    wake_axis.bar(
+        wake_labels,
+        wake_values,
+        color=["#c44e52", "#4c72b0", "#2f6db3", "#6d597a"],
+        edgecolor=NASA_TEXT,
+        linewidth=0.8,
+    )
+    wake_axis.set_ylim(-0.05, 1.05)
+    wake_axis.set_title("WAKE FACTORS", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
+    wake_axis.set_ylabel("Wake factor [-]", color=NASA_TEXT, fontsize=8)
 
-    capture_axis = axes[1][0]
-    _style_axis(capture_axis)
-    if x_values.size:
-        _shade_regions(capture_axis)
-    capture_axis.plot(x_values, fy_values, color="#4c72b0", linewidth=1.8, label="fy")
-    capture_axis.plot(x_values, fz_values, color="#dd8452", linewidth=1.8, label="fz")
-    capture_axis.set_ylim(-0.05, 1.05)
-    capture_axis.set_title("CAPTURE FRACTION", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
-    capture_axis.set_xlabel("X from thruster plane [m]", color=NASA_TEXT, fontsize=9)
-    capture_axis.set_ylabel("Capture fraction [-]", color=NASA_TEXT, fontsize=8)
-    capture_axis.legend(loc="best", facecolor=NASA_PANEL, edgecolor=NASA_GRID, framealpha=1.0, fontsize=7)
-
-    totals_axis = axes[1][1]
-    _style_axis(totals_axis)
-    drag_components = _drag_component_map(state, diagnostics)
-    component_labels = [_drag_component_label(name) for name in drag_components]
-    component_values = list(drag_components.values())
-    component_labels.extend(["Refuel", "Propulsive"])
-    component_values.extend([exchange_terms["refueling_exchange"], exchange_terms["propulsive_exchange"]])
-    values = np.nan_to_num(np.asarray(component_values, dtype=float), nan=0.0, posinf=0.0, neginf=0.0)
-    totals_axis.bar(component_labels, values, color=[NASA_LINE[i % len(NASA_LINE)] for i in range(len(component_labels))], edgecolor=NASA_TEXT, linewidth=0.8)
-    shown_drag_sum = float(np.sum(list(drag_components.values())))
-    totals_axis.axhline(exchange_terms["total_drag"], color="#6b7280", linestyle="--", linewidth=1.1, label=f"State total drag = {exchange_terms['total_drag']:.3e} N")
-    if not np.isclose(shown_drag_sum, exchange_terms["total_drag"], rtol=1.0e-6, atol=1.0e-12):
-        totals_axis.axhline(shown_drag_sum, color="#2f6db3", linestyle="-.", linewidth=1.1, label=f"Shown drag sum = {shown_drag_sum:.3e} N")
-    totals_axis.axhline(exchange_terms["total_load"], color="#dd8452", linestyle=":", linewidth=1.2, label=f"Drag + exchanges = {exchange_terms['total_load']:.3e} N")
-    totals_axis.set_title("DRAG + EXCHANGE TERMS", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
-    totals_axis.set_ylabel("Force [N]", color=NASA_TEXT, fontsize=8)
-    totals_axis.legend(loc="best", facecolor=NASA_PANEL, edgecolor=NASA_GRID, framealpha=1.0, fontsize=7)
+    terms_axis = axes[1][1]
+    _style_axis(terms_axis)
+    thrust_available = _safe_float(getattr(state.thruster, "thrust", 0.0))
+    balance_residual = thrust_available - exchange_terms["total_load"]
+    term_labels = ["Aero Drag", "Refuel Ram", "Prop Ram", "Required Load", "Thrust"]
+    term_values = [
+        exchange_terms["total_drag"],
+        exchange_terms["refueling_exchange"],
+        exchange_terms["propulsive_exchange"],
+        exchange_terms["total_load"],
+        thrust_available,
+    ]
+    terms_axis.bar(
+        term_labels,
+        term_values,
+        color=["#6b7280", "#dd8452", "#55a868", "#c44e52", "#2f6db3"],
+        edgecolor=NASA_TEXT,
+        linewidth=0.8,
+    )
+    terms_axis.set_title("FORCE BALANCE (AERO + RAM)", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
+    terms_axis.set_ylabel("Force [N]", color=NASA_TEXT, fontsize=8)
+    terms_axis.text(
+        0.02,
+        0.98,
+        f"rho = {orbit_density:.3e} kg/m^3\nV = {orbit_velocity:.2f} m/s\nq = {dynamic_pressure:.3e} Pa\n"
+        f"Residual (T-Load) = {balance_residual:.3e} N",
+        transform=terms_axis.transAxes,
+        ha="left",
+        va="top",
+        color=NASA_TEXT,
+        fontsize=8,
+        fontfamily="Courier New",
+    )
 
     figure.patch.set_facecolor(NASA_BG)
-    figure.suptitle(f"DRAG DISTRIBUTION | Iteration {iteration if iteration is not None else 0}", color=NASA_TEXT, fontsize=14, fontfamily="Courier New", fontweight="bold")
+    figure.suptitle(
+        f"DRAG DIAGNOSTICS | Iteration {iteration if iteration is not None else 0}",
+        color=NASA_TEXT,
+        fontsize=14,
+        fontfamily="Courier New",
+        fontweight="bold",
+    )
+    figure.tight_layout(rect=[0, 0, 1, 0.96])
+
+
+def draw_thermal_distribution(
+    figure,
+    state: SpacecraftState,
+    diagnostics: ThermalDiagnostics,
+    iteration: int | None = None,
+) -> None:
+    """Render thermal contribution diagnostics for one spacecraft state."""
+    figure.clear()
+    axes = figure.subplots(2, 2, squeeze=False)
+    components = _thermal_component_map(diagnostics)
+    input_names = [name for name in components if name != "Q_radiated"]
+    input_labels = [_thermal_component_label(name) for name in input_names]
+    input_values = np.asarray([components[name] for name in input_names], dtype=float)
+    total_input = float(np.sum(input_values))
+    q_radiated = components["Q_radiated"]
+    net_load = total_input - q_radiated
+
+    def _style_axis(axis) -> None:
+        axis.set_facecolor(NASA_BG)
+        axis.grid(True, color=NASA_GRID, alpha=0.65, linestyle="--", linewidth=0.7)
+        axis.tick_params(colors=NASA_TEXT, labelsize=8)
+        for spine in axis.spines.values():
+            spine.set_color(NASA_TEXT)
+
+    input_axis = axes[0][0]
+    _style_axis(input_axis)
+    input_axis.bar(input_labels, input_values, color=[NASA_LINE[i % len(NASA_LINE)] for i in range(len(input_labels))], edgecolor=NASA_TEXT, linewidth=0.8)
+    input_axis.set_title("HEATING INPUTS", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
+    input_axis.set_ylabel("Heat rate [W]", color=NASA_TEXT, fontsize=8)
+
+    signed_axis = axes[0][1]
+    _style_axis(signed_axis)
+    signed_labels = input_labels + [_thermal_component_label("Q_radiated")]
+    signed_values = np.concatenate([input_values, np.array([-q_radiated], dtype=float)])
+    signed_colors = [NASA_LINE[i % len(NASA_LINE)] for i in range(len(input_labels))] + ["#6b7280"]
+    signed_axis.bar(signed_labels, signed_values, color=signed_colors, edgecolor=NASA_TEXT, linewidth=0.8)
+    signed_axis.axhline(0.0, color=NASA_TEXT, linewidth=0.9)
+    signed_axis.set_title("SIGNED CONTRIBUTIONS", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
+    signed_axis.set_ylabel("Heat rate [W]", color=NASA_TEXT, fontsize=8)
+
+    balance_axis = axes[1][0]
+    _style_axis(balance_axis)
+    balance_labels = ["Total in", "Radiated", "Net load"]
+    balance_values = np.asarray([total_input, q_radiated, net_load], dtype=float)
+    balance_axis.bar(balance_labels, balance_values, color=["#dd8452", "#6b7280", "#2f6db3"], edgecolor=NASA_TEXT, linewidth=0.8)
+    balance_axis.set_title("THERMAL BALANCE", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
+    balance_axis.set_ylabel("Heat rate [W]", color=NASA_TEXT, fontsize=8)
+
+    summary_axis = axes[1][1]
+    summary_axis.set_facecolor(NASA_BG)
+    summary_axis.axis("off")
+    summary_axis.text(
+        0.02,
+        0.98,
+        (
+            f"A_rad = {_safe_float(state.geometry.A_rad):.3f} m^2\n"
+            f"T_des = {_safe_float(state.thermal.T_des):.2f} K\n"
+            f"alpha_body = {_safe_float(state.thermal.alpha_body):.3f}\n"
+            f"alpha_solar = {_safe_float(state.thermal.alpha_solar):.3f}\n"
+            f"eps_body = {_safe_float(state.thermal.epsilon_therm_body):.3f}\n"
+            f"eps_solar = {_safe_float(state.thermal.epsilon_therm_solar):.3f}\n"
+            f"eps_rad = {_safe_float(state.thermal.epsilon_therm_rad):.3f}"
+        ),
+        transform=summary_axis.transAxes,
+        ha="left",
+        va="top",
+        color=NASA_TEXT,
+        fontsize=10,
+        fontfamily="Courier New",
+    )
+    summary_axis.set_title("THERMAL STATE", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
+
+    figure.patch.set_facecolor(NASA_BG)
+    figure.suptitle(f"THERMAL CONTRIBUTIONS | Iteration {iteration if iteration is not None else 0}", color=NASA_TEXT, fontsize=14, fontfamily="Courier New", fontweight="bold")
     figure.tight_layout(rect=[0, 0, 1, 0.96])
 
 
@@ -1041,11 +1436,11 @@ def draw_propulsion_overview(figure, state: SpacecraftState, iteration: int | No
     figure.clear()
     silhouette_axis, telemetry_axis = figure.subplots(1, 2, gridspec_kw={"width_ratios": [1.35, 1.0]})
 
-    power_required = _safe_float(getattr(state.thruster, "power_required", 0.0))
+    power_required = _safe_float(getattr(state.thruster, "power", 0.0))
     thrust = _safe_float(getattr(state.thruster, "thrust", 0.0))
     mass_flow = _safe_float(getattr(state.thruster, "m_flow", 0.0))
     isp = _safe_float(getattr(state.thruster, "specific_impulse", 0.0))
-    efficiency = _safe_float(getattr(state.thruster, "thruster_eff", 0.0))
+    efficiency = _safe_float(getattr(state.thruster, "eff", 0.0))
     prop_area = _safe_float(getattr(state.geometry, "A_prop", 0.0))
     intake_area = _safe_float(getattr(state.geometry, "A_in", 0.0))
     orbit_density = _safe_float(getattr(state.orbit, "density", 0.0))
@@ -1142,8 +1537,9 @@ class _HistoryPlotterUI:
         self.series = series
         self.paths = list(series.keys())
         self.rows: list[dict[str, Any]] = []
-        self.drag_diagnostics_cache: dict[int, tuple[SpacecraftState, DragDiagnostics]] = {}
-        self.atmosphere_profile_cache: dict[str, np.ndarray] | None = None
+        self.drag_state_cache: dict[int, SpacecraftState] = {}
+        self.thermal_diagnostics_cache: dict[int, tuple[SpacecraftState, ThermalDiagnostics]] = {}
+        self.atmosphere_profile_cache: dict[tuple[str, float, float], dict[str, np.ndarray]] = {}
 
         self.root = tk.Tk()
         self.root.title(window_title)
@@ -1153,8 +1549,8 @@ class _HistoryPlotterUI:
         self.view_iteration = tk.IntVar(value=max(len(history) - 1, 0))
         self.status_vars = {
             "geometry": tk.StringVar(),
-            "drag3d": tk.StringVar(),
             "drag": tk.StringVar(),
+            "thermal": tk.StringVar(),
             "propulsion": tk.StringVar(),
             "refueling": tk.StringVar(),
             "atmosphere": tk.StringVar(),
@@ -1185,8 +1581,8 @@ class _HistoryPlotterUI:
 
         self._create_plot_tab()
         self.figure_tabs["geometry"] = self._create_figure_tab("3D View", self.status_vars["geometry"])
-        self.figure_tabs["drag3d"] = self._create_figure_tab("3D Drag", self.status_vars["drag3d"])
         self.figure_tabs["drag"] = self._create_figure_tab("Drag Test", self.status_vars["drag"])
+        self.figure_tabs["thermal"] = self._create_figure_tab("Thermal", self.status_vars["thermal"])
         self.figure_tabs["propulsion"] = self._create_figure_tab("Propulsion", self.status_vars["propulsion"])
         self.figure_tabs["atmosphere"] = self._create_figure_tab("Atmosphere", self.status_vars["atmosphere"])
         self.text_tabs["refueling"] = self._create_text_tab("Refueling", self.status_vars["refueling"])
@@ -1198,7 +1594,7 @@ class _HistoryPlotterUI:
         tk.Label(controls_parent, text="ARISS FLIGHT DATA BOARD", bg=NASA_BG, fg=NASA_TEXT, font=("Courier New", 11, "bold"), justify="left").pack(anchor="w", pady=(0, 8))
         tk.Label(
             controls_parent,
-            text="SELECT ANY STATE CHANNEL\nMULTI-SERIES PER PLOT\nPLOTS + 3D + 3D DRAG + DRAG + PROP + REFUEL + ATMOSPHERE",
+            text="SELECT ANY STATE CHANNEL\nMULTI-SERIES PER PLOT\nPLOTS + 3D + DRAG + THERMAL + PROP + REFUEL + ATMOSPHERE",
             bg=NASA_BG,
             fg=NASA_TEXT,
             font=("Courier New", 9),
@@ -1281,30 +1677,50 @@ class _HistoryPlotterUI:
         # Keep the derived views synchronized with the iteration selected in the
         # main history board.
         self.redraw_geometry()
-        self.redraw_drag_3d()
         self.redraw_drag_test()
+        self.redraw_thermal()
         self.redraw_propulsion()
         self.redraw_refueling()
         self.redraw_atmosphere()
 
-    def _get_drag_diagnostics(self, index: int) -> tuple[SpacecraftState, DragDiagnostics]:
-        cached = self.drag_diagnostics_cache.get(index)
+    def _get_drag_state(self, index: int) -> SpacecraftState:
+        cached = self.drag_state_cache.get(index)
         if cached is not None:
             return cached
-        # Cache drag diagnostics because several tabs reuse the same drag model
-        # output for the selected iteration.
+        # Cache drag model state because several tabs reuse the same values.
         with redirect_stdout(io.StringIO()):
             cached = compute_drag_diagnostics(self.history[index])
-        self.drag_diagnostics_cache[index] = cached
+        self.drag_state_cache[index] = cached
         return cached
 
-    def _get_atmosphere_profile(self) -> dict[str, np.ndarray]:
-        if self.atmosphere_profile_cache is not None:
-            return self.atmosphere_profile_cache
+    def _get_thermal_diagnostics(self, index: int) -> tuple[SpacecraftState, ThermalDiagnostics]:
+        cached = self.thermal_diagnostics_cache.get(index)
+        if cached is not None:
+            return cached
+        state = deepcopy(self.history[index])
+        diagnostics = thermal_model(state)
+        cached = (state, diagnostics)
+        self.thermal_diagnostics_cache[index] = cached
+        return cached
+
+    def _get_atmosphere_profile(self, state: SpacecraftState) -> dict[str, np.ndarray]:
+        key = (
+            str(getattr(state.orbit, "msis_date", "2000-01-01T00:00:00")),
+            _safe_float(getattr(state.orbit, "msis_f107", 140.0)),
+            _safe_float(getattr(state.orbit, "msis_ap", 15.0)),
+        )
+        cached = self.atmosphere_profile_cache.get(key)
+        if cached is not None:
+            return cached
 
         altitude_km = np.linspace(80.0, 1000.0, 600)
-        total_density, _temperature, r_specific, o2_density, n2_density, o_density = atmos(altitude_km)
-        self.atmosphere_profile_cache = {
+        total_density, _temperature, r_specific, o2_density, n2_density, o_density = atmos(
+            altitude_km,
+            msis_date=key[0],
+            msis_f107=key[1],
+            msis_ap=key[2],
+        )
+        cached = {
             "altitude_km": np.asarray(altitude_km, dtype=float),
             "total_density": np.maximum(np.asarray(total_density, dtype=float), 1.0e-30),
             "r_specific": np.asarray(r_specific, dtype=float),
@@ -1312,7 +1728,8 @@ class _HistoryPlotterUI:
             "n2_density": np.maximum(np.asarray(n2_density, dtype=float), 1.0e-30),
             "o_density": np.maximum(np.asarray(o_density, dtype=float), 1.0e-30),
         }
-        return self.atmosphere_profile_cache
+        self.atmosphere_profile_cache[key] = cached
+        return cached
 
     def _style_history_axis(self, axis) -> None:
         axis.set_facecolor(NASA_BG)
@@ -1441,45 +1858,20 @@ class _HistoryPlotterUI:
         figure.tight_layout()
         tab["canvas"].draw_idle()
 
-    def redraw_drag_3d(self) -> None:
-        index = self._current_index()
-        tab = self.figure_tabs["drag3d"]
-        figure = tab["figure"]
-
-        try:
-            state, diagnostics = self._get_drag_diagnostics(index)
-            draw_spacecraft_drag_geometry(figure, state, diagnostics, iteration=index)
-            fy_profile = np.asarray(diagnostics.fy_array, dtype=float)
-            fz_profile = np.asarray(diagnostics.fz_array, dtype=float)
-            wake_profile = 0.5 * (
-                np.nan_to_num(fy_profile, nan=0.0, posinf=1.0, neginf=0.0)
-                + np.nan_to_num(fz_profile, nan=0.0, posinf=1.0, neginf=0.0)
-            )
-            if wake_profile.size:
-                wake_min, wake_mean, wake_max = float(np.min(wake_profile)), float(np.mean(wake_profile)), float(np.max(wake_profile))
-            else:
-                wake_min = wake_mean = wake_max = 0.0
-            self.status_vars["drag3d"].set(
-                f"Iteration {index} / {len(self.history) - 1} | Exposure min {wake_min:.3f} | mean {wake_mean:.3f} | max {wake_max:.3f}"
-            )
-        except Exception as exc:
-            self._draw_error_figure(figure, f"3D drag view unavailable\n{exc}")
-            self.status_vars["drag3d"].set(f"Iteration {index} / {len(self.history) - 1} | 3D drag view unavailable")
-
-        tab["canvas"].draw_idle()
-
     def redraw_drag_test(self) -> None:
         index = self._current_index()
         tab = self.figure_tabs["drag"]
         figure = tab["figure"]
 
         try:
-            state, diagnostics = self._get_drag_diagnostics(index)
-            draw_drag_distribution(figure, state, diagnostics, iteration=index)
+            state = self._get_drag_state(index)
+            draw_drag_distribution(figure, state, iteration=index)
             exchange_terms = _momentum_exchange_terms(state)
-            drag_components = _drag_component_map(state, diagnostics)
+            drag_components = _drag_component_map(state)
             component_summary = " | ".join(f"{_drag_component_label(name)} {value:.3e} N" for name, value in drag_components.items())
             shown_drag_sum = float(np.sum(list(drag_components.values())))
+            thrust_available = _safe_float(getattr(state.thruster, "thrust", 0.0))
+            balance_residual = thrust_available - exchange_terms["total_load"]
             self.status_vars["drag"].set(
                 f"Iteration {index} / {len(self.history) - 1}\n"
                 f"{component_summary}\n"
@@ -1487,7 +1879,9 @@ class _HistoryPlotterUI:
                 f"Shown sum {shown_drag_sum:.3e} N | "
                 f"Refuel exchange {exchange_terms['refueling_exchange']:.3e} N | "
                 f"Propulsive exchange {exchange_terms['propulsive_exchange']:.3e} N | "
-                f"Total load {exchange_terms['total_load']:.3e} N"
+                f"Total load {exchange_terms['total_load']:.3e} N | "
+                f"Thrust {thrust_available:.3e} N | "
+                f"Residual {balance_residual:.3e} N"
             )
         except Exception as exc:
             self._draw_error_figure(figure, f"Drag diagnostics unavailable\n{exc}")
@@ -1503,9 +1897,34 @@ class _HistoryPlotterUI:
         self.status_vars["propulsion"].set(
             f"Iteration {index} / {len(self.history) - 1} | "
             f"Thrust {_safe_float(getattr(state.thruster, 'thrust', 0.0)):.3e} N | "
-            f"Power {_safe_float(getattr(state.thruster, 'power_required', 0.0)):.3f} W | "
+            f"Power {_safe_float(getattr(state.thruster, 'power', 0.0)):.3f} W | "
             f"m_flow {_safe_float(getattr(state.thruster, 'm_flow', 0.0)):.3e} kg/s"
         )
+        tab["canvas"].draw_idle()
+
+    def redraw_thermal(self) -> None:
+        index = self._current_index()
+        tab = self.figure_tabs["thermal"]
+        figure = tab["figure"]
+
+        try:
+            state, diagnostics = self._get_thermal_diagnostics(index)
+            draw_thermal_distribution(figure, state, diagnostics, iteration=index)
+            components = _thermal_component_map(diagnostics)
+            self.status_vars["thermal"].set(
+                f"Iteration {index} / {len(self.history) - 1} | "
+                f"Drag {components['Q_drag']:.3e} W | "
+                f"Sun {components['Q_sun']:.3e} W | "
+                f"Albedo {components['Q_albedo']:.3e} W | "
+                f"IR {components['Q_ir']:.3e} W | "
+                f"Internal {components['Q_internal']:.3e} W | "
+                f"Radiated {components['Q_radiated']:.3e} W | "
+                f"A_rad {_safe_float(state.geometry.A_rad):.3f} m^2"
+            )
+        except Exception as exc:
+            self._draw_error_figure(figure, f"Thermal diagnostics unavailable\n{exc}")
+            self.status_vars["thermal"].set(f"Iteration {index} / {len(self.history) - 1} | Thermal diagnostics unavailable")
+
         tab["canvas"].draw_idle()
 
     def _set_text_tab(self, key: str, lines: list[str]) -> None:
@@ -1533,8 +1952,13 @@ class _HistoryPlotterUI:
         figure.clear()
 
         try:
-            properties = atmosphere_properties_from_height(altitude_km)
-            profile = self._get_atmosphere_profile()
+            properties = atmosphere_properties_from_height(
+                altitude_km,
+                msis_date=state.orbit.msis_date,
+                msis_f107=state.orbit.msis_f107,
+                msis_ap=state.orbit.msis_ap,
+            )
+            profile = self._get_atmosphere_profile(state)
             axes = figure.subplots(2, 1, sharex=True, squeeze=True)
             composition_axis = axes[0]
             r_axis = axes[1]
