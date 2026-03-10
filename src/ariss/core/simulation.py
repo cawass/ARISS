@@ -29,7 +29,7 @@ if __package__ in (None, ""):
 
 from ariss.core.spacecraft import SpacecraftState
 from ariss.modules.Budgets import sizing_model
-from ariss.modules.Drag import drag_model
+from ariss.modules.Drag import DragDiagnostics, drag_model
 from ariss.modules.Power import power_model
 from ariss.modules.Propulsion import propulsion_model
 from ariss.modules.Refueling import refueling_model
@@ -39,6 +39,20 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 residual = 10e10
+
+def compute_drag_diagnostics(sc: SpacecraftState) -> tuple[SpacecraftState, DragDiagnostics]:
+
+    # Inputs:
+    #   sc: spacecraft state at the selected iteration.
+    #
+    # Outputs:
+    #   state: copied spacecraft state after running the drag model.
+    #   diagnostics: drag diagnostics for that copied state.
+
+    # Use a copy so UI diagnostics do not mutate the saved history state.
+    state = deepcopy(sc)
+    diagnostics = drag_model(state)
+    return state, diagnostics
 
 def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_tolerance: float = 1e-3) -> Tuple[SpacecraftState, bool, List[SpacecraftState]]:
 

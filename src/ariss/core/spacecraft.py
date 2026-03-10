@@ -95,7 +95,7 @@ class GeometryState:
     epsilon_body: float = 0.1  # [-] Free-molecular accommodation coefficient of body side surfaces.
     epsilon_solar: float = 0.1  # [-] Free-molecular accommodation coefficient of solar-panel surfaces.
     epsilon_rad: float = 0.1  # [-] Free-molecular accommodation coefficient of radiator surfaces.
-    epsilon_in_norm: float = 0.1  # [-] Free-molecular accommodation coefficient of the inlet front face.
+    epsilon_in_norm: float = 0.9  # [-] Free-molecular accommodation coefficient of the inlet front face.
 
     A_in: float = 4.0387  # [m^2] Total inlet area exposed to incoming atmospheric flow.
     A_ref: float = 2  # [m^2] Intake area reserved for the refueling stream that fills the tanks(Perfect collection efficiency).
