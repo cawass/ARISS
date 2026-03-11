@@ -104,7 +104,44 @@ def thermal_model(sc: SpacecraftState):
 
     Q_in_total = Q_drag + Q_sun + Q_albedo + Q_ir + Q_internal
     # Final Area - assuming radiators don't absorb anything and back of solar panels are radiators
-    sc.geometry.A_rad = max(((Q_in_total - Q_radiated)/ (const.STEFAN_BOLTZMANN * sc.thermal.T_des**4 * sc.thermal.epsilon_therm_body) - sc.geometry.A_solar)/2, 0.0)
+    sc.geometry.A_rad = max(((Q_in_total - Q_radiated)/ (const.STEFAN_BOLTZMANN * sc.thermal.T_des**4 * sc.thermal.epsilon_therm_rad) - sc.geometry.A_solar)/2, 0.0)
+    
+    diagnostics = ThermalDiagnostics(
+        Q_drag=Q_drag,
+        Q_sun=Q_sun,
+        Q_albedo=Q_albedo,
+        Q_ir=Q_ir,
+        Q_internal=Q_internal,
+        Q_radiated=Q_radiated,
+    )
+    return diagnostics
+
+def thermal_extremes(sc: SpacecraftState, diagnostics: ThermalDiagnostics, Ae_total: float, convergence_threshold: float = 0.1, max_iterations: int = 10000):
+    """
+    Calculates the minimum and maximum temperature for a given spacecraft.
+    
+    Parameters
+    ----------
+    sc : SpacecraftState
+        The spacecraft state object
+    diagnostics : ThermalDiagnostics
+        Thermal diagnostics from thermal_model function
+    Ae_total : float
+        Total effective emissivity area [m^2]
+    convergence_threshold : float, optional
+        Temperature convergence criterion [K], default 0.1
+    max_iterations : int, optional
+        Maximum iterations for thermal simulation, default 10000
+        
+    Returns
+    -------
+    T_max : float
+        Maximum temperature [K]
+    T_min : float
+        Minimum temperature [K]
+    """
+    Q_in_total = (diagnostics.Q_drag + diagnostics.Q_sun + diagnostics.Q_albedo + 
+                  diagnostics.Q_ir + diagnostics.Q_internal)
     
     # Calculate equilibrium temperature
     if sc.geometry.A_rad == 0.0:
@@ -115,20 +152,54 @@ def thermal_model(sc: SpacecraftState):
         # Radiators are used, temperature is maintained at design temperature
         T_max = sc.thermal.T_des
 
-    # Calculate cold-case temperature
+    # Calculate cold-case temperature (eclipse conditions)
     if sc.orbit.max_eclipse_fraction > 0.0:
+        time = 0
+        dt = 0.1
+        # Calculate orbital period and eclipse duration
+        orbital_radius = const.EARTH_RADIUS + sc.orbit.altitude  # [m]
+        orbital_period = 2 * np.pi * orbital_radius / sc.orbit.velocity  # [s] Orbital period
+        # Calculate heat capacity
+        heat_capacity = sc.thermal.specific_heat * sc.mass.Mass_total
+        # Set starting temperature to hot case
+        T_history = [T_max]
+
+        # Convergence tracking for minimum temperature per orbit
+        min_temps_per_orbit = []
+
+        for iter in range(max_iterations):
+            if (time % orbital_period) <= (sc.orbit.max_eclipse_fraction * orbital_period):
+                Q_in = Q_in_total - diagnostics.Q_sun - diagnostics.Q_albedo
+            else:
+                Q_in = Q_in_total
+            
+            Q_radiated_total = (Ae_total + sc.geometry.A_rad * 2 * sc.thermal.epsilon_therm_rad) * T_history[-1]**4 * const.STEFAN_BOLTZMANN
+
+            T_history.append(T_history[-1] + (Q_in - Q_radiated_total) / heat_capacity * dt)
+
+            time += dt
+            
+            # Record minimum temperature when completing each orbit
+            orbits_completed = int(time / orbital_period)
+            if len(min_temps_per_orbit) < orbits_completed:
+                # Find minimum temperature in the latest orbit
+                start_idx = len(min_temps_per_orbit) * int(orbital_period / dt)
+                orbit_min_temp = min(T_history[start_idx:])
+                min_temps_per_orbit.append(orbit_min_temp)
+                
+                # Check convergence: compare last two orbits' minimum temperatures
+                if len(min_temps_per_orbit) >= 3:
+                    temp_change = abs(min_temps_per_orbit[-1] - min_temps_per_orbit[-2])
+                    if temp_change < convergence_threshold:
+                        T_min = min_temps_per_orbit[-1]
+                        return T_max, T_min
         
-        T_min = 0.0
-    else: T_min = T_max
+        # If loop completes without convergence, use the last minimum
+        T_min = min_temps_per_orbit[-1] if min_temps_per_orbit else T_max
+
+    else:
+        T_min = T_max
     
-    diagnostics = ThermalDiagnostics(
-        Q_drag=Q_drag,
-        Q_sun=Q_sun,
-        Q_albedo=Q_albedo,
-        Q_ir=Q_ir,
-        Q_internal=Q_internal,
-        Q_radiated=Q_radiated,
-        T_max=T_max,
-        T_min=T_min,
-    )
-    return diagnostics
+    return T_max, T_min
+    
+    

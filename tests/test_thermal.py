@@ -102,14 +102,6 @@ def test_radiated_heating():
     assert np.isclose(diagnostics.Q_radiated, 14577.84676)
 
 
-def test_temperature_limits():
-    """Test temperature limits (currently not implemented, set to 0.0)"""
-    sc = SpacecraftState()
-    diagnostics = thermal_model(sc)
-    assert np.isclose(diagnostics.T_max,285.6,0.001)
-    assert diagnostics.T_min == 0.0
-
-
 def test_radiator_area_zero_cold_case():
     """Test that radiator area is zero when heat inputs are minimal (cold case)"""
     sc = SpacecraftState()

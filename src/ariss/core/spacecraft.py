@@ -80,7 +80,6 @@ class OrbitState:
     alpha: float = 0  # [rad] Flow incidence angle used by the drag model.
     gamma: float = 1.4  # [-] Ratio of specific heats of the atmosphere.
     R_spec: float = 287.0  # [J/(kg*K)] Specific gas constant of the local atmosphere.
-    max_eclipse_fraction: float = 0.3 # Maximum fraction of the orbit in eclipse, used for the cold case in the thermal model.
 
 @dataclass(frozen=False)
 class GeometryState:
