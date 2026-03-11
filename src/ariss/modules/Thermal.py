@@ -28,6 +28,8 @@ class ThermalDiagnostics:
 
     Attributes
     ----------
+    Ae_total: float
+        Total area emissivity product excluding radiators [m2]
     Q_drag : float
         Drag heating [W]
     Q_sun : float
@@ -40,11 +42,8 @@ class ThermalDiagnostics:
         Internal heating [W]
     Q_radiated : float
         Heat radiated by spacecraft excluding radiators [W]
-    T_max : float
-        Maximum experienced temperature
-    T_min : float
-        Minimum experienced temperature
     """
+    Ae_total: float = 0.0
 
     Q_drag: float = 0.0
     Q_sun: float = 0.0
@@ -128,6 +127,7 @@ def thermal_model(sc: SpacecraftState):
     sc.geometry.A_rad = max(((Q_in_total - Q_radiated)/ (const.STEFAN_BOLTZMANN * sc.thermal.T_des**4 * sc.thermal.epsilon_therm_rad) - sc.geometry.A_solar)/2, 0.0)
     
     diagnostics = ThermalDiagnostics(
+        Ae_total=Ae_total,
         Q_drag=Q_drag,
         Q_sun=Q_sun,
         Q_albedo=Q_albedo,
@@ -137,7 +137,7 @@ def thermal_model(sc: SpacecraftState):
     )
     return diagnostics
 
-def thermal_extremes(sc: SpacecraftState, diagnostics: ThermalDiagnostics, Ae_total: float, convergence_threshold: float = 0.1, max_iterations: int = 10000):
+def thermal_extremes(sc: SpacecraftState, diagnostics: ThermalDiagnostics, convergence_threshold: float = 0.1, max_iterations: int = 10000):
     """
     Calculates the minimum and maximum temperature for a given spacecraft.
     
@@ -179,7 +179,7 @@ def thermal_extremes(sc: SpacecraftState, diagnostics: ThermalDiagnostics, Ae_to
     # Calculate equilibrium temperature
     if sc.geometry.A_rad == 0.0:
         # No external radiators needed, calculate actual equilibrium temperature
-        T_eq = (Q_in_total / (Ae_total * const.STEFAN_BOLTZMANN)) ** (1/4) if Q_in_total > 0 else 0.0
+        T_eq = (Q_in_total / (diagnostics.Ae_total * const.STEFAN_BOLTZMANN)) ** (1/4) if Q_in_total > 0 else 0.0
         T_max = T_eq
     else:
         # Radiators are used, temperature is maintained at design temperature
@@ -207,7 +207,7 @@ def thermal_extremes(sc: SpacecraftState, diagnostics: ThermalDiagnostics, Ae_to
             else:
                 Q_in = Q_in_total
             
-            Q_radiated_total = (Ae_total + sc.geometry.A_rad * 2 * sc.thermal.epsilon_therm_rad) * T_history[-1]**4 * const.STEFAN_BOLTZMANN
+            Q_radiated_total = (diagnostics.Ae_total + sc.geometry.A_rad * 2 * sc.thermal.epsilon_therm_rad) * T_history[-1]**4 * const.STEFAN_BOLTZMANN
 
             T_history.append(T_history[-1] + (Q_in - Q_radiated_total) / heat_capacity * dt)
             time_history.append(time)
