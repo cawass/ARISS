@@ -59,8 +59,29 @@ class ThermalDiagnostics:
 
 def thermal_model(sc: SpacecraftState):
     """
-    Thermal model for the spacecraft
-    TODO Elaborate docstring
+    Thermal model for the spacecraft using a 1-node homogenous temperature assumption.
+
+    This function calculates the heat balance for a spacecraft by considering all heat
+    sources (solar radiation, Earth albedo, Earth infrared, internal dissipation, and
+    drag heating) and heat sinks (thermal radiation). It computes the required radiator
+    area to maintain the desired design temperature and provides detailed thermal
+    diagnostics for post-processing and analysis.
+
+    Parameters
+    ----------
+    sc : SpacecraftState
+        The spacecraft state object containing orbital, geometric, thermal, power,
+        and propulsion parameters.
+
+    Returns
+    -------
+    ThermalDiagnostics
+        A dataclass containing detailed thermal outputs
+
+    Updates
+    -----
+    sc : SpacecraftState
+        Updates the sc.geometry.A_rad with the required radiator area [m²]
     """
 
     # Geometry Calculations
