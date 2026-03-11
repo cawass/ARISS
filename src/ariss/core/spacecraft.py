@@ -80,6 +80,7 @@ class OrbitState:
     alpha: float = 0  # [rad] Flow incidence angle used by the drag model.
     gamma: float = 1.4  # [-] Ratio of specific heats of the atmosphere.
     R_spec: float = 287.0  # [J/(kg*K)] Specific gas constant of the local atmosphere.
+    max_eclipse_fraction: float = 0.3 # Maximum fraction of the orbit in eclipse, used for the cold case in the thermal model.
 
 @dataclass(frozen=False)
 class GeometryState:
@@ -217,6 +218,8 @@ class ThermalState:
     epsilon_therm_body: float = 0.9  # [-] Thermal emissivity of the body surfaces.
     epsilon_therm_solar: float = 0.85  # [-] Thermal emissivity of the solar-panel surfaces.
     epsilon_therm_rad: float = 0.9  # [-] Thermal emissivity of the radiator surfaces.
+
+    specific_heat: float = 910 # [J/kgK] Assumed specific heat of overall spacecraft, used for cold case caluclation
 
     def update(self, **kwargs: Any) -> "ThermalState":
         return replace(self, **kwargs)

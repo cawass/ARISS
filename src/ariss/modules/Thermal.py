@@ -114,6 +114,12 @@ def thermal_model(sc: SpacecraftState):
     else:
         # Radiators are used, temperature is maintained at design temperature
         T_max = sc.thermal.T_des
+
+    # Calculate cold-case temperature
+    if sc.orbit.max_eclipse_fraction > 0.0:
+        
+        T_min = 0.0
+    else: T_min = T_max
     
     diagnostics = ThermalDiagnostics(
         Q_drag=Q_drag,
@@ -123,6 +129,6 @@ def thermal_model(sc: SpacecraftState):
         Q_internal=Q_internal,
         Q_radiated=Q_radiated,
         T_max=T_max,
-        T_min=0.0,
+        T_min=T_min,
     )
     return diagnostics
