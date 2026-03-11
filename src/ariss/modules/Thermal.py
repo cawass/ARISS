@@ -157,9 +157,21 @@ def thermal_extremes(sc: SpacecraftState, diagnostics: ThermalDiagnostics, Ae_to
     Returns
     -------
     T_max : float
-        Maximum temperature [K]
+        Maximum equilibrium temperature [K] under sun-exposed conditions.
     T_min : float
-        Minimum temperature [K]
+        Minimum temperature [K] reached during eclipse phases after steady-state.
+    time_history : list of float
+        Time points [s] for the full transient simulation history.
+    T_history : list of float
+        Spacecraft temperature [K] at each time point in the simulation.
+    
+    Notes
+    -----
+    The transient analysis uses a simple forward Euler integration scheme with a
+    fixed time step of 0.1 s. Convergence is detected by comparing minimum temperatures
+    achieved in consecutive orbital cycles. The total simulation time depends on orbital
+    period and convergence behavior but is bounded by max_iterations.
+    
     """
     Q_in_total = (diagnostics.Q_drag + diagnostics.Q_sun + diagnostics.Q_albedo + 
                   diagnostics.Q_ir + diagnostics.Q_internal)
@@ -184,6 +196,7 @@ def thermal_extremes(sc: SpacecraftState, diagnostics: ThermalDiagnostics, Ae_to
         heat_capacity = sc.thermal.specific_heat * sc.mass.Mass_total
         # Set starting temperature to hot case
         T_history = [T_max]
+        time_history = []
 
         # Convergence tracking for minimum temperature per orbit
         min_temps_per_orbit = []
@@ -197,6 +210,7 @@ def thermal_extremes(sc: SpacecraftState, diagnostics: ThermalDiagnostics, Ae_to
             Q_radiated_total = (Ae_total + sc.geometry.A_rad * 2 * sc.thermal.epsilon_therm_rad) * T_history[-1]**4 * const.STEFAN_BOLTZMANN
 
             T_history.append(T_history[-1] + (Q_in - Q_radiated_total) / heat_capacity * dt)
+            time_history.append(time)
 
             time += dt
             
@@ -221,6 +235,6 @@ def thermal_extremes(sc: SpacecraftState, diagnostics: ThermalDiagnostics, Ae_to
     else:
         T_min = T_max
     
-    return T_max, T_min
+    return T_max, T_min, time_history, T_history
     
     
