@@ -94,6 +94,7 @@ def sweep_mansur_envelope(
     max_iterations: int = 240,
     mass_tolerance: float = 1.0e-3,
     thruster_power_w: float = 1000.0,
+    force_legacy_intake_mode: bool = True,
 ) -> dict[str, np.ndarray]:
     base_path = Path(config_path) if config_path is not None else Path(__file__).with_name("MansurVerification.toml")
     base_state = SpacecraftState.from_toml(base_path)
@@ -122,6 +123,10 @@ def sweep_mansur_envelope(
                 m_dot_mg_s[isp_idx, tp_idx] = _thruster_mdot_pt_1kw(eta_value, float(isp))
 
                 sc = deepcopy(base_state)
+                if force_legacy_intake_mode:
+                    # In ratio mode intake/drag sizing decouples from collection
+                    # behavior and compresses altitude sensitivity vs Isp.
+                    sc.geometry.use_intake_area_ratio = False
                 sc.thruster.specific_impulse = float(isp)
                 sc.thruster.eff = eta_value
                 sc.thruster.power = float(thruster_power_w)
@@ -164,6 +169,7 @@ def plot_mansur_envelope_verification(
     max_iterations: int = 240,
     mass_tolerance: float = 1.0e-3,
     thruster_power_w: float = 1000.0,
+    force_legacy_intake_mode: bool = True,
     show: bool = True,
     save_path: str | Path | None = None,
 ):
@@ -174,6 +180,7 @@ def plot_mansur_envelope_verification(
         max_iterations=max_iterations,
         mass_tolerance=mass_tolerance,
         thruster_power_w=thruster_power_w,
+        force_legacy_intake_mode=force_legacy_intake_mode,
     )
 
     tp_grid = results["tp_mn_kw"]

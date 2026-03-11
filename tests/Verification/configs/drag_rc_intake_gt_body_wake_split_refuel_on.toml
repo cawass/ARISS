@@ -56,7 +56,7 @@ power = 2000.0
 
 [refueling]
 coll_eff = 0.35
-t_refuel = 20736000.0
+t_refuel = 50736000.0
 
 [mission_profile]
 active_refueling = true

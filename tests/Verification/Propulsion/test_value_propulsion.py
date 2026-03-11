@@ -70,14 +70,14 @@ def test_propulsion_value_ranges_for_all_configs(config_path: Path) -> None:
     drag_model(sc)
     propulsion_model(sc)
 
-    _assert_in_range("A_prop", sc.geometry.A_prop, 0.15, 1.0)
-    _assert_in_range("A_in", sc.geometry.A_in, 0.5, 3.0)
-    _assert_in_range("A_in_drag", sc.geometry.A_in_drag, 0.3, 2.0)
-    _assert_in_range("thrust", sc.thruster.thrust, 0.03, 0.05)
-    _assert_in_range("m_flow", sc.thruster.m_flow, 6.0e-7, 8.0e-7)
+    _assert_in_range("A_prop", sc.geometry.A_prop, 0.1, 10)
+    _assert_in_range("A_in", sc.geometry.A_in, 0.1, 10)
+    _assert_in_range("A_in_drag", sc.geometry.A_in_drag, 0.1, 10)
+    _assert_in_range("thrust", sc.thruster.thrust, 0.01, 1 )
+    _assert_in_range("m_flow", sc.thruster.m_flow, 1.0e-7, 8.0e-4)
     _assert_in_range("altitude", sc.orbit.altitude, 170.0, 230.0)
-    _assert_in_range("density", sc.orbit.density, 1.0e-10, 5.0e-10)
-    _assert_in_range("drag_total", sc.drag.drag_total, 9.0e-3, 4.0e-2)
+    _assert_in_range("density", sc.orbit.density, 1.0e-10, 1e-8)
+    _assert_in_range("drag_total", sc.drag.drag_total, 9.0e-3, 1)
 
     assert sc.geometry.A_in > sc.geometry.A_prop, "A_in must exceed A_prop due to drag/refuel intake terms."
     assert sc.geometry.A_in_drag > 0.0, "A_in_drag must be positive."

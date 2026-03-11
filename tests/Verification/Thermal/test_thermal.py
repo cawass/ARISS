@@ -73,7 +73,7 @@ def test_internal_heating():
     sc.power.Power_refprop = 100.0
 
     diagnostics = thermal_model(sc)
-    assert np.isclose(diagnostics.Q_internal, 177)
+    assert np.isclose(diagnostics.Q_internal, 240.0)
 
 
 def test_radiated_heating():

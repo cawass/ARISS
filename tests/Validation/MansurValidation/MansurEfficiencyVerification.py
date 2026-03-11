@@ -43,6 +43,7 @@ def sweep_mansur_efficiencies(
     isp_values: np.ndarray | None = None,
     max_iterations: int = 400,
     mass_tolerance: float = 1.0e-3,
+    force_legacy_intake_mode: bool = True,
 ) -> dict[float, dict[str, np.ndarray]]:
     base_path = Path(config_path) if config_path is not None else Path(__file__).with_name("MansurVerification.toml")
     base_state = SpacecraftState.from_toml(base_path)
@@ -58,6 +59,10 @@ def sweep_mansur_efficiencies(
             for isp in isp_grid:
                 print(f"Running ISP: {isp}")
                 sc = deepcopy(base_state)
+                if force_legacy_intake_mode:
+                    # In ratio mode coll_eff does not affect intake/drag sizing.
+                    # This sweep is meant to compare collection efficiency effects.
+                    sc.geometry.use_intake_area_ratio = False
                 sc.refueling.coll_eff = float(efficiency)
                 sc.thruster.specific_impulse = float(isp)
                 with redirect_stdout(io.StringIO()):
@@ -85,6 +90,7 @@ def plot_mansur_efficiency_verification(
     isp_values: np.ndarray | None = None,
     max_iterations: int = 400,
     mass_tolerance: float = 1.0e-3,
+    force_legacy_intake_mode: bool = True,
     show: bool = True,
     save_path: str | Path | None = None,
 ):
@@ -94,6 +100,7 @@ def plot_mansur_efficiency_verification(
         isp_values=isp_values,
         max_iterations=max_iterations,
         mass_tolerance=mass_tolerance,
+        force_legacy_intake_mode=force_legacy_intake_mode,
     )
 
     figure, axis = plt.subplots(figsize=(8.0, 5.0))
@@ -105,7 +112,15 @@ def plot_mansur_efficiency_verification(
         isp_s = np.asarray(data.get("isp_s", np.array([])), dtype=float)
         if altitude_km.size == 0:
             continue
-        axis.plot(altitude_km, isp_s, color=color, linewidth=1.6, label=fr"$I_{{sp}}$ for $\eta_c = {efficiency:.2f}$")
+        axis.plot(
+            altitude_km,
+            isp_s,
+            color=color,
+            linewidth=1.6,
+            marker="o",
+            markersize=3.0,
+            label=fr"$I_{{sp}}$ for $\eta_c = {efficiency:.2f}$",
+        )
         solution_limit = float(np.min(altitude_km))
         axis.axvline(
             solution_limit,
@@ -119,7 +134,7 @@ def plot_mansur_efficiency_verification(
     axis.set_ylabel("Isp (s)")
     axis.set_title("Mansur Verification Sweep")
     axis.set_xlim(140.0, 200.0)
-    axis.set_ylim(1500.0, 6000.0)
+    axis.set_ylim(1500.0, 7000.0)
     axis.grid(True, alpha=0.3)
     axis.legend(loc="best")
     figure.tight_layout()

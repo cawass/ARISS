@@ -1,4 +1,20 @@
-"""Interactive history plots and geometry views for ``SpacecraftState``."""
+# ============================================================================== #
+#       ___    ____  ____  _____ _____
+#      /   |  / __ \/  _// ___// ___/
+#     / /| | / /_/ // / \__ \ \__ \
+#    / ___ |/ _, _// / ___/ /___/ /
+#   /_/  |_/_/ |_/___//____//____/
+#
+# ============================================================================== #
+#  ARISS - Atmospheric Refueling Iterative System Solver
+# ----------------------------------------------------------------------------
+#  Description:
+#      Atmospheric refueling power model based on intake mass flow and tank
+#
+#  Project:        ARISS
+#  Module:         history_ui.py
+#  Author:         Carlos Carrasco Requejo
+# ============================================================================
 
 from __future__ import annotations
 
