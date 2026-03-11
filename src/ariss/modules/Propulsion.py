@@ -20,6 +20,7 @@ from operator import itemgetter
 
 import numpy as np
 
+from ariss.core.spacecraft import apply_intake_area_ratio
 from ariss.utils import constants as const
 from ariss.utils.atmosphere import orbit_updates_from_density
 
@@ -80,9 +81,8 @@ def propulsion_model(sc):
     #   m_fuel = m0 * (exp(delta_v / v_e) - 1)
     #   q = 0.5 * rho * V^2
 
-    # Enforce matched body/intake area when requested by geometry settings.
-    if sc.geometry.Body_match_intake:
-        sc.geometry.A_body = sc.geometry.A_in
+    # Enforce the configured intake/body area ratio, when enabled.
+    apply_intake_area_ratio(sc.geometry)
 
     # Convert specific impulse into exhaust velocity for the intake-fed thruster.
     exhaust_velocity = const.EARTH_GRAVITY * sc.thruster.specific_impulse
@@ -139,12 +139,14 @@ def propulsion_model(sc):
     sc.thruster.m_flow = sc.geometry.A_prop * sc.orbit.velocity * sc.orbit.density
 
 
-    # Split the total intake into useful propulsion flow, useful refueling flow,
-    # and the extra capture area lost through imperfect collection efficiency.
-    sc.geometry.A_in_drag = (sc.geometry.A_ref + sc.geometry.A_prop) * (1 / sc.refueling.coll_eff - 1)
-    sc.geometry.A_in = sc.geometry.A_prop + sc.geometry.A_ref + sc.geometry.A_in_drag
-    if sc.geometry.Body_match_intake:
-        sc.geometry.A_body = sc.geometry.A_in
+    # Resolve intake areas:
+    # - ratio mode: A_in is imposed from A_body, then A_in_drag is inferred.
+    # - legacy mode: A_in comes from collection-efficiency split.
+    if sc.geometry.use_intake_area_ratio:
+        apply_intake_area_ratio(sc.geometry)
+    else:
+        sc.geometry.A_in_drag = (sc.geometry.A_ref + sc.geometry.A_prop) * (1 / sc.refueling.coll_eff - 1)
+        sc.geometry.A_in = sc.geometry.A_prop + sc.geometry.A_ref + sc.geometry.A_in_drag
 
     # Resize inlet/body geometry and recompute side area with shape-aware perimeters.
     w_in, h_in = _section_dims(sc.geometry.A_in, sc.geometry.AR_in, sc.geometry.S_in)

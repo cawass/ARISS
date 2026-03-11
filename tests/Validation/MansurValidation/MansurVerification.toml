@@ -15,6 +15,8 @@
 #  Author:         Carlos Carrasco Requejo, Lucas Calderon del Rio
 # ============================================================================== #
 
+name = "Mansur Validation Case"
+
 [orbit]
 altitude = 200.0                  # [km] Orbital altitude above Earth.
 velocity = 0.0                    # [m/s] Circular orbital velocity.
@@ -32,7 +34,8 @@ msis_ap = 15.0                    # [-] MSIS Ap geomagnetic index.
 [geometry]
 S_in = "c"                        # [str] Intake shape code ("c/e" round, "s/r" rectangular).
 S_body = "c"                      # [str] Body shape code ("c/e" round, "s/r" rectangular).
-Body_match_intake = true          # [bool] If true, body cross-section equals intake area.
+use_intake_area_ratio = true      # [bool] If true, enforce A_in/A_body = intake_area_ratio.
+intake_area_ratio = 1.0           # [-] Intake-to-body area ratio (1 equal, <1 smaller intake, >1 larger intake).
 AR_in = 1.0                       # [-] Intake width/height aspect ratio.
 AR_body = 1.0                     # [-] Body width/height aspect ratio.
 AR_solar = 0.5                    # [-] Solar panel planform aspect ratio.
@@ -41,7 +44,7 @@ epsilon_in = 0.1                  # [-] Inlet side free-molecular accommodation.
 epsilon_body = 0.1                # [-] Body side free-molecular accommodation.
 epsilon_solar = 0.1               # [-] Solar panel accommodation.
 epsilon_rad = 0.1                 # [-] Radiator accommodation.
-epsilon_in_norm = 0.1             # [-] Inlet front-face accommodation.
+epsilon_in_norm = 0.9             # [-] Inlet front-face accommodation.
 wake_in = 1.0                     # [-] Exposed fraction of inlet side to atmosphere.
 wake_body = 1.0                   # [-] Exposed fraction of body side to atmosphere.
 wake_solar = 1.0                  # [-] Exposed fraction of solar area to atmosphere.

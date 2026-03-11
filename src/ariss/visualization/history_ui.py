@@ -255,6 +255,11 @@ def _resolve_spacecraft_input(sc: SpacecraftInput | None) -> SpacecraftState:
     return load_spacecraft(sc)
 
 
+def _spacecraft_case_name(sc: SpacecraftState) -> str:
+    case_name = str(getattr(sc, "name", "")).strip()
+    return case_name
+
+
 def _normalize_paths(path: str | Sequence[str] | None, available_paths: list[str]) -> list[str]:
     if path is None:
         default_path = "mass.Mass_total" if "mass.Mass_total" in available_paths else available_paths[0]
@@ -1534,6 +1539,7 @@ class _HistoryPlotterUI:
         # Store the simulation history and the flattened numeric channels used by
         # the first tab plotting board.
         self.history = history
+        self.case_name = _spacecraft_case_name(history[0]) if history else ""
         self.series = series
         self.paths = list(series.keys())
         self.rows: list[dict[str, Any]] = []
@@ -1592,6 +1598,15 @@ class _HistoryPlotterUI:
 
     def _build_controls(self, controls_parent) -> None:
         tk.Label(controls_parent, text="ARISS FLIGHT DATA BOARD", bg=NASA_BG, fg=NASA_TEXT, font=("Courier New", 11, "bold"), justify="left").pack(anchor="w", pady=(0, 8))
+        if self.case_name:
+            tk.Label(
+                controls_parent,
+                text=f"CASE: {self.case_name}",
+                bg=NASA_BG,
+                fg=NASA_TEXT,
+                font=("Courier New", 9, "bold"),
+                justify="left",
+            ).pack(anchor="w", pady=(0, 8))
         tk.Label(
             controls_parent,
             text="SELECT ANY STATE CHANNEL\nMULTI-SERIES PER PLOT\nPLOTS + 3D + DRAG + THERMAL + PROP + REFUEL + ATMOSPHERE",
@@ -1829,7 +1844,10 @@ class _HistoryPlotterUI:
             axes[idx // cols][idx % cols].axis("off")
 
         self.figure.patch.set_facecolor(NASA_BG)
-        self.figure.suptitle("ARISS FLIGHT DATA WALL", color=NASA_TEXT, fontsize=14, fontfamily="Courier New", fontweight="bold")
+        title = "ARISS FLIGHT DATA WALL"
+        if self.case_name:
+            title = f"{title} | {self.case_name}"
+        self.figure.suptitle(title, color=NASA_TEXT, fontsize=14, fontfamily="Courier New", fontweight="bold")
         self.figure.tight_layout(rect=[0, 0, 1, 0.97])
         self.canvas.draw_idle()
         self._refresh_aux_tabs()
@@ -2038,6 +2056,9 @@ def launch_history_ui(
 ):
     """Run the sizing history and open the interactive visualization UI."""
     sc = _resolve_spacecraft_input(sc)
+    case_name = _spacecraft_case_name(sc)
+    if case_name:
+        window_title = f"{window_title} | {case_name}"
     _, _, history = run_sizing_with_history(sc, max_iterations=max_iterations, mass_tolerance=mass_tolerance)
     series = _history_series(history)
     default_specs = default_specs or DEFAULT_HISTORY_SPECS

@@ -18,7 +18,7 @@
 import numpy as np
 from scipy.special import erf
 
-from ariss.core.spacecraft import SpacecraftState
+from ariss.core.spacecraft import SpacecraftState, apply_intake_area_ratio
 from ariss.utils import constants as const
 
 
@@ -80,9 +80,8 @@ def drag_model(sc: SpacecraftState) -> None:
     #   alpha_in = atan(taper_half_gap / L_in)
     #   cd_effective = cd_raw * wake_factor
 
-    # Enforce matched body/intake area when requested by geometry settings.
-    if sc.geometry.Body_match_intake:
-        sc.geometry.A_body = sc.geometry.A_in
+    # Enforce the configured intake/body area ratio, when enabled.
+    apply_intake_area_ratio(sc.geometry)
 
     # Compute the free-molecular speed ratio from orbit state variables.
     speed_ratio = sc.orbit.velocity * np.sqrt(sc.orbit.molar_mass / (2.0 * const.UNIVERSAL_GAS * sc.orbit.temperature))
@@ -95,7 +94,10 @@ def drag_model(sc: SpacecraftState) -> None:
     width_gap = abs(w_body - w_in)
     height_gap = abs(h_body - h_in)
     taper_half_gap = 0.5 * (width_gap if width_gap >= height_gap else height_gap)
-    alpha_in = np.arctan(taper_half_gap / sc.geometry.L_in) if taper_half_gap > 0.0 and sc.geometry.L_in > 0.0 else sc.orbit.alpha
+    if sc.geometry.A_in < sc.geometry.A_body:
+        alpha_in = np.arctan(taper_half_gap / sc.geometry.L_in) 
+    else:
+        alpha_in = sc.orbit.alpha
 
     # Apply wake factors directly from geometry settings to each drag channel.
     sc.drag.cd_inlet_side = _drag_coefficient(speed_ratio, sc.geometry.epsilon_in, alpha_in, sc.orbit.temperature, sc.thermal.T_des, 1.0) * sc.geometry.wake_in

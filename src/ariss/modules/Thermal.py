@@ -19,7 +19,7 @@
 import numpy as np
 from dataclasses import dataclass
 
-from ariss.core.spacecraft import SpacecraftState
+from ariss.core.spacecraft import SpacecraftState, apply_intake_area_ratio
 from ariss.utils import constants as const
 
 @dataclass(frozen=True)
@@ -63,9 +63,8 @@ def thermal_model(sc: SpacecraftState):
     TODO Elaborate docstring
     """
 
-    # Enforce matched body/intake area when requested by geometry settings.
-    if sc.geometry.Body_match_intake:
-        sc.geometry.A_body = sc.geometry.A_in
+    # Enforce the configured intake/body area ratio, when enabled.
+    apply_intake_area_ratio(sc.geometry)
 
     # Geometry Calculations
     H_in = np.sqrt(sc.geometry.A_in /  sc.geometry.AR_in) # Intake height

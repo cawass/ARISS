@@ -15,6 +15,8 @@
 #  Author:         Carlos Carrasco Requejo, Lucas Calderon del Rio
 # ============================================================================== #
 
+name = "IEPC 2025 Validation Case"
+
 [orbit]
 altitude = 200.0                  # [km] Orbital altitude above Earth.
 velocity = 0.0                    # [m/s] Circular orbital velocity.
@@ -32,7 +34,8 @@ msis_ap = 15.0                    # [-] MSIS Ap geomagnetic index.
 [geometry]
 S_in = "c"                        # [str] Intake shape code ("c/e" round, "s/r" rectangular).
 S_body = "s"                      # [str] Body shape code ("c/e" round, "s/r" rectangular).
-Body_match_intake = false         # [bool] If true, body cross-section equals intake area.
+use_intake_area_ratio = true      # [bool] If true, enforce A_in/A_body = intake_area_ratio.
+intake_area_ratio = 2             # [-] Intake-to-body area ratio (1 equal, <1 smaller intake, >1 larger intake).
 AR_in = 1.0                       # [-] Intake width/height aspect ratio.
 AR_body = 1.0                     # [-] Body width/height aspect ratio.
 AR_solar = 5.0                    # [-] Solar panel planform aspect ratio.
@@ -55,13 +58,13 @@ A_solar = 0.5                     # [m^2] Deployable solar-array area.
 A_rad = 0.0                       # [m^2] Radiator area.
 L_in = 2.0                        # [m] Intake length along spacecraft axis.
 L_body = 2.0                      # [m] Body length along spacecraft axis.
-X_solar = 2.0                     # [m] Solar panel axial center from thruster-side butt.
+X_solar = 1.0                     # [m] Solar panel axial center from thruster-side butt.
 X_rad = 0.5                       # [m] Radiator axial center from thruster-side butt.
 
 [thruster]
 thrust = 0.0575                   # [N] Thruster force.
 specific_impulse = 5455.0         # [s] Thruster specific impulse.
-eff = 0.5                         # [-] Electrical-to-jet thruster efficiency.
+eff = 0.53                         # [-] Electrical-to-jet thruster efficiency.
 power = 5500.0                    # [W] Electrical power supplied to thruster.
 propellant_mass = 0.0             # [kg/s] Legacy propellant flow field.
 m_flow = 1e-3                     # [kg/s] Thruster mass flow rate.
@@ -123,7 +126,7 @@ drag_inlet_front = 0.2            # [N] Inlet-front drag force contribution.
 
 [refueling]
 coll_eff = 0.636                  # [-] Intake collection efficiency.
-t_refuel = 7000960.0              # [s] Nominal refueling duration.
+t_refuel = 12000960.0              # [s] Nominal refueling duration.
 eta_refuel = 0.1                  # [-] Refueling compression-process efficiency.
 m_flow = 1e-3                     # [kg/s] Captured mass flow into tanks.
 p_tank = 100000.0                 # [Pa] Storage tank pressure.

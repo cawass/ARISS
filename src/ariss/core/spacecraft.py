@@ -88,8 +88,8 @@ class OrbitState:
 class GeometryState:
     S_in: str = "c"  # [str] Intake shape code; values starting with "s"/"r" are rectangular, "e"/"c" are elliptic/circular.
     S_body: str = "s"  # [str] Body shape code; values starting with "s"/"r" are rectangular, "e"/"c" are elliptic/circular.
-
-    Body_match_intake: bool = True # If this is enabled the body cross sectional area will be equivalent to the intake area
+    use_intake_area_ratio: bool = False  # [bool] If true, enforce A_in/A_body = intake_area_ratio.
+    intake_area_ratio: float = 1.0  # [-] Intake-to-body area ratio; 1.0 equal, <1 smaller intake, >1 larger intake.
 
     AR_in: float = 1.0  # [-] Intake cross-section aspect ratio, width/height.
     AR_body: float = 1.0  # [-] Body cross-section aspect ratio, width/height.
@@ -122,6 +122,21 @@ class GeometryState:
 
     def update(self, **kwargs: Any) -> "GeometryState":
         return replace(self, **kwargs)
+
+
+def apply_intake_area_ratio(geometry: GeometryState) -> None:
+    # Inputs:
+    #   geometry: geometry state with ratio toggle and ratio value.
+    #
+    # Outputs:
+    #   Updates geometry.A_in in place so A_in/A_body equals intake_area_ratio
+    #   whenever use_intake_area_ratio is enabled, then rebuilds A_in_drag.
+    if not geometry.use_intake_area_ratio:
+        return
+    if geometry.intake_area_ratio <= 0.0:
+        raise ValueError("geometry.intake_area_ratio must be > 0 when use_intake_area_ratio is enabled.")
+    geometry.A_in = geometry.intake_area_ratio * geometry.A_body
+    geometry.A_in_drag = geometry.A_in - geometry.A_prop - geometry.A_ref
 
 
 @dataclass(frozen=True)
@@ -231,6 +246,7 @@ class ThermalState:
 
 @dataclass(frozen=True)
 class SpacecraftState:
+    name: str = "ARISS Case"  # [str] Human-readable case name used by UI and reports.
     orbit: OrbitState = field(default_factory=OrbitState)  # Orbit and atmosphere state.
     geometry: GeometryState = field(default_factory=GeometryState)  # Spacecraft geometry and surface properties.
     thruster: ThrusterState = field(default_factory=ThrusterState)  # Thruster performance and flow state.

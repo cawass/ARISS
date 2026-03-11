@@ -20,6 +20,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ariss.core.spacecraft import apply_intake_area_ratio
 from ariss.utils import constants as const
 
 
@@ -63,9 +64,8 @@ def power_model(sc):
     #   Elliptic/circular section: A = pi * W * H / 4
     #   Rectangular section: A = W * H
 
-    # Enforce matched body/intake area when requested by geometry settings.
-    if sc.geometry.Body_match_intake:
-        sc.geometry.A_body = sc.geometry.A_in
+    # Enforce the configured intake/body area ratio, when enabled.
+    apply_intake_area_ratio(sc.geometry)
 
     # Compute the usable solar power flux on the panel plane after accounting
     # for cell efficiency and the average Sun-pointing alignment angle.
