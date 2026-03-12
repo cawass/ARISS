@@ -16,7 +16,10 @@
 
 from __future__ import annotations
 
+import io
+import logging
 import sys
+from contextlib import redirect_stdout
 from pathlib import Path
 
 import pytest
@@ -26,6 +29,8 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from ariss.core.simulation import logger as simulation_logger
+from ariss.core.simulation import run_sizing_loop
 from ariss.core.spacecraft import SpacecraftState
 from ariss.modules.Drag import drag_model
 from ariss.modules.Propulsion import propulsion_model
@@ -81,3 +86,42 @@ def test_propulsion_value_ranges_for_all_configs(config_path: Path) -> None:
 
     assert sc.geometry.A_in > sc.geometry.A_prop, "A_in must exceed A_prop due to drag/refuel intake terms."
     assert sc.geometry.A_in_drag > 0.0, "A_in_drag must be positive."
+
+
+@pytest.mark.parametrize("config_path", CONFIG_PATHS, ids=lambda path: path.name)
+def test_converged_thrust_matches_required_drag_for_all_configs(config_path: Path) -> None:
+    # Inputs:
+    #   tests/Verification/configs/*.toml
+    #
+    # Outputs:
+    #   Ensures the converged propulsion thrust balances the required momentum
+    #   load from drag plus captured-stream ram for every verification case.
+
+    sc = SpacecraftState.from_toml(config_path)
+
+    previous_level = simulation_logger.level
+    simulation_logger.setLevel(logging.CRITICAL)
+    try:
+        try:
+            with redirect_stdout(io.StringIO()):
+                final_sc, converged, _history = run_sizing_loop(
+                    sc,
+                    max_iterations=120,
+                    mass_tolerance=1.0e-3,
+                )
+        except ImportError:
+            pytest.skip("pymsis is required for converged propulsion-balance tests.")
+    finally:
+        simulation_logger.setLevel(previous_level)
+
+    assert converged, f"Sizing loop did not converge for {config_path.name}"
+
+    rho = final_sc.orbit.density
+    velocity = final_sc.orbit.velocity
+    required_load = final_sc.drag.drag_total + rho * velocity * velocity * (final_sc.geometry.A_ref + final_sc.geometry.A_prop)
+
+    assert final_sc.thruster.thrust == pytest.approx(
+        required_load,
+        rel=1.0e-4,
+        abs=1.0e-8,
+    ), f"Thrust/load mismatch for {config_path.name}"

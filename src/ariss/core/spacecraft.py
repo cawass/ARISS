@@ -62,7 +62,7 @@ def _coerce_dataclass(dataclass_type: type[Any], payload: dict[str, Any]) -> Any
 
 @dataclass(frozen=False)
 class MissionProfileState:
-    active_refueling: bool = True  # [bool] Enables the mission branch that collects atmospheric propellant.
+    active_refueling: bool = False  # [bool] Enables the mission branch that collects atmospheric propellant.
     delta_v: float = 1157.8  # [m/s] Mission delta-v requirement used in the rocket equation.
     required_fuel: float = 0  # [kg] Fuel mass required to satisfy the mission delta-v target.
 
@@ -196,7 +196,7 @@ class ThrusterState:
 @dataclass(frozen=False)
 class RefuelingState:
     coll_eff: float = 0.61  # [-] Intake collection efficiency into useful captured flow.
-    t_refuel: float = 120 * 24 * 3600  # [s] Nominal refueling duration parameter stored with the subsystem.
+    t_refuel: float = 140 * 24 * 3600  # [s] Nominal refueling duration parameter stored with the subsystem.
     eta_refuel: float = 0.1  # [-] Efficiency of the refueling compression process.
     m_flow: float = 1e-3  # [kg/s] Captured mass flow routed into the storage tanks.
     p_tank: float = 100000  # [Pa] Storage tank pressure.
