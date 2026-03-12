@@ -99,11 +99,11 @@ def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_to
         # drag, and power updates each modify quantities that feed back into the
         # overall spacecraft mass and power closure.
         sizing_model(loop_sc)
+        drag_model(loop_sc)
+        sizing_model(loop_sc)
         propulsion_model(loop_sc)
         sizing_model(loop_sc)
         refueling_model(loop_sc)
-        sizing_model(loop_sc)
-        drag_model(loop_sc)
         sizing_model(loop_sc)
         power_model(loop_sc)
         sizing_model(loop_sc)

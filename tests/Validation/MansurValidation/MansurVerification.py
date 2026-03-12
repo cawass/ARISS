@@ -49,8 +49,7 @@ def run_mansur_verification(
     print(f"Final thrust [N]: {final_sc.thruster.thrust:.6e}")
     print(f"Final drag [N]: {final_sc.drag.drag_total:.6e}")
 
-    if show_ui:
-        plot_simulation_history(
+    plot_simulation_history(
             validation_path,
             max_iterations=max_iterations,
             mass_tolerance=mass_tolerance,

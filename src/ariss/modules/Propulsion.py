@@ -119,7 +119,13 @@ def propulsion_model(sc):
 
     # Solve the propulsion capture area needed to balance drag and, if active,
     # leave additional intake margin for the refueling stream.
-    sc.geometry.A_prop = (0.5 * sc.orbit.velocity * cd_s_total + sc.geometry.A_ref) / (exhaust_velocity - sc.orbit.velocity)
+    sc.geometry.A_prop = (
+        0.5 * sc.orbit.velocity * cd_s_total
+        + sc.orbit.velocity * sc.geometry.A_ref
+    ) / (exhaust_velocity - sc.orbit.velocity)
+
+    # The propulsion intake mass flow follows directly from captured density flux.
+    sc.thruster.m_flow = sc.geometry.A_prop * sc.orbit.velocity * sc.orbit.density
 
     # Invert the propulsion power relation to infer the atmospheric density that
     # makes the chosen propulsion area feasible at the available jet power.
@@ -135,8 +141,6 @@ def propulsion_model(sc):
         )
     )
 
-    # The propulsion intake mass flow follows directly from captured density flux.
-    sc.thruster.m_flow = sc.geometry.A_prop * sc.orbit.velocity * sc.orbit.density
 
 
     # Resolve intake areas:
