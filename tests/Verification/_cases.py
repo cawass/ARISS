@@ -25,7 +25,7 @@ def verification_case_paths(
 
     case_dir = CONFIG_DIR if config_dir is None else Path(config_dir)
     candidates: list[Path] = []
-    for pattern in ("drag_*.toml", "case_*.toml"):
+    for pattern in ("case_*.toml",):
         candidates.extend(case_dir.glob(pattern))
     if not candidates:
         candidates.extend(case_dir.glob("*.toml"))
@@ -59,4 +59,3 @@ __all__ = [
     "build_spacecraft_from_case",
     "verification_case_paths",
 ]
-

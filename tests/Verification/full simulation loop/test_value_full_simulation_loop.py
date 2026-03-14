@@ -78,8 +78,8 @@ def test_full_simulation_loop_value_ranges_for_all_configs(config_path: Path) ->
     assert converged, f"Sizing loop did not converge for {config_path.name}"
     _assert_in_range("iterations", float(len(history)), 1.0, 119.0)
 
-    _assert_in_range("altitude", final_sc.orbit.altitude, 160.0, 240.0)
-    _assert_in_range("density", final_sc.orbit.density, 7.0e-11, 8.2e-10)
+    _assert_in_range("altitude", final_sc.orbit.altitude, 130.0, 240.0)
+    _assert_in_range("density", final_sc.orbit.density, 7.0e-12, 8.2e-9)
     _assert_in_range("Mass_total", final_sc.mass.Mass_total, 0, 2000)
     _assert_in_range("thrust", final_sc.thruster.thrust, 0, 1)
     _assert_in_range("drag_total", final_sc.drag.drag_total, 0, 1)

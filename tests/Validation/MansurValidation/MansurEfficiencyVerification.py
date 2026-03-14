@@ -14,9 +14,12 @@
 #  Module:         MansurEfficiencyVerification.py
 # ============================================================================== #
 
+import sys
+import io
+import logging
+from contextlib import redirect_stdout
 from copy import deepcopy
 from pathlib import Path
-import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,6 +41,7 @@ if str(SRC) not in sys.path:
 # ------------------------------------------------------------------------------ #
 
 from ariss.core.simulation import load_spacecraft_from_base_config
+from ariss.core.simulation import logger as simulation_logger
 from ariss.core.simulation import run_sizing_loop
 
 
@@ -49,7 +53,7 @@ CONFIG_PATH = Path(__file__).with_name("MansurVerification.toml")
 
 COLLECTION_EFFICIENCIES = (0.35, 0.40, 0.45)
 
-POWER_GRID = np.linspace(200, 30000, 40)  # W
+ISP = np.linspace(200, 10000, 40)  # [s]
 
 
 # ------------------------------------------------------------------------------ #
@@ -61,31 +65,34 @@ def sweep_mansur_efficiencies():
     base_spacecraft = load_spacecraft_from_base_config(CONFIG_PATH)
 
     results = {}
+    previous_level = simulation_logger.level
+    simulation_logger.setLevel(logging.CRITICAL)
 
-    for efficiency in COLLECTION_EFFICIENCIES:
+    try:
+        for efficiency in COLLECTION_EFFICIENCIES:
 
-        converged_altitudes = []
-        converged_isp = []
+            converged_altitudes = []
+            converged_isp = []
 
-        for power in POWER_GRID:
+            for isp in ISP:
 
-            print(f"Running Power: {power:.1f} W")
+                print(f"Running Isp: {isp:.1f} s")
 
-            spacecraft = deepcopy(base_spacecraft)
+                spacecraft = deepcopy(base_spacecraft)
 
-            spacecraft.refueling.coll_eff = efficiency
-            spacecraft.thruster.power = power
+                spacecraft.refueling.coll_eff = efficiency
+                spacecraft.thruster.specific_impulse = float(isp)
 
-            final_sc, converged, _ = run_sizing_loop(spacecraft)
+                with redirect_stdout(io.StringIO()):
+                    final_sc, converged, _ = run_sizing_loop(spacecraft)
 
-            if converged:
-                converged_altitudes.append(final_sc.orbit.altitude)
-                converged_isp.append(final_sc.thruster.specific_impulse)
+                if converged:
+                    converged_altitudes.append(final_sc.orbit.altitude)
+                    converged_isp.append(final_sc.thruster.specific_impulse)
 
-        results[efficiency] = (
-            np.array(converged_altitudes),
-            np.array(converged_isp),
-        )
+            results[efficiency] = (np.array(converged_altitudes), np.array(converged_isp))
+    finally:
+        simulation_logger.setLevel(previous_level)
 
     return results
 
@@ -94,7 +101,51 @@ def sweep_mansur_efficiencies():
 # Plot the Mansur verification curves
 # ------------------------------------------------------------------------------ #
 
-def plot_results(results):
+def _plot_sweep_curve(axis, altitude_km: np.ndarray, isp_s: np.ndarray, color: str, efficiency: float) -> None:
+
+    # Inputs:
+    #   axis: matplotlib axis used for plotting.
+    #   altitude_km: converged altitudes in the same order as the Isp sweep.
+    #   isp_s: converged specific impulse values in sweep order.
+    #   color: curve color.
+    #   efficiency: collection efficiency used for the sweep.
+    #
+    # Outputs:
+    #   Plots the sweep curve without folding the descending and ascending
+    #   altitude branches onto each other.
+
+    turning_index = int(np.argmin(altitude_km))
+    first_branch = slice(0, turning_index + 1)
+    second_branch = slice(turning_index, altitude_km.size)
+
+    axis.plot(
+        altitude_km[first_branch],
+        isp_s[first_branch],
+        color=color,
+        linewidth=1.6,
+        marker="o",
+        markersize=3.0,
+        label=f"Isp for eta_c = {efficiency:.2f}",
+    )
+
+    if second_branch.stop - second_branch.start > 1:
+        axis.plot(
+            altitude_km[second_branch],
+            isp_s[second_branch],
+            color=color,
+            linewidth=1.6,
+            marker="o",
+            markersize=3.0,
+        )
+
+
+def plot_results(results, show: bool = True):
+
+    if show and "agg" in plt.get_backend().lower():
+        try:
+            plt.switch_backend("TkAgg")
+        except Exception:
+            pass
 
     figure, axis = plt.subplots(figsize=(8, 5))
 
@@ -107,15 +158,7 @@ def plot_results(results):
         if altitude_km.size == 0:
             continue
 
-        axis.plot(
-            altitude_km,
-            isp_s,
-            color=color,
-            linewidth=1.6,
-            marker="o",
-            markersize=3.0,
-            label=f"Isp for ηc = {efficiency:.2f}",
-        )
+        _plot_sweep_curve(axis, altitude_km, isp_s, color, efficiency)
 
         solution_limit = float(np.min(altitude_km))
 
@@ -139,7 +182,8 @@ def plot_results(results):
 
     figure.tight_layout()
 
-    plt.show()
+    if show:
+        plt.show()
 
 
 # ------------------------------------------------------------------------------ #

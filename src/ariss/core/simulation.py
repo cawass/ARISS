@@ -99,12 +99,34 @@ def compute_drag_diagnostics(sc: SpacecraftState) -> SpacecraftState:
     drag_model(state)
     return state
 
-def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_tolerance: float = 1e-3) -> Tuple[SpacecraftState, bool, List[SpacecraftState]]:
+
+def _normalized_residual(current: float, reference: float, floor: float) -> float:
+    # Inputs:
+    #   current: current value after the iteration update.
+    #   reference: comparison value used to build the residual scale.
+    #   floor: minimum scale to avoid division by zero.
+    #
+    # Outputs:
+    #   Relative residual based on the larger of current/reference magnitudes.
+
+    scale = max(abs(current), abs(reference), floor)
+    return abs(current - reference) / scale
+
+
+def run_sizing_loop(
+    loop_sc: SpacecraftState,
+    max_iterations: int = 200,
+    mass_tolerance: float = 1e-3,
+    force_tolerance: float = 1e-2,
+    density_tolerance: float = 1e-3,
+) -> Tuple[SpacecraftState, bool, List[SpacecraftState]]:
 
     # Inputs:
     #   loop_sc: initial SpacecraftState.
     #   max_iterations: maximum number of iterations.
     #   mass_tolerance: convergence tolerance on total mass [kg].
+    #   force_tolerance: relative tolerance on thrust-drag balance [-].
+    #   density_tolerance: relative tolerance on atmospheric-density change [-].
     #
     # Outputs:
     #   loop_sc: final spacecraft state.
@@ -113,7 +135,9 @@ def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_to
     #
     # Equations used:
     #   residual_i = |M_i - M_(i-1)|
-    #   converged if residual_i <= mass_tolerance, for i > 10
+    #   force_residual_i = |T_i - L_i| / max(|T_i|, |L_i|, eps)
+    #   density_residual_i = |rho_i - rho_(i-1)| / max(|rho_i|, |rho_(i-1)|, eps)
+    #   converged if all residuals satisfy their tolerances, for i > 10
     #   orbit updates from orbit_updates_from_height(h)
 
     # Initialize the orbit-dependent atmospheric properties from the starting
@@ -130,6 +154,8 @@ def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_to
     logger.info("Starting sizing loop. Initial Total Mass: %.2f kg", loop_sc.mass.Mass_total)
     history = []
     residual = 10e10
+    force_residual = 10e10
+    density_residual = 10e10
     converged = False
 
     # Each pass updates the spacecraft state by cycling through the subsystem
@@ -157,12 +183,23 @@ def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_to
         # Measure convergence by the change in total spacecraft mass between
         # consecutive saved iterations.
         if i > 0:
-            residual = abs(loop_sc.mass.Mass_total - history[i - 1].mass.Mass_total)
-        logger.debug("Iter %d: Mass = %.6f kg | Residual = %.6e", i, loop_sc.mass.Mass_total, residual)
+            previous_state = history[i - 1]
+            residual = abs(loop_sc.mass.Mass_total - previous_state.mass.Mass_total)
+            density_residual = _normalized_residual(loop_sc.orbit.density, previous_state.orbit.density, 1.0e-20)
+        force_residual = _normalized_residual(loop_sc.thruster.thrust, loop_sc.thruster.required_load, 1.0e-12)
+        logger.debug(
+            "Iter %d: Mass = %.6f kg | Mass residual = %.6e | Force residual = %.6e | Density residual = %.6e",
+            i,
+            loop_sc.mass.Mass_total,
+            residual,
+            force_residual,
+            density_residual,
+        )
 
-        # Require both a small residual and a minimum number of iterations to
-        # avoid exiting on an early transient match.
-        if residual <= mass_tolerance and i > 10:
+        # Require mass stability, force balance, density stability, and a
+        # minimum number of iterations to avoid exiting on an early transient
+        # match.
+        if residual <= mass_tolerance and force_residual <= force_tolerance and density_residual <= density_tolerance and i > 10:
             logger.info("Convergence reached at iteration %d. Final Mass: %.2f kg", i, loop_sc.mass.Mass_total)
             converged = True
             history.append(deepcopy(loop_sc))
@@ -175,9 +212,11 @@ def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_to
     # Warn when the loop exits without satisfying the convergence criterion.
     if not converged:
         logger.warning(
-            "Sizing loop FAILED to converge after %d iterations. Final residual: %.6f kg",
+            "Sizing loop FAILED to converge after %d iterations. Final mass residual: %.6f kg | Final force residual: %.6e | Final density residual: %.6e",
             max_iterations,
             residual,
+            force_residual,
+            density_residual,
         )
     return loop_sc, converged, history
 

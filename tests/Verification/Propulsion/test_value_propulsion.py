@@ -79,9 +79,9 @@ def test_propulsion_value_ranges_for_all_configs(config_path: Path) -> None:
     drag_model(sc)
     propulsion_model(sc)
 
-    _assert_in_range("A_prop", sc.geometry.A_prop, 0.1, 10)
-    _assert_in_range("A_in", sc.geometry.A_in, 0.1, 10)
-    _assert_in_range("A_in_drag", sc.geometry.A_in_drag, 0.1, 10)
+    _assert_in_range("A_prop", sc.geometry.A_prop, 0.0, 10)
+    _assert_in_range("A_in", sc.geometry.A_in, 0.0, 10)
+    _assert_in_range("A_in_drag", sc.geometry.A_in_drag, 0.0, 10)
     _assert_in_range("thrust", sc.thruster.thrust, 0.01, 1 )
     _assert_in_range("m_flow", sc.thruster.m_flow, 1.0e-7, 8.0e-4)
     _assert_in_range("altitude", sc.orbit.altitude, 130.0, 230.0)

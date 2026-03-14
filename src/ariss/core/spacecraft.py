@@ -73,9 +73,11 @@ def _load_toml_file(filepath: str | PathLike[str]) -> dict[str, Any]:
 
 @dataclass(frozen=False)
 class MissionProfileState:
+    """Mission-level targets and refueling activation flags."""
+
     active_refueling: bool = False  # [bool] Enables the mission branch that collects atmospheric propellant.
     delta_v: float = 1157.8  # [m/s] Mission delta-v requirement used in the rocket equation.
-    required_fuel: float = 0  # [kg] Fuel mass required to satisfy the mission delta-v target.
+    required_fuel: float = 0  # [kg] Derived: fuel mass required to satisfy the mission delta-v target.
 
     def update(self, **kwargs: Any) -> "MissionProfileState":
         return replace(self, **kwargs)
@@ -83,65 +85,72 @@ class MissionProfileState:
 
 @dataclass(frozen=False)
 class OrbitState:
-    altitude: float = 0
-    velocity: float = 0
-    density: float = 0
-    p_orb: float = 1e-5
-    temperature: float = 0
-    molar_mass: float = 0
-    alpha: float = 0
-    gamma: float = 1.4
-    R_spec: float = 287.0
-    msis_date: str = "2000-01-01T00:00:00"
-    msis_f107: float = 140.0
-    msis_ap: float = 15.0
+    """Orbital environment inputs and atmosphere-derived state."""
+
+    altitude: float = 0  # [km] Input/derived: orbital altitude above Earth.
+    velocity: float = 0  # [m/s] Derived: orbital velocity at the current altitude.
+    density: float = 0  # [kg/m^3] Derived: local atmospheric density.
+    p_orb: float = 1e-5  # [Pa] Input: local orbital pressure used by refueling compression.
+    temperature: float = 0  # [K] Derived: local atmospheric temperature.
+    molar_mass: float = 0  # [kg/mol] Derived: local atmospheric molar mass.
+    alpha: float = 0  # [rad] Input: angle of attack used by drag and thermal models.
+    gamma: float = 1.4  # [-] Input: specific heat ratio of the captured gas.
+    R_spec: float = 287.0  # [J/kg/K] Input/derived: specific gas constant for the local gas mix.
+    msis_date: str = "2000-01-01T00:00:00"  # [UTC ISO-8601] Input: atmosphere model timestamp.
+    msis_f107: float = 140.0  # [sfu] Input: solar radio flux index for the atmosphere model.
+    msis_ap: float = 15.0  # [-] Input: geomagnetic activity index for the atmosphere model.
 
 
 @dataclass(frozen=False)
 class GeometryState:
-    S_in: str = "c"
-    S_body: str = "s"
-    use_intake_area_ratio: bool = False
-    intake_area_ratio: float = 1.0
+    """Spacecraft geometry inputs and solved capture-area allocation."""
 
-    AR_in: float = 1.0
-    AR_body: float = 1.0
-    AR_solar: float = 5
-    AR_rad: float = 5
+    S_in: str = "c"  # [code] Input: intake cross-section shape code.
+    S_body: str = "s"  # [code] Input: body cross-section shape code.
+    use_intake_area_ratio: bool = False  # [bool] Input: enforces A_in = intake_area_ratio * A_body when enabled.
+    fixed_body: bool = False  # [bool] Input: keeps the body area fixed while solving in ratio mode.
+    intake_area_ratio: float = 1.0  # [-] Input: total intake-to-body frontal area ratio.
 
-    epsilon_in: float = 0.1
-    epsilon_body: float = 0.1
-    epsilon_solar: float = 0.1
-    epsilon_rad: float = 0.1
-    epsilon_in_norm: float = 0.9
+    AR_in: float = 1.0  # [-] Input: intake section aspect ratio.
+    AR_body: float = 1.0  # [-] Input: body section aspect ratio.
+    AR_solar: float = 5  # [-] Input: solar array planform aspect ratio.
+    AR_rad: float = 5  # [-] Input: radiator planform aspect ratio.
 
-    wake_in: float = 1
-    wake_body: float = 1
-    wake_solar: float = 1
-    wake_radiator: float = 1
+    epsilon_in: float = 0.1  # [-] Input: inlet wall accommodation coefficient for side drag.
+    epsilon_body: float = 0.1  # [-] Input: body wall accommodation coefficient for drag.
+    epsilon_solar: float = 0.1  # [-] Input: solar array accommodation coefficient for drag.
+    epsilon_rad: float = 0.1  # [-] Input: radiator accommodation coefficient for drag.
+    epsilon_in_norm: float = 0.9  # [-] Input: inlet normal-face accommodation coefficient.
 
-    A_in: float = 4.0387
-    A_ref: float = 2
-    A_prop: float = 2
-    A_in_drag: float = 2
-    A_body: float = 0.5
-    A_solar: float = 5
-    A_rad: float = 0.0
+    wake_in: float = 1  # [-] Input: inlet wake factor applied to side drag.
+    wake_body: float = 1  # [-] Input: body wake factor applied to side drag.
+    wake_solar: float = 1  # [-] Input: solar array wake factor.
+    wake_radiator: float = 1  # [-] Input: radiator wake factor.
 
-    L_in: float = 2.5
-    L_body: float = 2.5
-    X_solar: float = 2.0
-    X_rad: float = 0.5
+    A_in: float = 4.0387  # [m^2] Input/derived: total intake frontal area.
+    A_ref: float = 2  # [m^2] Derived: intake area assigned to refueling capture.
+    A_prop: float = 2  # [m^2] Derived: intake area assigned to propulsion capture.
+    A_in_drag: float = 2  # [m^2] Derived: intake area exposed only to drag.
+    A_body: float = 0.5  # [m^2] Input/derived: spacecraft body frontal area.
+    A_solar: float = 5  # [m^2] Input: total deployed solar array area.
+    A_rad: float = 0.0  # [m^2] Input/derived: total radiator area.
+
+    L_in: float = 2.5  # [m] Input: intake length along the spacecraft axis.
+    L_body: float = 2.5  # [m] Input: body length along the spacecraft axis.
+    X_solar: float = 2.0  # [m] Input: solar array mounting center from the aft reference.
+    X_rad: float = 0.5  # [m] Input: radiator mounting center from the aft reference.
 
     def update(self, **kwargs: Any) -> "GeometryState":
         return replace(self, **kwargs)
 
 @dataclass(frozen=True)
 class RateState:
-    R_mass_volume_in: float = 10
-    R_mass_volume_body: float = 10
-    R_mass_surface_solar: float = 5
-    R_mass_surface_rad: float = 5
+    """Structural mass-rate coefficients used by sizing relations."""
+
+    R_mass_volume_in: float = 10  # [kg/m^3] Input: inlet structural mass density rate.
+    R_mass_volume_body: float = 10  # [kg/m^3] Input: body structural mass density rate.
+    R_mass_surface_solar: float = 5  # [kg/m^2] Input: solar array areal mass rate.
+    R_mass_surface_rad: float = 5  # [kg/m^2] Input: radiator areal mass rate.
 
     def update(self, **kwargs: Any) -> "RateState":
         return replace(self, **kwargs)
@@ -149,15 +158,17 @@ class RateState:
 
 @dataclass(frozen=False)
 class MassState:
-    Mass_in: float = 0.0
-    Mass_body: float = 0.0
-    Mass_solar: float = 0.0
-    Mass_rad: float = 0.0
-    Mass_prop: float = 61
-    Mass_ADCS: float = 20
-    Mass_payload: float = 24
-    Mass_refprop: float = 700
-    Mass_total: float = 0.0
+    """Subsystem and total mass bookkeeping."""
+
+    Mass_in: float = 0.0  # [kg] Derived: intake structural mass.
+    Mass_body: float = 0.0  # [kg] Derived: body structural mass.
+    Mass_solar: float = 0.0  # [kg] Derived: solar array mass.
+    Mass_rad: float = 0.0  # [kg] Derived: radiator mass.
+    Mass_prop: float = 61  # [kg] Input/derived: propulsion subsystem dry mass.
+    Mass_ADCS: float = 20  # [kg] Input: ADCS subsystem mass.
+    Mass_payload: float = 24  # [kg] Input: payload mass.
+    Mass_refprop: float = 700  # [kg] Input/derived: refueling and propellant storage subsystem mass.
+    Mass_total: float = 0.0  # [kg] Derived: total spacecraft mass.
 
     def update(self, **kwargs: Any) -> "MassState":
         return replace(self, **kwargs)
@@ -165,15 +176,17 @@ class MassState:
 
 @dataclass(frozen=False)
 class PowerState:
-    Power_in: float = 0.0
-    Power_body: float = 0.0
-    Power_solar: float = 0.0
-    Power_rad: float = 0.0
-    Power_prop: float = 0.0
-    Power_ADCS: float = 2000.0
-    Power_payload: float = 0.0
-    Power_refprop: float = 0.0
-    Power_total: float = 0.0
+    """Subsystem and total power bookkeeping."""
+
+    Power_in: float = 0.0  # [W] Derived: intake subsystem power.
+    Power_body: float = 0.0  # [W] Derived: body subsystem power.
+    Power_solar: float = 0.0  # [W] Derived: solar power generation or allocation.
+    Power_rad: float = 0.0  # [W] Derived: radiator subsystem power.
+    Power_prop: float = 0.0  # [W] Derived: propulsion subsystem power.
+    Power_ADCS: float = 2000.0  # [W] Input: ADCS power demand.
+    Power_payload: float = 0.0  # [W] Input: payload power demand.
+    Power_refprop: float = 0.0  # [W] Derived: refueling and propellant processing power.
+    Power_total: float = 0.0  # [W] Derived: total spacecraft power demand.
 
     def update(self, **kwargs: Any) -> "PowerState":
         return replace(self, **kwargs)
@@ -181,12 +194,18 @@ class PowerState:
 
 @dataclass(frozen=False)
 class ThrusterState:
-    thrust: float = 0.1039
-    specific_impulse: float = 4500
-    eff: float = 0.5
-    power: float = 5000.0
-    propellant_mass: float = 0.0
-    m_flow: float = 1e-3
+    """Thruster operating point, efficiency, and flow state."""
+
+    thrust: float = 0.1039  # [N] Derived: thrust produced by the intake-fed thruster.
+    specific_impulse: float = 4500  # [s] Input/derived: thruster specific impulse.
+    eff: float = 0.5  # [-] Input: thruster efficiency.
+    power: float = 5000.0  # [W] Input: electrical power available to the thruster.
+    propellant_mass: float = 0.0  # [kg/s] Derived: propellant throughput inferred from intake capture.
+    m_flow: float = 1e-3  # [kg/s] Derived: thruster propellant mass flow rate.
+    propulsive_ram_load: float = 0.0  # [N] Derived: momentum-exchange load from propulsion capture.
+    refueling_ram_load: float = 0.0  # [N] Derived: momentum-exchange load from refueling capture.
+    required_load: float = 0.0  # [N] Derived: total propulsion load including aero and ram terms.
+    force_residual: float = 0.0  # [N] Derived: thrust minus total required propulsion load.
 
     def update(self, **kwargs: Any) -> "ThrusterState":
         return replace(self, **kwargs)
@@ -194,12 +213,14 @@ class ThrusterState:
 
 @dataclass(frozen=False)
 class RefuelingState:
-    coll_eff: float = 0.61
-    t_refuel: float = 140 * 24 * 3600
-    eta_refuel: float = 0.1
-    m_flow: float = 1e-3
-    p_tank: float = 100000
-    V_prop: float = 0.7
+    """Refueling performance inputs and solved refill flow state."""
+
+    coll_eff: float = 0.61  # [-] Input: intake collection efficiency for useful captured flow.
+    t_refuel: float = 140 * 24 * 3600  # [s] Input: time allowed to complete the refueling target.
+    eta_refuel: float = 0.1  # [-] Input: refueling compression efficiency.
+    m_flow: float = 1e-3  # [kg/s] Derived: refueling mass flow rate.
+    p_tank: float = 100000  # [Pa] Input: storage tank pressure.
+    V_prop: float = 0.7  # [m^3] Input: propellant storage volume.
 
     def update(self, **kwargs: Any) -> "RefuelingState":
         return replace(self, **kwargs)
@@ -207,9 +228,11 @@ class RefuelingState:
 
 @dataclass(frozen=True)
 class SolarState:
-    av_aligment: float = 60
-    eta_solar: float = 0.3
-    eta_power: float = 0.9
+    """Solar conversion and pointing efficiency inputs."""
+
+    av_aligment: float = 60  # [deg] Input: average solar array alignment angle.
+    eta_solar: float = 0.3  # [-] Input: solar conversion efficiency.
+    eta_power: float = 0.9  # [-] Input: power conditioning efficiency.
 
     def update(self, **kwargs: Any) -> "SolarState":
         return replace(self, **kwargs)
@@ -217,30 +240,34 @@ class SolarState:
 
 @dataclass(frozen=False)
 class DragState:
-    cd_solar: float = 0.2
-    cd_rad: float = 0.2
-    cd_body_side: float = 0.2
-    cd_inlet_side: float = 0.2
-    cd_inlet_front: float = 0.2
+    """Drag coefficients and force outputs for each exposed surface."""
 
-    drag_total: float = 1
-    drag_solar: float = 0.2
-    drag_rad: float = 0.2
-    drag_body_side: float = 0.2
-    drag_inlet_side: float = 0.2
-    drag_inlet_front: float = 0.2
+    cd_solar: float = 0.2  # [-] Derived: solar array drag coefficient.
+    cd_rad: float = 0.2  # [-] Derived: radiator drag coefficient.
+    cd_body_side: float = 0.2  # [-] Derived: body-side drag coefficient.
+    cd_inlet_side: float = 0.2  # [-] Derived: inlet-side drag coefficient.
+    cd_inlet_front: float = 0.2  # [-] Derived: inlet-front drag coefficient.
+
+    drag_total: float = 1  # [N] Derived: total aerodynamic drag force.
+    drag_solar: float = 0.2  # [N] Derived: solar array drag force.
+    drag_rad: float = 0.2  # [N] Derived: radiator drag force.
+    drag_body_side: float = 0.2  # [N] Derived: body-side drag force.
+    drag_inlet_side: float = 0.2  # [N] Derived: inlet-side drag force.
+    drag_inlet_front: float = 0.2  # [N] Derived: inlet-front drag force.
 
 
 @dataclass(frozen=True)
 class ThermalState:
-    T_des: float = 300.0
-    alpha_body: float = 0.1
-    alpha_solar: float = 0.9
+    """Thermal design targets and surface optical properties."""
 
-    epsilon_therm_in: float = 0.5
-    epsilon_therm_body: float = 0.9
-    epsilon_therm_solar: float = 0.85
-    epsilon_therm_rad: float = 0.9
+    T_des: float = 300.0  # [K] Input: design temperature target.
+    alpha_body: float = 0.1  # [-] Input: body solar absorptivity.
+    alpha_solar: float = 0.9  # [-] Input: solar array absorptivity.
+
+    epsilon_therm_in: float = 0.5  # [-] Input: intake thermal emissivity.
+    epsilon_therm_body: float = 0.9  # [-] Input: body thermal emissivity.
+    epsilon_therm_solar: float = 0.85  # [-] Input: solar array thermal emissivity.
+    epsilon_therm_rad: float = 0.9  # [-] Input: radiator thermal emissivity.
 
     def update(self, **kwargs: Any) -> "ThermalState":
         return replace(self, **kwargs)
@@ -248,19 +275,21 @@ class ThermalState:
 
 @dataclass(frozen=True)
 class SpacecraftState:
-    name: str = "ARISS Case"
+    """Top-level container that groups every spacecraft subsystem state."""
 
-    orbit: OrbitState = field(default_factory=OrbitState)
-    geometry: GeometryState = field(default_factory=GeometryState)
-    thruster: ThrusterState = field(default_factory=ThrusterState)
-    rate: RateState = field(default_factory=RateState)
-    mass: MassState = field(default_factory=MassState)
-    power: PowerState = field(default_factory=PowerState)
-    solar: SolarState = field(default_factory=SolarState)
-    thermal: ThermalState = field(default_factory=ThermalState)
-    drag: DragState = field(default_factory=DragState)
-    refueling: RefuelingState = field(default_factory=RefuelingState)
-    mission_profile: MissionProfileState = field(default_factory=MissionProfileState)
+    name: str = "ARISS Case"  # [text] Input: human-readable case name.
+
+    orbit: OrbitState = field(default_factory=OrbitState)  # [state] Input/derived: orbital environment state bundle.
+    geometry: GeometryState = field(default_factory=GeometryState)  # [state] Input/derived: geometry definition and solved areas.
+    thruster: ThrusterState = field(default_factory=ThrusterState)  # [state] Input/derived: propulsion operating point bundle.
+    rate: RateState = field(default_factory=RateState)  # [state] Input: structural mass rate bundle.
+    mass: MassState = field(default_factory=MassState)  # [state] Derived: subsystem and total mass bundle.
+    power: PowerState = field(default_factory=PowerState)  # [state] Derived: subsystem and total power bundle.
+    solar: SolarState = field(default_factory=SolarState)  # [state] Input: solar performance parameter bundle.
+    thermal: ThermalState = field(default_factory=ThermalState)  # [state] Input: thermal property bundle.
+    drag: DragState = field(default_factory=DragState)  # [state] Derived: drag coefficient and force bundle.
+    refueling: RefuelingState = field(default_factory=RefuelingState)  # [state] Input/derived: refueling performance bundle.
+    mission_profile: MissionProfileState = field(default_factory=MissionProfileState)  # [state] Input/derived: mission target bundle.
 
     @classmethod
     def from_toml(cls, filepath: str | PathLike[str]) -> "SpacecraftState":
