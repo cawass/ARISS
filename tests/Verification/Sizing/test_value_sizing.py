@@ -29,10 +29,14 @@ if str(SRC) not in sys.path:
 
 from ariss.core.spacecraft import SpacecraftState
 from ariss.modules.Budgets import sizing_model
+from tests.Verification._cases import (
+    build_spacecraft_from_case,
+    verification_case_paths,
+)
 
 
 CONFIG_DIR = Path(__file__).resolve().parents[1] / "configs"
-CONFIG_PATHS = sorted(CONFIG_DIR.glob("*.toml"))
+CONFIG_PATHS = verification_case_paths(CONFIG_DIR)
 
 
 def _assert_in_range(name: str, value: float, low: float, high: float) -> None:
@@ -48,7 +52,7 @@ def test_sizing_value_ranges_for_all_configs(config_path: Path) -> None:
     #   Ensures sizing_model returns bounded, physically plausible mass and
     #   power budgets for all geometry/wake verification cases.
 
-    sc = SpacecraftState.from_toml(config_path)
+    sc = build_spacecraft_from_case(config_path)
 
     # Exercise power-chain overhead and power-budget closure with non-zero loads.
     sc.power.Power_in = 100.0
@@ -94,3 +98,4 @@ def test_sizing_value_ranges_for_all_configs(config_path: Path) -> None:
         + sc.power.Power_refprop
     )
     assert sc.power.Power_total == pytest.approx(power_sum, rel=1.0e-12, abs=1.0e-12)
+

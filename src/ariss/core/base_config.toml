@@ -8,14 +8,14 @@
 #        ARISS - Atmospheric Refueling Iterative System Solver
 # ============================================================================== #
 #  Description:
-#      Validation configuration for the Mansur/Tisaev-style sweep case.
+#      Single base verification case used by all sweep configurations.
+#      This file explicitly defines every SpacecraftState field.
 #
 #  Project:        ARISS
-#  Module:         MansurVerification.toml
-#  Author:         Carlos Carrasco Requejo, Lucas Calderon del Rio
+#  Module:         drag_base.toml
 # ============================================================================== #
 
-name = "Mansur Validation Case"
+name = "Drag Base Case"
 
 [orbit]
 altitude = 200.0                  # [km] Orbital altitude above Earth.
@@ -49,12 +49,12 @@ wake_in = 1.0                     # [-] Exposed fraction of inlet side to atmosp
 wake_body = 1.0                   # [-] Exposed fraction of body side to atmosphere.
 wake_solar = 1.0                  # [-] Exposed fraction of solar area to atmosphere.
 wake_radiator = 1.0               # [-] Exposed fraction of radiator area to atmosphere.
-A_in = 4.0387                     # [m^2] Total intake area facing atmospheric flow.
-A_ref = 2.0                       # [m^2] Intake area allocated to refueling stream.
-A_prop = 2.0                      # [m^2] Intake area allocated to propulsion stream.
-A_in_drag = 2.0                   # [m^2] Intake area producing drag only (non-useful capture).
-A_body = 0.5                      # [m^2] Body cross-sectional area.
-A_solar = 5.0                     # [m^2] Deployable solar-array area.
+A_in = 1                          # [m^2] Total intake area facing atmospheric flow.
+A_ref =  0                        # [m^2] Intake area allocated to refueling stream.
+A_prop = 0                        # [m^2] Intake area allocated to propulsion stream.
+A_in_drag = 0                     # [m^2] Intake area producing drag only (non-useful capture).
+A_body = 1.1                      # [m^2] Body cross-sectional area.
+A_solar = 0                       # [m^2] Deployable solar-array area.
 A_rad = 0.0                       # [m^2] Radiator area.
 L_in = 3.575                      # [m] Intake length along spacecraft axis.
 L_body = 0.825                    # [m] Body length along spacecraft axis.
@@ -126,7 +126,7 @@ drag_inlet_front = 0.2            # [N] Inlet-front drag force contribution.
 
 [refueling]
 coll_eff = 0.35                   # [-] Intake collection efficiency.
-t_refuel = 864000.0               # [s] Nominal refueling duration.
+t_refuel = 31000000.0               # [s] Nominal refueling duration.
 eta_refuel = 0.1                  # [-] Refueling compression-process efficiency.
 m_flow = 1e-3                     # [kg/s] Captured mass flow into tanks.
 p_tank = 100000.0                 # [Pa] Storage tank pressure.

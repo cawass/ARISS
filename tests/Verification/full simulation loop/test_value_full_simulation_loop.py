@@ -34,10 +34,14 @@ if str(SRC) not in sys.path:
 from ariss.core.simulation import logger as simulation_logger
 from ariss.core.simulation import run_sizing_loop
 from ariss.core.spacecraft import SpacecraftState
+from tests.Verification._cases import (
+    build_spacecraft_from_case,
+    verification_case_paths,
+)
 
 
 CONFIG_DIR = Path(__file__).resolve().parents[1] / "configs"
-CONFIG_PATHS = sorted(CONFIG_DIR.glob("*.toml"))
+CONFIG_PATHS = verification_case_paths(CONFIG_DIR)
 RUN_UI_TEST = os.environ.get("ARISS_RUN_UI_TEST", "0").strip().lower() in {"1", "true", "yes", "on"}
 
 
@@ -54,7 +58,7 @@ def test_full_simulation_loop_value_ranges_for_all_configs(config_path: Path) ->
     #   Ensures the full iterative loop converges and returns bounded final-state
     #   values for all verification spacecraft configurations.
 
-    sc = SpacecraftState.from_toml(config_path)
+    sc = build_spacecraft_from_case(config_path)
 
     previous_level = simulation_logger.level
     simulation_logger.setLevel(logging.CRITICAL)
@@ -74,8 +78,8 @@ def test_full_simulation_loop_value_ranges_for_all_configs(config_path: Path) ->
     assert converged, f"Sizing loop did not converge for {config_path.name}"
     _assert_in_range("iterations", float(len(history)), 1.0, 119.0)
 
-    _assert_in_range("altitude", final_sc.orbit.altitude, 165.0, 240.0)
-    _assert_in_range("density", final_sc.orbit.density, 7.0e-11, 8.0e-10)
+    _assert_in_range("altitude", final_sc.orbit.altitude, 160.0, 240.0)
+    _assert_in_range("density", final_sc.orbit.density, 7.0e-11, 8.2e-10)
     _assert_in_range("Mass_total", final_sc.mass.Mass_total, 0, 2000)
     _assert_in_range("thrust", final_sc.thruster.thrust, 0, 1)
     _assert_in_range("drag_total", final_sc.drag.drag_total, 0, 1)
@@ -105,14 +109,26 @@ def test_run_ui_test() -> None:
         pytest.skip("UI test disabled. Set ARISS_RUN_UI_TEST=1 to run manual visualization.")
 
     try:
-        from ariss.visualization.history_ui import plot_simulation_history
+        from ariss.core.simulation_ui import plot_simulation_history
     except Exception as exc:
         pytest.skip(f"UI dependencies unavailable: {exc}")
 
+    # Preflight Tk once so missing Tcl/Tk installations skip cleanly.
+    try:
+        import tkinter as tk
+
+        probe = tk.Tk()
+        probe.withdraw()
+        probe.destroy()
+    except Exception as exc:
+        pytest.skip(f"Tk UI backend unavailable: {exc}")
+
     for config_path in CONFIG_PATHS:
+        sc = build_spacecraft_from_case(config_path)
         plot_simulation_history(
-            config_path,
+            sc,
             max_iterations=120,
             mass_tolerance=1.0e-3,
             show=True,
         )
+

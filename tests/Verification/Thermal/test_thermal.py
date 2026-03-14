@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
-from src.ariss.modules.Thermal import thermal_model
-from src.ariss.core.spacecraft import SpacecraftState
+from ariss.modules.Thermal import thermal_model
+from ariss.core.spacecraft import SpacecraftState
 from dataclasses import replace
 
 def test_drag_heating():

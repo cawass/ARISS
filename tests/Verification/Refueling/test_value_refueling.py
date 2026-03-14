@@ -29,13 +29,18 @@ if str(SRC) not in sys.path:
 from ariss.core.spacecraft import SpacecraftState
 from ariss.modules.Refueling import refueling_model
 from ariss.utils.atmosphere import orbit_updates_from_height
+from tests.Verification._cases import (
+    build_spacecraft_from_case,
+    verification_case_paths,
+)
 
 
-CONFIG_PATH = Path(__file__).resolve().parents[1] / "configs" / "drag_cc_equal_area.toml"
+CONFIG_DIR = Path(__file__).resolve().parents[1] / "configs"
+CONFIG_PATHS = verification_case_paths(CONFIG_DIR)
 
 
-def _build_state() -> SpacecraftState:
-    sc = SpacecraftState.from_toml(CONFIG_PATH)
+def _build_state(config_path: Path) -> SpacecraftState:
+    sc = build_spacecraft_from_case(config_path)
     try:
         updates = orbit_updates_from_height(
             sc.orbit.altitude,
@@ -54,8 +59,9 @@ def _assert_in_range(name: str, value: float, low: float, high: float) -> None:
     assert low <= value <= high, f"{name}={value:.6e} is outside [{low:.6e}, {high:.6e}]"
 
 
-def test_refueling_inactive_returns_zero_power() -> None:
-    sc = _build_state()
+@pytest.mark.parametrize("config_path", CONFIG_PATHS, ids=lambda path: path.name)
+def test_refueling_inactive_returns_zero_power(config_path: Path) -> None:
+    sc = _build_state(config_path)
     sc.mission_profile.active_refueling = False
 
     power_refprop = refueling_model(sc)
@@ -64,14 +70,15 @@ def test_refueling_inactive_returns_zero_power() -> None:
     assert sc.power.Power_refprop == 0.0
 
 
-def test_refueling_active_value_range() -> None:
+@pytest.mark.parametrize("config_path", CONFIG_PATHS, ids=lambda path: path.name)
+def test_refueling_active_value_range(config_path: Path) -> None:
     # Inputs:
-    #   Controlled refueling state for one verification config.
+    #   Controlled refueling state for each verification config.
     #
     # Outputs:
     #   Ensures refueling_model returns bounded compression power and tank volume.
 
-    sc = _build_state()
+    sc = _build_state(config_path)
     sc.mission_profile.active_refueling = True
     sc.refueling.m_flow = 1.0e-4
     sc.thruster.m_flow = 1.0e-6
@@ -84,3 +91,4 @@ def test_refueling_active_value_range() -> None:
     _assert_in_range("Power_refprop", power_refprop, 1, 10.0e5)
     _assert_in_range("V_prop", sc.refueling.V_prop, 0.1, 5.0)
     assert sc.power.Power_refprop == pytest.approx(power_refprop, rel=1.0e-12, abs=1.0e-12)
+

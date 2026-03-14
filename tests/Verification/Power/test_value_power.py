@@ -29,14 +29,18 @@ if str(SRC) not in sys.path:
 from ariss.core.spacecraft import SpacecraftState
 from ariss.modules.Power import power_model
 from ariss.utils.atmosphere import orbit_updates_from_height
+from tests.Verification._cases import (
+    build_spacecraft_from_case,
+    verification_case_paths,
+)
 
 
 CONFIG_DIR = Path(__file__).resolve().parents[1] / "configs"
-CONFIG_PATHS = sorted(CONFIG_DIR.glob("*.toml"))
+CONFIG_PATHS = verification_case_paths(CONFIG_DIR)
 
 
 def _build_state(config_path: Path) -> SpacecraftState:
-    sc = SpacecraftState.from_toml(config_path)
+    sc = build_spacecraft_from_case(config_path)
     try:
         updates = orbit_updates_from_height(
             sc.orbit.altitude,
@@ -69,5 +73,6 @@ def test_power_value_ranges_for_all_configs(config_path: Path) -> None:
 
     power_model(sc)
 
-    _assert_in_range("A_solar", sc.geometry.A_solar, 35.0, 45.0)
+    _assert_in_range("A_solar", sc.geometry.A_solar, 20.0, 35.0)
     assert sc.geometry.A_solar >= 0.0, "A_solar must be non-negative."
+

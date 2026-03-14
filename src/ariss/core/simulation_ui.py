@@ -7,13 +7,20 @@
 #
 # ============================================================================== #
 #  ARISS - Atmospheric Refueling Iterative System Solver
-# ----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 #  Description:
 #      Atmospheric refueling power model based on intake mass flow and tank
 #
 #  Project:        ARISS
 #  Module:         history_ui.py
 #  Author:         Carlos Carrasco Requejo
+#
+#  Notes:
+#      Refactor performed to:
+#        - enforce true equal-scale 3D axes in Matplotlib,
+#        - reduce repeated panel-drawing logic,
+#        - remove unused helper functions,
+#        - add comments around the less obvious geometry/plotting paths.
 # ============================================================================
 
 from __future__ import annotations
@@ -45,8 +52,12 @@ except Exception:  # pragma: no cover
     tk = None
     ttk = None
 
-from ariss.core.simulation import compute_drag_diagnostics, run_sizing_loop
-from ariss.core.spacecraft import GeometryState, SpacecraftState, load_spacecraft
+from ariss.core.simulation import (
+    compute_drag_diagnostics,
+    load_spacecraft_from_base_config,
+    run_sizing_loop,
+)
+from ariss.core.spacecraft import GeometryState, SpacecraftState
 from ariss.modules.Thermal import ThermalDiagnostics, thermal_model
 from ariss.utils import constants as const
 from ariss.utils.atmosphere import atmosphere_properties_from_height, atmos
@@ -55,25 +66,8 @@ NASA_BG = "#ffffff"
 NASA_PANEL = "#f4efe2"
 NASA_GRID = "#b9b1a2"
 NASA_TEXT = "#1c2833"
-HISTORY_PLOT_COLORS = [
-    "#0f4c81",
-    "#d95d39",
-    "#2a9d8f",
-    "#d4a017",
-    "#6d597a",
-    "#457b9d",
-    "#bc4749",
-    "#5f6f52",
-]
-NASA_LINE = [
-    "#1a7bc0",
-    "#c44e52",
-    "#dd8452",
-    "#4c72b0",
-    "#55a868",
-    "#8172b2",
-    "#937860",
-]
+HISTORY_PLOT_COLORS = ["#0f4c81", "#d95d39", "#2a9d8f", "#d4a017", "#6d597a", "#457b9d", "#bc4749", "#5f6f52"]
+NASA_LINE = ["#1a7bc0", "#c44e52", "#dd8452", "#4c72b0", "#55a868", "#8172b2", "#937860"]
 GEOM_BODY = "#f5efe4"
 GEOM_INTAKE = "#ece6da"
 GEOM_SOLAR = "#2f6db3"
@@ -87,117 +81,24 @@ PlotSpec = tuple[str | Sequence[str], str, bool]
 SpacecraftInput = SpacecraftState | str | PathLike[str]
 DEFAULT_HISTORY_SPECS: list[PlotSpec] = [
     ("orbit.altitude", "ORBITAL HEIGHT", False),
-    (
-        [
-            "power.Power_total",
-            "power.Power_in",
-            "power.Power_body",
-            "power.Power_solar",
-            "power.Power_rad",
-            "power.Power_prop",
-            "power.Power_ADCS",
-            "power.Power_payload",
-            "power.Power_refprop",
-        ],
-        "POWER BUDGETS",
-        False,
-    ),
-    (
-        [
-            "mass.Mass_total",
-            "mass.Mass_in",
-            "mass.Mass_body",
-            "mass.Mass_solar",
-            "mass.Mass_rad",
-            "mass.Mass_prop",
-            "mass.Mass_ADCS",
-            "mass.Mass_payload",
-            "mass.Mass_refprop",
-        ],
-        "MASS BUDGETS",
-        False,
-    ),
-    (
-        [
-            "geometry.A_body",
-            "geometry.A_in",
-            "geometry.A_in_drag",
-            "geometry.A_prop",
-            "geometry.A_solar",
-            "geometry.L_body",
-            "geometry.L_in",
-        ],
-        "KEY GEOMETRY",
-        False,
-    ),
+    (["power.Power_total", "power.Power_in", "power.Power_body", "power.Power_solar", "power.Power_rad", "power.Power_prop", "power.Power_ADCS", "power.Power_payload", "power.Power_refprop"], "POWER BUDGETS", False),
+    (["mass.Mass_total", "mass.Mass_in", "mass.Mass_body", "mass.Mass_solar", "mass.Mass_rad", "mass.Mass_prop", "mass.Mass_ADCS", "mass.Mass_payload", "mass.Mass_refprop"], "MASS BUDGETS", False),
+    (["geometry.A_body", "geometry.A_in", "geometry.A_in_drag", "geometry.A_prop", "geometry.A_solar", "geometry.L_body", "geometry.L_in"], "KEY GEOMETRY", False),
 ]
 
-ATMOSPHERE_SPECS: list[PlotSpec] = [
-    ("orbit.altitude", "ALTITUDE", False),
-    ("orbit.density", "DENSITY", True),
-    ("orbit.temperature", "TEMPERATURE", False),
-    ("orbit.molar_mass", "MOLAR MASS", True),
-    ("orbit.velocity", "ORBITAL VELOCITY", False),
-    ("drag.drag_total", "TOTAL DRAG", True),
-]
+ATMOSPHERE_SPECS: list[PlotSpec] = [("orbit.altitude", "ALTITUDE", False), ("orbit.density", "DENSITY", True), ("orbit.temperature", "TEMPERATURE", False), ("orbit.molar_mass", "MOLAR MASS", True), ("orbit.velocity", "ORBITAL VELOCITY", False), ("drag.drag_total", "TOTAL DRAG", True)]
 
-BUDGET_SPECS: list[PlotSpec] = [
-    ("mass.Mass_total", "TOTAL MASS", False),
-    ("mass.Mass_in", "INLET MASS", False),
-    ("mass.Mass_solar", "SOLAR ARRAY MASS", False),
-    ("power.Power_total", "TOTAL POWER", False),
-    ("power.Power_prop", "PROPULSION POWER", True),
-    ("power.Power_solar", "SOLAR POWER", True),
-]
+BUDGET_SPECS: list[PlotSpec] = [("mass.Mass_total", "TOTAL MASS", False), ("mass.Mass_in", "INLET MASS", False), ("mass.Mass_solar", "SOLAR ARRAY MASS", False), ("power.Power_total", "TOTAL POWER", False), ("power.Power_prop", "PROPULSION POWER", True), ("power.Power_solar", "SOLAR POWER", True)]
 
-DIMENSION_SPECS: list[PlotSpec] = [
-    ("geometry.A_in", "INTAKE AREA", False),
-    ("geometry.A_in_drag", "DRAG INTAKE AREA", False),
-    ("geometry.A_prop", "PROPULSIVE AREA", False),
-    ("geometry.A_solar", "SOLAR AREA", False),
-    ("geometry.L_in", "INTAKE LENGTH", False),
-    ("geometry.L_body", "BODY LENGTH", False),
-    ("geometry.AR_in", "INTAKE ASPECT RATIO", False),
-]
+DIMENSION_SPECS: list[PlotSpec] = [("geometry.A_in", "INTAKE AREA", False), ("geometry.A_in_drag", "DRAG INTAKE AREA", False), ("geometry.A_prop", "PROPULSIVE AREA", False), ("geometry.A_solar", "SOLAR AREA", False), ("geometry.L_in", "INTAKE LENGTH", False), ("geometry.L_body", "BODY LENGTH", False), ("geometry.AR_in", "INTAKE ASPECT RATIO", False)]
 
-DRAG_SPECS: list[PlotSpec] = [
-    ("drag.drag_total", "TOTAL DRAG", True),
-    ("drag.drag_body_side", "BODY SIDE DRAG", True),
-    ("drag.drag_inlet_side", "INLET SIDE DRAG", True),
-    ("drag.drag_inlet_front", "INLET FRONT DRAG", True),
-    ("drag.drag_solar", "SOLAR DRAG", True),
-    ("geometry.A_in_drag", "DRAG INTAKE AREA", False),
-    ("orbit.density", "DENSITY", True),
-]
+DRAG_SPECS: list[PlotSpec] = [("drag.drag_total", "TOTAL DRAG", True), ("drag.drag_body_side", "BODY SIDE DRAG", True), ("drag.drag_inlet_side", "INLET SIDE DRAG", True), ("drag.drag_inlet_front", "INLET FRONT DRAG", True), ("drag.drag_solar", "SOLAR DRAG", True), ("geometry.A_in_drag", "DRAG INTAKE AREA", False), ("orbit.density", "DENSITY", True)]
 
-POWER_SPECS: list[PlotSpec] = [
-    ("power.Power_total", "TOTAL POWER", False),
-    ("power.Power_prop", "PROPULSION POWER", True),
-    ("power.Power_solar", "SOLAR POWER", True),
-    ("geometry.A_solar", "SOLAR ARRAY AREA", False),
-    ("solar.eta_power", "POWER EFFICIENCY", False),
-    ("solar.av_aligment", "ARRAY ALIGNMENT", False),
-]
+POWER_SPECS: list[PlotSpec] = [("power.Power_total", "TOTAL POWER", False), ("power.Power_prop", "PROPULSION POWER", True), ("power.Power_solar", "SOLAR POWER", True), ("geometry.A_solar", "SOLAR ARRAY AREA", False), ("solar.eta_power", "POWER EFFICIENCY", False), ("solar.av_aligment", "ARRAY ALIGNMENT", False)]
 
-PROPULSION_SPECS: list[PlotSpec] = [
-    ("geometry.A_prop", "REQUIRED PROPULSIVE AREA", False),
-    ("geometry.A_in", "INTAKE AREA", False),
-    ("geometry.A_in_drag", "DRAG INTAKE AREA", False),
-    ("thruster.power", "POWER REQUIRED", True),
-    ("thruster.thrust", "THRUST", True),
-    ("thruster.m_flow", "PROPELLANT MASS FLOW", True),
-    ("orbit.density", "INFERRED DENSITY", True),
-]
+PROPULSION_SPECS: list[PlotSpec] = [("geometry.A_prop", "REQUIRED PROPULSIVE AREA", False), ("geometry.A_in", "INTAKE AREA", False), ("geometry.A_in_drag", "DRAG INTAKE AREA", False), ("thruster.power", "POWER REQUIRED", True), ("thruster.thrust", "THRUST", True), ("thruster.m_flow", "PROPELLANT MASS FLOW", True), ("orbit.density", "INFERRED DENSITY", True)]
 
-SIM_BUDGET_SPECS: list[PlotSpec] = [
-    ("mass.Mass_total", "TOTAL MASS", False),
-    ("power.Power_total", "TOTAL POWER", False),
-    ("drag.drag_total", "TOTAL DRAG", True),
-    ("drag.drag_inlet_front", "FRONT INLET DRAG", True),
-    ("geometry.A_prop", "PROPULSIVE AREA", False),
-    ("orbit.altitude", "ALTITUDE", False),
-    ("orbit.density", "DENSITY", True),
-]
+SIM_BUDGET_SPECS: list[PlotSpec] = [("mass.Mass_total", "TOTAL MASS", False), ("power.Power_total", "TOTAL POWER", False), ("drag.drag_total", "TOTAL DRAG", True), ("drag.drag_inlet_front", "FRONT INLET DRAG", True), ("geometry.A_prop", "PROPULSIVE AREA", False), ("orbit.altitude", "ALTITUDE", False), ("orbit.density", "DENSITY", True)]
 
 
 @dataclass(frozen=True)
@@ -209,6 +110,9 @@ class _SectionShape:
     is_square: bool
 
 
+# ---------------------------------------------------------------------------
+# History and data flattening helpers
+# ---------------------------------------------------------------------------
 def run_sizing_with_history(
     sc: SpacecraftState,
     max_iterations: int = 200,
@@ -223,6 +127,7 @@ def run_sizing_with_history(
 
 
 def _flatten_numeric(prefix: str, value: Any, out: dict[str, float]) -> None:
+    """Flatten dataclass / dict trees into dotted numeric channels."""
     if is_dataclass(value):
         field_names: set[str] = set()
         for field_info in fields(value):
@@ -248,6 +153,7 @@ def _flatten_numeric(prefix: str, value: Any, out: dict[str, float]) -> None:
 
 
 def _history_series(history: list[SpacecraftState]) -> dict[str, list[float]]:
+    """Build time-series arrays for every numeric state channel seen in history."""
     series: dict[str, list[float]] = {}
     for index, state in enumerate(history):
         current: dict[str, float] = {}
@@ -267,13 +173,14 @@ def _history_series(history: list[SpacecraftState]) -> dict[str, list[float]]:
 
 def _resolve_spacecraft_input(sc: SpacecraftInput | None) -> SpacecraftState:
     if sc is None:
-        return SpacecraftState()
-    return load_spacecraft(sc)
+        return load_spacecraft_from_base_config()
+    if isinstance(sc, SpacecraftState):
+        return sc
+    return load_spacecraft_from_base_config(Path(sc))
 
 
 def _spacecraft_case_name(sc: SpacecraftState) -> str:
-    case_name = str(getattr(sc, "name", "")).strip()
-    return case_name
+    return str(getattr(sc, "name", "")).strip()
 
 
 def _normalize_paths(path: str | Sequence[str] | None, available_paths: list[str]) -> list[str]:
@@ -321,6 +228,9 @@ def _positive(value: float, floor: float = 1.0e-6) -> float:
     return max(abs(float(value)), floor)
 
 
+# ---------------------------------------------------------------------------
+# Geometry sizing helpers
+# ---------------------------------------------------------------------------
 def _rect_dims(area: float, aspect_ratio: float) -> tuple[float, float]:
     area = _positive(area)
     aspect_ratio = _positive(aspect_ratio)
@@ -384,6 +294,7 @@ def _local_section(
     intake_height: float,
     intake_power: float,
 ) -> tuple[float, float, float]:
+    """Return local super-ellipse dimensions at an axial location."""
     if x <= body_length or intake_length <= 0.0:
         return body_width, body_height, body_power
     progress = float(np.clip((x - body_length) / intake_length, 0.0, 1.0))
@@ -437,6 +348,18 @@ def _shape_at_x(
         return body_shape
     progress = (x_geom - body_length) / intake_length
     return _interpolate_shape(body_shape, intake_shape, progress)
+
+
+# ---------------------------------------------------------------------------
+# Generic plotting helpers
+# ---------------------------------------------------------------------------
+def _style_2d_axis(axis) -> None:
+    """Apply the shared 2D styling used across history, drag, and thermal views."""
+    axis.set_facecolor(NASA_BG)
+    axis.grid(True, color=NASA_GRID, alpha=0.65, linestyle="--", linewidth=0.7)
+    axis.tick_params(colors=NASA_TEXT, labelsize=8)
+    for spine in axis.spines.values():
+        spine.set_color(NASA_TEXT)
 
 
 def _box_faces(
@@ -509,29 +432,11 @@ def _add_box_edges(
     linewidth: float = 1.3,
     zorder: float | None = None,
 ) -> None:
-    vertices = [
-        (x0, y0, z0),
-        (x1, y0, z0),
-        (x1, y1, z0),
-        (x0, y1, z0),
-        (x0, y0, z1),
-        (x1, y0, z1),
-        (x1, y1, z1),
-        (x0, y1, z1),
-    ]
+    vertices = [(x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0), (x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)]
     edges = [
-        (0, 1),
-        (1, 2),
-        (2, 3),
-        (3, 0),
-        (4, 5),
-        (5, 6),
-        (6, 7),
-        (7, 4),
-        (0, 4),
-        (1, 5),
-        (2, 6),
-        (3, 7),
+        (0, 1), (1, 2), (2, 3), (3, 0),
+        (4, 5), (5, 6), (6, 7), (7, 4),
+        (0, 4), (1, 5), (2, 6), (3, 7),
     ]
     for start, end in edges:
         axis.plot(
@@ -566,48 +471,8 @@ def _add_tapered_box(
     r1 = (x1, 0.5 * rear_width, -0.5 * rear_height)
     r2 = (x1, 0.5 * rear_width, 0.5 * rear_height)
     r3 = (x1, -0.5 * rear_width, 0.5 * rear_height)
-    faces = [
-        [f0, f1, f2, f3],
-        [r0, r1, r2, r3],
-        [f0, f1, r1, r0],
-        [f1, f2, r2, r1],
-        [f2, f3, r3, r2],
-        [f3, f0, r0, r3],
-    ]
+    faces = [[f0, f1, f2, f3], [r0, r1, r2, r3], [f0, f1, r1, r0], [f1, f2, r2, r1], [f2, f3, r3, r2], [f3, f0, r0, r3]]
     _add_poly3d(axis, faces, color, alpha, edgecolor, linewidth, zorder)
-
-
-def _add_elliptic_tube(
-    axis,
-    x0: float,
-    length: float,
-    semi_y: float,
-    semi_z: float,
-    color: Any,
-    alpha: float = 0.75,
-    edgecolor: str = NASA_TEXT,
-    linewidth: float = 0.3,
-    zorder: float | None = None,
-) -> None:
-    theta = np.linspace(0.0, 2.0 * np.pi, 40)
-    x = np.array([x0, x0 + length])
-    theta_grid, x_grid = np.meshgrid(theta, x, indexing="ij")
-    y_grid = semi_y * np.cos(theta_grid)
-    z_grid = semi_z * np.sin(theta_grid)
-    surface = axis.plot_surface(
-        x_grid,
-        y_grid,
-        z_grid,
-        color=color,
-        alpha=alpha,
-        linewidth=linewidth,
-        edgecolor=edgecolor,
-        shade=False,
-    )
-    if zorder is not None:
-        surface.set_zorder(zorder)
-        surface.set_zsort("max")
-        surface.set_sort_zpos(zorder)
 
 
 def _add_tapered_elliptic_tube(
@@ -665,12 +530,7 @@ def _add_tapered_top_face(
     epsilon = 1.0e-3 * max(front_height, rear_height, 1.0)
     front_z = 0.5 * front_height + epsilon
     rear_z = 0.5 * rear_height + epsilon
-    face = [
-        (x0, -0.5 * front_width, front_z),
-        (x0, 0.5 * front_width, front_z),
-        (x1, 0.5 * rear_width, rear_z),
-        (x1, -0.5 * rear_width, rear_z),
-    ]
+    face = [(x0, -0.5 * front_width, front_z), (x0, 0.5 * front_width, front_z), (x1, 0.5 * rear_width, rear_z), (x1, -0.5 * rear_width, rear_z)]
     _add_poly3d(axis, [face], color, alpha, edgecolor, linewidth, zorder)
 
 
@@ -738,17 +598,32 @@ def _extend_bounds(
     bounds["z"].extend(z_values)
 
 
-def _set_equal_limits(axis, bounds: dict[str, list[float]]) -> None:
+def _set_equal_limits(axis, bounds: dict[str, list[float]], padding: float = 0.05) -> None:
+    """
+    Force equal scaling in all three axes.
+
+    ``mplot3d`` often looks stretched even when limits are symmetric. The extra
+    ``set_box_aspect((1, 1, 1))`` call is what actually fixes the rendered cube.
+    """
     x_min, x_max = min(bounds["x"]), max(bounds["x"])
     y_min, y_max = min(bounds["y"]), max(bounds["y"])
     z_min, z_max = min(bounds["z"]), max(bounds["z"])
+
+    x_span = max(x_max - x_min, 1.0e-9)
+    y_span = max(y_max - y_min, 1.0e-9)
+    z_span = max(z_max - z_min, 1.0e-9)
+
     x_mid = 0.5 * (x_min + x_max)
     y_mid = 0.5 * (y_min + y_max)
     z_mid = 0.5 * (z_min + z_max)
-    radius = max(x_max - x_min, y_max - y_min, z_max - z_min, 1.0) * 0.6
+
+    radius = 0.5 * max(x_span, y_span, z_span, 1.0) * (1.0 + padding)
     axis.set_xlim(x_mid - radius, x_mid + radius)
     axis.set_ylim(y_mid - radius, y_mid + radius)
     axis.set_zlim(z_mid - radius, z_mid + radius)
+
+    if hasattr(axis, "set_box_aspect"):
+        axis.set_box_aspect((1.0, 1.0, 1.0))
 
 
 def _style_3d_axis(axis, title: str) -> None:
@@ -768,7 +643,6 @@ def _style_3d_axis(axis, title: str) -> None:
         pane.set_facecolor((1.0, 1.0, 1.0, 1.0))
         pane.set_edgecolor(NASA_GRID)
 
-    # Matplotlib keeps these private; we guard use for compatibility.
     for ax in (axis.xaxis, axis.yaxis, axis.zaxis):
         try:
             ax._axinfo["grid"]["color"] = grid_color
@@ -776,34 +650,29 @@ def _style_3d_axis(axis, title: str) -> None:
             continue
 
 
-def _drag_x_spacecraft_frame(total_length: float, x_values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    # Keep axial coordinates clipped/sorted for robust interpolation/plotting.
-    x_spacecraft = np.clip(np.asarray(x_values, dtype=float), 0.0, total_length)
-    order = np.argsort(x_spacecraft)
-    return x_spacecraft[order], order
-
-
+# ---------------------------------------------------------------------------
+# Wake / drag helpers
+# ---------------------------------------------------------------------------
 def _wake_profile_arrays(
     total_length: float,
     geometry: GeometryState,
     x_values: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return piecewise wake-factor arrays along the spacecraft length."""
     if x_values is None or np.asarray(x_values, dtype=float).size == 0:
         if total_length > 0.0:
             x_drag = np.array([0.0, total_length], dtype=float)
         else:
             x_drag = np.array([0.0], dtype=float)
     else:
-        x_drag, _ = _drag_x_spacecraft_frame(total_length, np.asarray(x_values, dtype=float))
+        x_drag = np.clip(np.asarray(x_values, dtype=float), 0.0, total_length)
+        x_drag = np.unique(np.sort(x_drag))
 
     body_end = float(np.clip(_safe_float(geometry.L_body), 0.0, total_length))
     wake_body = float(getattr(geometry, "wake_body", 1.0))
     wake_in = float(getattr(geometry, "wake_in", 1.0))
     profile = np.where(x_drag < body_end, wake_body, wake_in).astype(float)
-    fy_profile = profile.copy()
-    fz_profile = profile.copy()
-
-    return x_drag, fy_profile, fz_profile
+    return x_drag, profile.copy(), profile.copy()
 
 
 def _wake_fraction_at_x(
@@ -942,6 +811,60 @@ def _plot_drag_slice_lines(
                 )
 
 
+# ---------------------------------------------------------------------------
+# 3D spacecraft rendering
+# ---------------------------------------------------------------------------
+def _add_symmetric_panel_pair(
+    axis,
+    *,
+    x0: float,
+    x1: float,
+    lateral_extent: float,
+    normal_thickness: float,
+    offset: float,
+    along_axis: str,
+    color: Any,
+    edgecolor: str,
+    alpha: float,
+    face_zorder: float,
+    edge_zorder: float,
+    bounds: dict[str, list[float]],
+) -> None:
+    """
+    Draw a mirrored pair of rectangular appendages.
+
+    ``along_axis`` controls whether the pair extends along Y (solar-style wings)
+    or Z (radiator-style top/bottom plates).
+    """
+    if along_axis == "y":
+        pos0 = offset
+        pos1 = offset + lateral_extent
+        neg1 = -offset
+        neg0 = -(offset + lateral_extent)
+
+        _add_box(axis, x0, x1, pos0, pos1, -0.5 * normal_thickness, 0.5 * normal_thickness, color, alpha=alpha, zorder=face_zorder)
+        _add_box(axis, x0, x1, neg0, neg1, -0.5 * normal_thickness, 0.5 * normal_thickness, color, alpha=alpha, zorder=face_zorder)
+        _add_box_edges(axis, x0, x1, pos0, pos1, -0.5 * normal_thickness, 0.5 * normal_thickness, color=edgecolor, linewidth=1.2, zorder=edge_zorder)
+        _add_box_edges(axis, x0, x1, neg0, neg1, -0.5 * normal_thickness, 0.5 * normal_thickness, color=edgecolor, linewidth=1.2, zorder=edge_zorder)
+        _extend_bounds(bounds, [x0, x1], [neg0, pos1], [-0.5 * normal_thickness, 0.5 * normal_thickness])
+        return
+
+    if along_axis == "z":
+        pos0 = offset
+        pos1 = offset + lateral_extent
+        neg1 = -offset
+        neg0 = -(offset + lateral_extent)
+
+        _add_box(axis, x0, x1, -0.5 * normal_thickness, 0.5 * normal_thickness, pos0, pos1, color, alpha=alpha, zorder=face_zorder)
+        _add_box(axis, x0, x1, -0.5 * normal_thickness, 0.5 * normal_thickness, neg0, neg1, color, alpha=alpha, zorder=face_zorder)
+        _add_box_edges(axis, x0, x1, -0.5 * normal_thickness, 0.5 * normal_thickness, pos0, pos1, color=edgecolor, linewidth=1.0, zorder=edge_zorder)
+        _add_box_edges(axis, x0, x1, -0.5 * normal_thickness, 0.5 * normal_thickness, neg0, neg1, color=edgecolor, linewidth=1.0, zorder=edge_zorder)
+        _extend_bounds(bounds, [x0, x1], [-0.5 * normal_thickness, 0.5 * normal_thickness], [neg0, pos1])
+        return
+
+    raise ValueError(f"Unsupported panel axis: {along_axis}")
+
+
 def _render_spacecraft(
     axis,
     geometry: GeometryState,
@@ -949,6 +872,11 @@ def _render_spacecraft(
     x_samples: np.ndarray | None = None,
     core_edgecolor: str | None = None,
 ) -> dict[str, list[float]]:
+    """
+    Draw the body/intake shell plus all mounted appendages.
+
+    The function returns axis bounds so the caller can apply equal-scale limits.
+    """
     bounds = {"x": [], "y": [], "z": []}
     body_length = _positive(geometry.L_body, 0.1)
     intake_length = _positive(geometry.L_in, 0.1)
@@ -965,9 +893,11 @@ def _render_spacecraft(
         if x_samples.size < 2:
             x_samples = np.array([0.0, body_length, total_length], dtype=float)
 
+    # Draw the centerbody in axial segments so wake coloring can vary along x.
     for x0, x1 in zip(x_samples[:-1], x_samples[1:]):
         if x1 <= x0:
             continue
+
         x_mid = 0.5 * (x0 + x1)
         shape_0 = _shape_at_x(x0, body_length, intake_length, body_shape, intake_shape)
         shape_1 = _shape_at_x(x1, body_length, intake_length, body_shape, intake_shape)
@@ -1008,6 +938,7 @@ def _render_spacecraft(
                 zorder=zorder,
             )
 
+        # When solar area exists, paint the top shell to make exposure obvious.
         if geometry.A_solar > 0.0:
             solar_cover_color = color_fn("solar", x_mid, total_length)
             solar_zorder = zorder + 3.0
@@ -1054,6 +985,7 @@ def _render_spacecraft(
         _add_rectangle_outline(axis, prop_x, prop_width, prop_height, color_fn("prop", prop_x, total_length), zorder=40.0)
         _extend_bounds(bounds, [prop_x], [-0.5 * prop_width, 0.5 * prop_width], [-0.5 * prop_height, 0.5 * prop_height])
 
+    # Solar wings: mirrored plates extending along Y.
     if geometry.A_solar > 0.0:
         solar_area_each = 0.5 * geometry.A_solar
         solar_span, solar_chord = _panel_planform_dims(solar_area_each, geometry.AR_solar)
@@ -1061,17 +993,23 @@ def _render_spacecraft(
         solar_clearance = max(0.04, 1.25 * solar_thickness)
         solar_x0, solar_x1 = _mounted_axial_bounds(geometry.X_solar, solar_chord, body_length)
         solar_color = color_fn("solar", 0.5 * (solar_x0 + solar_x1), total_length)
-        starboard_y0 = 0.5 * body_shape.width + solar_clearance
-        starboard_y1 = starboard_y0 + solar_span
-        port_y1 = -0.5 * body_shape.width - solar_clearance
-        port_y0 = port_y1 - solar_span
+        _add_symmetric_panel_pair(
+            axis,
+            x0=solar_x0,
+            x1=solar_x1,
+            lateral_extent=solar_span,
+            normal_thickness=solar_thickness,
+            offset=0.5 * body_shape.width + solar_clearance,
+            along_axis="y",
+            color=solar_color,
+            edgecolor=NASA_TEXT,
+            alpha=0.92,
+            face_zorder=30.0,
+            edge_zorder=31.0,
+            bounds=bounds,
+        )
 
-        _add_box(axis, solar_x0, solar_x1, starboard_y0, starboard_y1, -0.5 * solar_thickness, 0.5 * solar_thickness, solar_color, alpha=0.92, zorder=30.0)
-        _add_box(axis, solar_x0, solar_x1, port_y0, port_y1, -0.5 * solar_thickness, 0.5 * solar_thickness, solar_color, alpha=0.92, zorder=30.0)
-        _add_box_edges(axis, solar_x0, solar_x1, starboard_y0, starboard_y1, -0.5 * solar_thickness, 0.5 * solar_thickness, color=NASA_TEXT, linewidth=1.2, zorder=31.0)
-        _add_box_edges(axis, solar_x0, solar_x1, port_y0, port_y1, -0.5 * solar_thickness, 0.5 * solar_thickness, color=NASA_TEXT, linewidth=1.2, zorder=31.0)
-        _extend_bounds(bounds, [solar_x0, solar_x1], [port_y0, starboard_y1], [-0.5 * solar_thickness, 0.5 * solar_thickness])
-
+    # Radiators: mirrored plates extending along Z.
     if geometry.A_rad > 0.0:
         rad_area_each = 0.5 * geometry.A_rad
         rad_span, rad_chord = _panel_planform_dims(rad_area_each, geometry.AR_rad)
@@ -1079,19 +1017,20 @@ def _render_spacecraft(
         rad_clearance = max(0.03, 1.1 * rad_thickness)
         rad_x0, rad_x1 = _mounted_axial_bounds(geometry.X_rad, rad_chord, body_length)
         rad_color = color_fn("rad", 0.5 * (rad_x0 + rad_x1), total_length)
-        top_z0 = 0.5 * body_shape.height + rad_clearance
-        top_z1 = top_z0 + rad_span
-        bottom_z1 = -0.5 * body_shape.height - rad_clearance
-        bottom_z0 = bottom_z1 - rad_span
-        _add_box(axis, rad_x0, rad_x1, -0.5 * rad_thickness, 0.5 * rad_thickness, top_z0, top_z1, rad_color, alpha=0.9, zorder=20.0)
-        _add_box(axis, rad_x0, rad_x1, -0.5 * rad_thickness, 0.5 * rad_thickness, bottom_z0, bottom_z1, rad_color, alpha=0.9, zorder=20.0)
-        _add_box_edges(axis, rad_x0, rad_x1, -0.5 * rad_thickness, 0.5 * rad_thickness, top_z0, top_z1, color=GEOM_EDGE, linewidth=1.0, zorder=21.0)
-        _add_box_edges(axis, rad_x0, rad_x1, -0.5 * rad_thickness, 0.5 * rad_thickness, bottom_z0, bottom_z1, color=GEOM_EDGE, linewidth=1.0, zorder=21.0)
-        _extend_bounds(
-            bounds,
-            [rad_x0, rad_x1],
-            [-0.5 * rad_thickness, 0.5 * rad_thickness],
-            [bottom_z0, top_z1],
+        _add_symmetric_panel_pair(
+            axis,
+            x0=rad_x0,
+            x1=rad_x1,
+            lateral_extent=rad_span,
+            normal_thickness=rad_thickness,
+            offset=0.5 * body_shape.height + rad_clearance,
+            along_axis="z",
+            color=rad_color,
+            edgecolor=GEOM_EDGE,
+            alpha=0.90,
+            face_zorder=20.0,
+            edge_zorder=21.0,
+            bounds=bounds,
         )
 
     return bounds
@@ -1166,6 +1105,9 @@ def draw_spacecraft_drag_geometry(
     figure.tight_layout()
 
 
+# ---------------------------------------------------------------------------
+# Drag / thermal / propulsion diagnostics
+# ---------------------------------------------------------------------------
 def _momentum_exchange_terms(state: SpacecraftState) -> dict[str, float]:
     rho = _safe_float(state.orbit.density)
     velocity = _safe_float(state.orbit.velocity)
@@ -1208,16 +1150,7 @@ def _drag_component_map(state: SpacecraftState) -> dict[str, float]:
     for name, value in vars(drag_state).items():
         drag_values[name] = value
 
-    preferred_order = [
-        "drag_body_side",
-        "drag_inlet_side",
-        "drag_inlet_front",
-        "drag_solar",
-        "drag_rad",
-        "drag_body",
-        "drag_inlet",
-        "drag_inlet_normal",
-    ]
+    preferred_order = ["drag_body_side", "drag_inlet_side", "drag_inlet_front", "drag_solar", "drag_rad", "drag_body", "drag_inlet", "drag_inlet_normal"]
     component_names = [name for name in preferred_order if name in drag_values]
     component_names.extend(
         sorted(
@@ -1274,15 +1207,8 @@ def draw_drag_distribution(
     orbit_velocity = _safe_float(state.orbit.velocity)
     dynamic_pressure = 0.5 * orbit_density * orbit_velocity * orbit_velocity
 
-    def _style_axis(axis) -> None:
-        axis.set_facecolor(NASA_BG)
-        axis.grid(True, color=NASA_GRID, alpha=0.65, linestyle="--", linewidth=0.7)
-        axis.tick_params(colors=NASA_TEXT, labelsize=8)
-        for spine in axis.spines.values():
-            spine.set_color(NASA_TEXT)
-
     cd_axis = axes[0][0]
-    _style_axis(cd_axis)
+    _style_2d_axis(cd_axis)
     cd_labels = list(drag_coefficients.keys())
     cd_values = list(drag_coefficients.values())
     cd_axis.bar(
@@ -1296,7 +1222,7 @@ def draw_drag_distribution(
     cd_axis.set_ylabel("Cd [-]", color=NASA_TEXT, fontsize=8)
 
     force_axis = axes[0][1]
-    _style_axis(force_axis)
+    _style_2d_axis(force_axis)
     force_labels = [_drag_component_label(name) for name in drag_components]
     force_values = list(drag_components.values())
     force_axis.bar(
@@ -1316,7 +1242,7 @@ def draw_drag_distribution(
     force_axis.legend(loc="best", facecolor=NASA_PANEL, edgecolor=NASA_GRID, framealpha=1.0, fontsize=7)
 
     wake_axis = axes[1][0]
-    _style_axis(wake_axis)
+    _style_2d_axis(wake_axis)
     wake_labels = list(wake_factors.keys())
     wake_values = list(wake_factors.values())
     wake_axis.bar(
@@ -1331,17 +1257,11 @@ def draw_drag_distribution(
     wake_axis.set_ylabel("Wake factor [-]", color=NASA_TEXT, fontsize=8)
 
     terms_axis = axes[1][1]
-    _style_axis(terms_axis)
+    _style_2d_axis(terms_axis)
     thrust_available = _safe_float(getattr(state.thruster, "thrust", 0.0))
     balance_residual = thrust_available - exchange_terms["total_load"]
     term_labels = ["Aero Drag", "Refuel Ram", "Prop Ram", "Required Load", "Thrust"]
-    term_values = [
-        exchange_terms["total_drag"],
-        exchange_terms["refueling_exchange"],
-        exchange_terms["propulsive_exchange"],
-        exchange_terms["total_load"],
-        thrust_available,
-    ]
+    term_values = [exchange_terms["total_drag"], exchange_terms["refueling_exchange"], exchange_terms["propulsive_exchange"], exchange_terms["total_load"], thrust_available]
     terms_axis.bar(
         term_labels,
         term_values,
@@ -1392,21 +1312,20 @@ def draw_thermal_distribution(
     q_radiated = components["Q_radiated"]
     net_load = total_input - q_radiated
 
-    def _style_axis(axis) -> None:
-        axis.set_facecolor(NASA_BG)
-        axis.grid(True, color=NASA_GRID, alpha=0.65, linestyle="--", linewidth=0.7)
-        axis.tick_params(colors=NASA_TEXT, labelsize=8)
-        for spine in axis.spines.values():
-            spine.set_color(NASA_TEXT)
-
     input_axis = axes[0][0]
-    _style_axis(input_axis)
-    input_axis.bar(input_labels, input_values, color=[NASA_LINE[i % len(NASA_LINE)] for i in range(len(input_labels))], edgecolor=NASA_TEXT, linewidth=0.8)
+    _style_2d_axis(input_axis)
+    input_axis.bar(
+        input_labels,
+        input_values,
+        color=[NASA_LINE[i % len(NASA_LINE)] for i in range(len(input_labels))],
+        edgecolor=NASA_TEXT,
+        linewidth=0.8,
+    )
     input_axis.set_title("HEATING INPUTS", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
     input_axis.set_ylabel("Heat rate [W]", color=NASA_TEXT, fontsize=8)
 
     signed_axis = axes[0][1]
-    _style_axis(signed_axis)
+    _style_2d_axis(signed_axis)
     signed_labels = input_labels + [_thermal_component_label("Q_radiated")]
     signed_values = np.concatenate([input_values, np.array([-q_radiated], dtype=float)])
     signed_colors = [NASA_LINE[i % len(NASA_LINE)] for i in range(len(input_labels))] + ["#6b7280"]
@@ -1416,7 +1335,7 @@ def draw_thermal_distribution(
     signed_axis.set_ylabel("Heat rate [W]", color=NASA_TEXT, fontsize=8)
 
     balance_axis = axes[1][0]
-    _style_axis(balance_axis)
+    _style_2d_axis(balance_axis)
     balance_labels = ["Total in", "Radiated", "Net load"]
     balance_values = np.asarray([total_input, q_radiated, net_load], dtype=float)
     balance_axis.bar(balance_labels, balance_values, color=["#dd8452", "#6b7280", "#2f6db3"], edgecolor=NASA_TEXT, linewidth=0.8)
@@ -1448,7 +1367,13 @@ def draw_thermal_distribution(
     summary_axis.set_title("THERMAL STATE", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
 
     figure.patch.set_facecolor(NASA_BG)
-    figure.suptitle(f"THERMAL CONTRIBUTIONS | Iteration {iteration if iteration is not None else 0}", color=NASA_TEXT, fontsize=14, fontfamily="Courier New", fontweight="bold")
+    figure.suptitle(
+        f"THERMAL CONTRIBUTIONS | Iteration {iteration if iteration is not None else 0}",
+        color=NASA_TEXT,
+        fontsize=14,
+        fontfamily="Courier New",
+        fontweight="bold",
+    )
     figure.tight_layout(rect=[0, 0, 1, 0.96])
 
 
@@ -1526,7 +1451,13 @@ def draw_propulsion_overview(figure, state: SpacecraftState, iteration: int | No
     telemetry_axis.text(0.03, 0.97, "\n".join(lines), va="top", ha="left", color=NASA_TEXT, fontsize=10, fontfamily="Courier New", transform=telemetry_axis.transAxes)
 
     figure.patch.set_facecolor(NASA_BG)
-    figure.suptitle(f"PROPULSION CONSOLE | Iteration {iteration if iteration is not None else 0}", color=NASA_TEXT, fontsize=14, fontfamily="Courier New", fontweight="bold")
+    figure.suptitle(
+        f"PROPULSION CONSOLE | Iteration {iteration if iteration is not None else 0}",
+        color=NASA_TEXT,
+        fontsize=14,
+        fontfamily="Courier New",
+        fontweight="bold",
+    )
     figure.tight_layout(rect=[0, 0, 1, 0.95])
 
 
@@ -1541,6 +1472,9 @@ def _format_refueling_lines(state: SpacecraftState, iteration: int, history_leng
     ]
 
 
+# ---------------------------------------------------------------------------
+# Tk history UI
+# ---------------------------------------------------------------------------
 class _HistoryPlotterUI:
     def __init__(
         self,
@@ -1552,8 +1486,6 @@ class _HistoryPlotterUI:
         if tk is None or ttk is None:
             raise RuntimeError("Tkinter is not available in this environment.")
 
-        # Store the simulation history and the flattened numeric channels used by
-        # the first tab plotting board.
         self.history = history
         self.case_name = _spacecraft_case_name(history[0]) if history else ""
         self.series = series
@@ -1573,8 +1505,6 @@ class _HistoryPlotterUI:
             "geometry": tk.StringVar(),
             "drag": tk.StringVar(),
             "thermal": tk.StringVar(),
-            "propulsion": tk.StringVar(),
-            "refueling": tk.StringVar(),
             "atmosphere": tk.StringVar(),
         }
         self.figure_tabs: dict[str, dict[str, Any]] = {}
@@ -1585,8 +1515,6 @@ class _HistoryPlotterUI:
         self._refresh_aux_tabs()
 
     def _build_layout(self, default_specs: list[PlotSpec]) -> None:
-        # Split the UI into a left control rail and a right notebook with the
-        # main history board plus the derived diagnostics tabs.
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_columnconfigure(1, weight=1)
 
@@ -1603,11 +1531,9 @@ class _HistoryPlotterUI:
 
         self._create_plot_tab()
         self.figure_tabs["geometry"] = self._create_figure_tab("3D View", self.status_vars["geometry"])
-        self.figure_tabs["drag"] = self._create_figure_tab("Drag Test", self.status_vars["drag"])
+        self.figure_tabs["drag"] = self._create_figure_tab("Drag/Propulsion", self.status_vars["drag"])
         self.figure_tabs["thermal"] = self._create_figure_tab("Thermal", self.status_vars["thermal"])
-        self.figure_tabs["propulsion"] = self._create_figure_tab("Propulsion", self.status_vars["propulsion"])
         self.figure_tabs["atmosphere"] = self._create_figure_tab("Atmosphere", self.status_vars["atmosphere"])
-        self.text_tabs["refueling"] = self._create_text_tab("Refueling", self.status_vars["refueling"])
 
         for spec in default_specs:
             self.add_plot_row(*spec)
@@ -1625,7 +1551,7 @@ class _HistoryPlotterUI:
             ).pack(anchor="w", pady=(0, 8))
         tk.Label(
             controls_parent,
-            text="SELECT ANY STATE CHANNEL\nMULTI-SERIES PER PLOT\nPLOTS + 3D + DRAG + THERMAL + PROP + REFUEL + ATMOSPHERE",
+            text="SELECT ANY STATE CHANNEL\nMULTI-SERIES PER PLOT\nPLOTS + 3D + DRAG/PROP + THERMAL + ATMOSPHERE",
             bg=NASA_BG,
             fg=NASA_TEXT,
             font=("Courier New", 9),
@@ -1672,8 +1598,6 @@ class _HistoryPlotterUI:
         return {"tab": tab, "figure": figure, "canvas": canvas, "toolbar": toolbar}
 
     def _attach_figure_canvas(self, parent, figure):
-        # Reuse the same figure/canvas/toolbar construction for the main history
-        # tab and every auxiliary diagnostics tab.
         canvas = FigureCanvasTkAgg(figure, master=parent)
         canvas.get_tk_widget().pack(fill="both", expand=True)
         toolbar_frame = tk.Frame(parent, bg=NASA_BG)
@@ -1705,20 +1629,15 @@ class _HistoryPlotterUI:
         return max(0, min(self.view_iteration.get(), len(self.history) - 1))
 
     def _refresh_aux_tabs(self) -> None:
-        # Keep the derived views synchronized with the iteration selected in the
-        # main history board.
         self.redraw_geometry()
         self.redraw_drag_test()
         self.redraw_thermal()
-        self.redraw_propulsion()
-        self.redraw_refueling()
         self.redraw_atmosphere()
 
     def _get_drag_state(self, index: int) -> SpacecraftState:
         cached = self.drag_state_cache.get(index)
         if cached is not None:
             return cached
-        # Cache drag model state because several tabs reuse the same values.
         with redirect_stdout(io.StringIO()):
             cached = compute_drag_diagnostics(self.history[index])
         self.drag_state_cache[index] = cached
@@ -1763,11 +1682,7 @@ class _HistoryPlotterUI:
         return cached
 
     def _style_history_axis(self, axis) -> None:
-        axis.set_facecolor(NASA_BG)
-        axis.grid(True, color=NASA_GRID, alpha=0.65, linestyle="--", linewidth=0.7)
-        axis.tick_params(colors=NASA_TEXT, labelsize=8)
-        for spine in axis.spines.values():
-            spine.set_color(NASA_TEXT)
+        _style_2d_axis(axis)
 
     def _draw_empty_history_axis(self, axis, title: str) -> None:
         axis.set_title(title or "No series selected", color=NASA_TEXT, fontsize=10, fontfamily="Courier New")
@@ -1776,8 +1691,6 @@ class _HistoryPlotterUI:
         axis.set_yticks([])
 
     def _plot_history_selection(self, axis, selected_paths: list[str], row: dict[str, Any], x_values: list[int]) -> None:
-        # Draw the chosen time histories with the dedicated first-tab palette and
-        # switch to log/symlog only when the selected data actually allow it.
         all_positive = True
         for line_idx, path in enumerate(selected_paths):
             y_values = self.series.get(path, [])
@@ -1822,17 +1735,17 @@ class _HistoryPlotterUI:
         tk.Entry(row_frame, textvariable=title_var, width=28, bg=NASA_PANEL, fg=NASA_TEXT, insertbackground=NASA_TEXT, relief="flat", highlightthickness=1, highlightbackground=NASA_GRID).grid(row=0, column=1, padx=(0, 6), sticky="w")
         tk.Checkbutton(row_frame, text="Log Y", variable=log_var, bg=NASA_BG, fg=NASA_TEXT, activebackground=NASA_BG, activeforeground=NASA_TEXT, selectcolor=NASA_PANEL).grid(row=0, column=2, padx=(0, 6), sticky="w")
         row_data = {"paths": path_list, "title": title_var, "log": log_var}
+
         def _remove() -> None:
             if row_data in self.rows:
                 self.rows.remove(row_data)
             row_frame.destroy()
             self.redraw()
+
         tk.Button(row_frame, text="Remove", command=_remove, bg=NASA_PANEL, fg=NASA_TEXT, relief="ridge").grid(row=0, column=3, sticky="w")
         self.rows.append(row_data)
 
     def redraw(self) -> None:
-        # Redraw the first tab as a configurable wall of history plots driven by
-        # the flattened simulation time series.
         self.figure.clear()
         if not self.rows:
             self.canvas.draw_idle()
@@ -2062,6 +1975,9 @@ class _HistoryPlotterUI:
         self.root.mainloop()
 
 
+# ---------------------------------------------------------------------------
+# Public entrypoints
+# ---------------------------------------------------------------------------
 def launch_history_ui(
     sc: SpacecraftInput | None = None,
     max_iterations: int = 200,
@@ -2213,20 +2129,7 @@ def plot_simulation_history(
     )
 
 
-__all__ = [
-    "draw_spacecraft_drag_geometry",
-    "draw_spacecraft_geometry",
-    "launch_history_ui",
-    "plot_atmosphere_profiles",
-    "plot_budgets_total",
-    "plot_dimension_evolution",
-    "plot_drag_diagnostics",
-    "plot_power_diagnostics",
-    "plot_propulsion_diagnostics",
-    "plot_simulation_budgets",
-    "plot_simulation_history",
-    "run_sizing_with_history",
-]
+__all__ = ["draw_spacecraft_drag_geometry", "draw_spacecraft_geometry", "launch_history_ui", "plot_atmosphere_profiles", "plot_budgets_total", "plot_dimension_evolution", "plot_drag_diagnostics", "plot_power_diagnostics", "plot_propulsion_diagnostics", "plot_simulation_budgets", "plot_simulation_history", "run_sizing_with_history"]
 
 
 if __name__ == "__main__":

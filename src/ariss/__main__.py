@@ -4,7 +4,7 @@ import argparse
 import json
 from dataclasses import asdict
 
-from ariss.core.spacecraft import load_spacecraft
+from ariss import load_spacecraft
 
 
 def _simulation_summary(spacecraft, converged: bool, history) -> dict[str, object]:
@@ -42,7 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "ui":
-        from ariss.visualization.history_ui import plot_simulation_history
+        from ariss.core.simulation_ui import plot_simulation_history
 
         plot_simulation_history(
             sc=args.spacecraft,

@@ -19,10 +19,12 @@
 # ============================================================================
 import logging
 import sys
+import tomllib
 from dataclasses import replace
 from copy import deepcopy
+from os import PathLike
 from pathlib import Path
-from typing import List, Tuple
+from typing import Any, List, Tuple
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -40,6 +42,49 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 residual = 10e10
+
+
+def _apply_toml_overrides(target: Any, payload: dict[str, Any], prefix: str = "") -> None:
+    # Inputs:
+    #   target: dataclass-like object to update.
+    #   payload: TOML dictionary with override values.
+    #   prefix: dotted path used for diagnostics.
+    #
+    # Outputs:
+    #   Applies payload values in-place on target, recursively for nested tables.
+
+    for key, value in payload.items():
+        dotted = f"{prefix}.{key}" if prefix else key
+        if not hasattr(target, key):
+            raise KeyError(f"Unknown key in spacecraft override: {dotted}")
+        current = getattr(target, key)
+        if isinstance(value, dict):
+            _apply_toml_overrides(current, value, dotted)
+        else:
+            object.__setattr__(target, key, value)
+
+
+def load_spacecraft_from_base_config(
+    case_path: str | PathLike[str] | None = None,
+    *,
+    base_config_path: str | PathLike[str] | None = None,
+) -> SpacecraftState:
+
+    # Inputs:
+    #   case_path: optional TOML file containing case-specific overrides.
+    #   base_config_path: optional path to the base spacecraft TOML.
+    #
+    # Outputs:
+    #   Spacecraft state initialized from base config and optionally updated
+    #   from case_path.
+
+    base_path = Path(base_config_path) if base_config_path is not None else Path(__file__).with_name("base_config.toml")
+    sc = SpacecraftState.from_toml(base_path)
+    if case_path is not None:
+        with open(Path(case_path), "rb") as handle:
+            overrides = tomllib.load(handle)
+        _apply_toml_overrides(sc, overrides)
+    return sc
 
 def compute_drag_diagnostics(sc: SpacecraftState) -> SpacecraftState:
 
@@ -90,7 +135,6 @@ def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_to
     # Each pass updates the spacecraft state by cycling through the subsystem
     # models and re-closing the mass and power budgets between them.
     for i in range(max_iterations):
-        print(f"Iteratation Number{i}")
         # Save the pre-iteration state so convergence history can be inspected.
         history.append(deepcopy(loop_sc))
         loop_sc = deepcopy(loop_sc)
@@ -139,4 +183,6 @@ def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_to
 
 
 if __name__ == "__main__":
-    final_sc, _, _ = run_sizing_loop(SpacecraftState())
+    case_override = Path(sys.argv[1]) if len(sys.argv) > 1 else None
+    sc = load_spacecraft_from_base_config(case_override)
+    final_sc, _, _ = run_sizing_loop(sc)

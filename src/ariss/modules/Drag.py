@@ -18,7 +18,7 @@
 import numpy as np
 from scipy.special import erf
 
-from ariss.core.spacecraft import SpacecraftState, apply_intake_area_ratio
+from ariss.core.spacecraft import SpacecraftState
 from ariss.utils import constants as const
 
 
@@ -79,9 +79,6 @@ def drag_model(sc: SpacecraftState) -> None:
     #   S = V_orbit * sqrt(M / (2 * R_u * T))
     #   alpha_in = atan(taper_half_gap / L_in)
     #   cd_effective = cd_raw * wake_factor
-
-    # Enforce the configured intake/body area ratio, when enabled.
-    apply_intake_area_ratio(sc.geometry)
 
     # Compute the free-molecular speed ratio from orbit state variables.
     speed_ratio = sc.orbit.velocity * np.sqrt(sc.orbit.molar_mass / (2.0 * const.UNIVERSAL_GAS * sc.orbit.temperature))

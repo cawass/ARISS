@@ -14,32 +14,53 @@
 #  Module:         MansurVerification.py
 # ============================================================================== #
 
-from __future__ import annotations
-
-import argparse
 import sys
 from pathlib import Path
 
 
+# ------------------------------------------------------------------------------ #
+# Path setup so the ARISS source can be imported
+# ------------------------------------------------------------------------------ #
+
 ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "src"
+
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from ariss import plot_simulation_history, run_simulation
+
+# ------------------------------------------------------------------------------ #
+# ARISS simulation imports
+# ------------------------------------------------------------------------------ #
+
+from ariss.core.simulation import load_spacecraft_from_base_config
+from ariss.core.simulation import run_sizing_loop
 
 
-def run_mansur_verification(
-    config_path: str | Path | None = None,
-    show_ui: bool = False,
-    max_iterations: int = 200,
-    mass_tolerance: float = 1.0e-3,
-):
-    validation_path = Path(config_path) if config_path is not None else Path(__file__).with_name("MansurVerification.toml")
-    final_sc, converged, history = run_simulation(
-        validation_path,
-        max_iterations=max_iterations,
-        mass_tolerance=mass_tolerance,
+# ------------------------------------------------------------------------------ #
+# Configuration
+# ------------------------------------------------------------------------------ #
+
+CONFIG_PATH = Path(__file__).with_name("MansurVerification.toml")
+
+MAX_ITERATIONS = 200
+MASS_TOLERANCE = 1e-3
+
+SHOW_UI = True
+
+
+# ------------------------------------------------------------------------------ #
+# Run the Mansur validation case
+# ------------------------------------------------------------------------------ #
+
+def run_mansur_verification():
+
+    spacecraft = load_spacecraft_from_base_config(CONFIG_PATH)
+
+    final_sc, converged, history = run_sizing_loop(
+        spacecraft,
+        max_iterations=MAX_ITERATIONS,
+        mass_tolerance=MASS_TOLERANCE,
     )
 
     print(f"Converged: {converged}")
@@ -49,25 +70,22 @@ def run_mansur_verification(
     print(f"Final thrust [N]: {final_sc.thruster.thrust:.6e}")
     print(f"Final drag [N]: {final_sc.drag.drag_total:.6e}")
 
-    plot_simulation_history(
-            validation_path,
-            max_iterations=max_iterations,
-            mass_tolerance=mass_tolerance,
+    if SHOW_UI:
+        from ariss import plot_simulation_history
+
+        plot_simulation_history(
+            CONFIG_PATH,
+            max_iterations=MAX_ITERATIONS,
+            mass_tolerance=MASS_TOLERANCE,
             show=True,
         )
 
     return final_sc, converged, history
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run the Mansur validation case.")
-    parser.add_argument("--show-ui", action="store_true", help="Open the Tk history UI after the sizing loop.")
-    parser.add_argument("--max-iterations", type=int, default=200)
-    parser.add_argument("--mass-tolerance", type=float, default=1.0e-3)
-    args = parser.parse_args()
+# ------------------------------------------------------------------------------ #
+# Run script
+# ------------------------------------------------------------------------------ #
 
-    run_mansur_verification(
-        show_ui=args.show_ui,
-        max_iterations=args.max_iterations,
-        mass_tolerance=args.mass_tolerance,
-    )
+if __name__ == "__main__":
+    run_mansur_verification()

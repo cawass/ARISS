@@ -29,14 +29,18 @@ if str(SRC) not in sys.path:
 from ariss.core.spacecraft import SpacecraftState
 from ariss.modules.Thermal import thermal_model
 from ariss.utils.atmosphere import orbit_updates_from_height
+from tests.Verification._cases import (
+    build_spacecraft_from_case,
+    verification_case_paths,
+)
 
 
 CONFIG_DIR = Path(__file__).resolve().parents[1] / "configs"
-CONFIG_PATHS = sorted(CONFIG_DIR.glob("*.toml"))
+CONFIG_PATHS = verification_case_paths(CONFIG_DIR)
 
 
 def _build_state(config_path: Path) -> SpacecraftState:
-    sc = SpacecraftState.from_toml(config_path)
+    sc = build_spacecraft_from_case(config_path)
     try:
         updates = orbit_updates_from_height(
             sc.orbit.altitude,
@@ -80,3 +84,4 @@ def test_thermal_value_ranges_for_all_configs(config_path: Path) -> None:
 
     assert diagnostics.T_max == 0.0
     assert diagnostics.T_min == 0.0
+

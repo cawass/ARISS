@@ -20,7 +20,6 @@ from operator import itemgetter
 
 import numpy as np
 
-from ariss.core.spacecraft import apply_intake_area_ratio
 from ariss.utils import constants as const
 from ariss.utils.atmosphere import orbit_updates_from_density
 
@@ -81,8 +80,7 @@ def propulsion_model(sc):
     #   m_fuel = m0 * (exp(delta_v / v_e) - 1)
     #   q = 0.5 * rho * V^2
 
-    # Enforce the configured intake/body area ratio, when enabled.
-    apply_intake_area_ratio(sc.geometry)
+
 
     # Convert specific impulse into exhaust velocity for the intake-fed thruster.
     exhaust_velocity = const.EARTH_GRAVITY * sc.thruster.specific_impulse
@@ -106,51 +104,79 @@ def propulsion_model(sc):
     cd_s_inlet_front = sc.drag.cd_inlet_front * sc.geometry.A_in_drag
     cd_s_total = cd_s_solar + cd_s_rad + cd_s_body + cd_s_inlet_side + cd_s_inlet_front
 
-    
-    if sc.mission_profile.active_refueling:
-        # Use the rocket equation to convert the mission delta-v requirement into
-        # a fuel mass target, then convert that target into a required refill rate.
-        sc.mission_profile.required_fuel = sc.mass.Mass_total * (np.exp((sc.mission_profile.delta_v) / (exhaust_velocity)) - 1)
-        sc.refueling.m_flow = sc.mission_profile.required_fuel / sc.refueling.t_refuel
-        sc.geometry.A_ref = sc.refueling.m_flow / (sc.orbit.density * sc.orbit.velocity)
-    else:
-        sc.geometry.A_ref = 0.0
-        sc.refueling.m_flow = 0.0
+    if sc.geometry.use_intake_area_ratio: 
+        sc.geometry.A_in = sc.geometry.intake_area_ratio*sc.geometry.A_body
+        if sc.mission_profile.active_refueling:
+            # Use the rocket equation to convert the mission delta-v requirement into
+            # a fuel mass target, then convert that target into a required refill rate.
+            sc.mission_profile.required_fuel = sc.mass.Mass_total * (np.exp((sc.mission_profile.delta_v) / (exhaust_velocity)) - 1)
+            sc.refueling.m_flow = sc.mission_profile.required_fuel / sc.refueling.t_refuel
+            sc.geometry.A_ref = sc.refueling.m_flow / (sc.orbit.density * sc.orbit.velocity)
+        else:
+            sc.geometry.A_ref = 0.0
+            sc.refueling.m_flow = 0.0
+        
+        sc.geometry.A_prop = sc.geometry.A_in*sc.refueling.coll_eff - sc.geometry.A_ref
+        sc.geometry.A_in_drag = sc.geometry.A_in - sc.geometry.A_prop - sc.geometry.A_ref
 
-    # Solve the propulsion capture area needed to balance drag and, if active,
-    # leave additional intake margin for the refueling stream.
-    sc.geometry.A_prop = (
-        0.5 * sc.orbit.velocity * cd_s_total
-        + sc.orbit.velocity * sc.geometry.A_ref
-    ) / (exhaust_velocity - sc.orbit.velocity)
+            # Enforce the configured intake/body area ratio, when enabled.
 
-    # The propulsion intake mass flow follows directly from captured density flux.
-    sc.thruster.m_flow = sc.geometry.A_prop * sc.orbit.velocity * sc.orbit.density
-
-    # Invert the propulsion power relation to infer the atmospheric density that
-    # makes the chosen propulsion area feasible at the available jet power.
-    sc.orbit.density = (2.0 * sc.thruster.power * sc.thruster.eff) / (sc.orbit.velocity * sc.geometry.A_prop * (exhaust_velocity ** 2))
-
-    # Update the orbit state from the solved density with a single atmosphere lookup.
-    sc.orbit.altitude, sc.orbit.temperature, sc.orbit.molar_mass, sc.orbit.velocity = itemgetter("altitude", "temperature", "molar_mass", "velocity")(
-        orbit_updates_from_density(
-            sc.orbit.density,
-            msis_date=sc.orbit.msis_date,
-            msis_f107=sc.orbit.msis_f107,
-            msis_ap=sc.orbit.msis_ap,
+        sc.thruster.specific_impulse = (sc.orbit.velocity *(sc.geometry.A_prop + sc.geometry.A_ref + 0.5 * cd_s_total)) / (const.EARTH_GRAVITY * sc.geometry.A_prop)
+        
+        exhaust_velocity = const.EARTH_GRAVITY * sc.thruster.specific_impulse
+        sc.thruster.m_flow = sc.geometry.A_prop * sc.orbit.velocity * sc.orbit.density
+        sc.orbit.density = (2.0 * sc.thruster.power * sc.thruster.eff) / (sc.orbit.velocity * sc.geometry.A_prop * (exhaust_velocity ** 2))
+        sc.orbit.altitude, sc.orbit.temperature, sc.orbit.molar_mass, sc.orbit.velocity = itemgetter("altitude", "temperature", "molar_mass", "velocity")(
+            orbit_updates_from_density(
+                sc.orbit.density,
+                msis_date=sc.orbit.msis_date,
+                msis_f107=sc.orbit.msis_f107,
+                msis_ap=sc.orbit.msis_ap,
+            )
         )
-    )
+
+        sc.geometry.A_in_drag = sc.geometry.A_in - sc.geometry.A_prop - sc.geometry.A_ref
+
+    else:
+        if sc.mission_profile.active_refueling:
+            # Use the rocket equation to convert the mission delta-v requirement into
+            # a fuel mass target, then convert that target into a required refill rate.
+            sc.mission_profile.required_fuel = sc.mass.Mass_total * (np.exp((sc.mission_profile.delta_v) / (exhaust_velocity)) - 1)
+            sc.refueling.m_flow = sc.mission_profile.required_fuel / sc.refueling.t_refuel
+            sc.geometry.A_ref = sc.refueling.m_flow / (sc.orbit.density * sc.orbit.velocity)
+        else:
+            sc.geometry.A_ref = 0.0
+            sc.refueling.m_flow = 0.0
+
+        # Solve the propulsion capture area needed to balance drag and, if active,
+        # leave additional intake margin for the refueling stream.
+        sc.geometry.A_prop = (0.5 * sc.orbit.velocity * cd_s_total + sc.orbit.velocity * sc.geometry.A_ref) / (exhaust_velocity - sc.orbit.velocity)
+
+        # The propulsion intake mass flow follows directly from captured density flux.
+        sc.thruster.m_flow = sc.geometry.A_prop * sc.orbit.velocity * sc.orbit.density
+
+        # Invert the propulsion power relation to infer the atmospheric density that
+        # makes the chosen propulsion area feasible at the available jet power.
+        sc.orbit.density = (2.0 * sc.thruster.power * sc.thruster.eff) / (sc.orbit.velocity * sc.geometry.A_prop * (exhaust_velocity ** 2))
+
+        # Update the orbit state from the solved density with a single atmosphere lookup.
+        sc.orbit.altitude, sc.orbit.temperature, sc.orbit.molar_mass, sc.orbit.velocity = itemgetter("altitude", "temperature", "molar_mass", "velocity")(
+            orbit_updates_from_density(
+                sc.orbit.density,
+                msis_date=sc.orbit.msis_date,
+                msis_f107=sc.orbit.msis_f107,
+                msis_ap=sc.orbit.msis_ap,
+            )
+        )
+        
+        sc.geometry.A_in_drag = (sc.geometry.A_ref + sc.geometry.A_prop) * (1 / sc.refueling.coll_eff - 1)
+        sc.geometry.A_in = sc.geometry.A_prop + sc.geometry.A_ref + sc.geometry.A_in_drag
 
 
 
     # Resolve intake areas:
     # - ratio mode: A_in is imposed from A_body, then A_in_drag is inferred.
     # - legacy mode: A_in comes from collection-efficiency split.
-    if sc.geometry.use_intake_area_ratio:
-        apply_intake_area_ratio(sc.geometry)
-    else:
-        sc.geometry.A_in_drag = (sc.geometry.A_ref + sc.geometry.A_prop) * (1 / sc.refueling.coll_eff - 1)
-        sc.geometry.A_in = sc.geometry.A_prop + sc.geometry.A_ref + sc.geometry.A_in_drag
 
     # Resize inlet/body geometry and recompute side area with shape-aware perimeters.
     w_in, h_in = _section_dims(sc.geometry.A_in, sc.geometry.AR_in, sc.geometry.S_in)

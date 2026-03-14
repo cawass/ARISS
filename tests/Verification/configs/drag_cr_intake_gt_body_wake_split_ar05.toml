@@ -1,0 +1,29 @@
+# ============================================================================== #
+#       ___    ____  ____  _____ _____
+#      /   |  / __ \/  _// ___// ___/
+#     / /| | / /_/ // / \__ \ \__ \
+#    / ___ |/ _, _// / ___/ /___/ /
+#   /_/  |_/_/ |_/___//____//____/
+#
+#        ARISS - Atmospheric Refueling Iterative System Solver
+# ============================================================================== #
+#  Description:
+#      Case-only override. Base spacecraft comes from src/ariss/core/base_config.toml.
+#
+#  Project:        ARISS
+#  Module:         drag_cr_intake_gt_body_wake_split_ar05.toml
+# ============================================================================== #
+
+name = "Case CR Intake>Body Wake Split | No Refueling | AR 0.5"
+
+[geometry]
+S_in = "c"
+S_body = "r"
+AR_in = 0.5
+AR_body = 0.5
+use_intake_area_ratio = true
+intake_area_ratio = 1.0
+
+[mission_profile]
+active_refueling = false
+

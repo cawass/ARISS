@@ -15,7 +15,7 @@
 #  Author:         Carlos Carrasco Requejo
 # ============================================================================
 
-from ariss.core.spacecraft import SpacecraftState, apply_intake_area_ratio
+from ariss.core.spacecraft import SpacecraftState
 
 def sizing_model(sc: SpacecraftState) -> None:
     # Inputs:
@@ -32,9 +32,6 @@ def sizing_model(sc: SpacecraftState) -> None:
     #   Power_solar = Power_total * (1 / eta_power - 1)
     #   Power_prop = power_required / thruster_eff
     #   Power_total = sum(subsystem powers)
-
-    # Enforce the configured intake/body area ratio, when enabled.
-    apply_intake_area_ratio(sc.geometry)
 
     # Size the structural masses from simple volumetric and areal scaling laws.
     # The intake mass uses the average of inlet and body areas to approximate a

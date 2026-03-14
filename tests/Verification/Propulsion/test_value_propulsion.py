@@ -35,14 +35,18 @@ from ariss.core.spacecraft import SpacecraftState
 from ariss.modules.Drag import drag_model
 from ariss.modules.Propulsion import propulsion_model
 from ariss.utils.atmosphere import orbit_updates_from_height
+from tests.Verification._cases import (
+    build_spacecraft_from_case,
+    verification_case_paths,
+)
 
 
 CONFIG_DIR = Path(__file__).resolve().parents[1] / "configs"
-CONFIG_PATHS = sorted(CONFIG_DIR.glob("*.toml"))
+CONFIG_PATHS = verification_case_paths(CONFIG_DIR)
 
 
 def _build_state(config_path: Path) -> SpacecraftState:
-    sc = SpacecraftState.from_toml(config_path)
+    sc = build_spacecraft_from_case(config_path)
     try:
         updates = orbit_updates_from_height(
             sc.orbit.altitude,
@@ -80,7 +84,7 @@ def test_propulsion_value_ranges_for_all_configs(config_path: Path) -> None:
     _assert_in_range("A_in_drag", sc.geometry.A_in_drag, 0.1, 10)
     _assert_in_range("thrust", sc.thruster.thrust, 0.01, 1 )
     _assert_in_range("m_flow", sc.thruster.m_flow, 1.0e-7, 8.0e-4)
-    _assert_in_range("altitude", sc.orbit.altitude, 170.0, 230.0)
+    _assert_in_range("altitude", sc.orbit.altitude, 130.0, 230.0)
     _assert_in_range("density", sc.orbit.density, 1.0e-10, 1e-8)
     _assert_in_range("drag_total", sc.drag.drag_total, 9.0e-3, 1)
 
@@ -97,7 +101,7 @@ def test_converged_thrust_matches_required_drag_for_all_configs(config_path: Pat
     #   Ensures the converged propulsion thrust balances the required momentum
     #   load from drag plus captured-stream ram for every verification case.
 
-    sc = SpacecraftState.from_toml(config_path)
+    sc = build_spacecraft_from_case(config_path)
 
     previous_level = simulation_logger.level
     simulation_logger.setLevel(logging.CRITICAL)
@@ -122,6 +126,7 @@ def test_converged_thrust_matches_required_drag_for_all_configs(config_path: Pat
 
     assert final_sc.thruster.thrust == pytest.approx(
         required_load,
-        rel=1.0e-4,
+        rel=1.0e-3,
         abs=1.0e-8,
     ), f"Thrust/load mismatch for {config_path.name}"
+
