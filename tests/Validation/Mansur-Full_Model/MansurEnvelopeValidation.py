@@ -107,7 +107,7 @@ def sweep_mansur_envelope(
     base_path = (
         Path(config_path)
         if config_path is not None
-        else Path(__file__).with_name("MansurVerification.toml")
+        else Path(__file__).with_name("MansurValidation.toml")
     )
 
     base_state = SpacecraftState.from_toml(base_path)

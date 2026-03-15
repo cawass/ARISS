@@ -1,0 +1,63 @@
+# ============================================================================== #
+#       ___    ____  ____  _____ _____
+#      /   |  / __ \/  _// ___// ___/
+#     / /| | / /_/ // / \__ \ \__ \
+#    / ___ |/ _, _// / ___/ /___/ /
+#   /_/  |_/_/ |_/___//____//____/
+#
+#        ARISS - Atmospheric Refueling Iterative System Solver
+# ============================================================================== #
+#  Description:
+#      Crandall and Wirz (2022) 3U CubeSat drag reference case used for Fig. 6.
+#
+#  Project:        ARISS
+#  Module:         CrandallWirz2022_3U.toml
+# ============================================================================== #
+
+name = "Crandall & Wirz 2022 | 3U CubeSat"
+
+[orbit]
+alpha = 0.0
+msis_f107 = 114.0
+msis_ap = 8.0
+use_average = true
+
+[geometry]
+S_in = "s"
+S_body = "s"
+use_intake_area_ratio = true
+fixed_body = true
+intake_area_ratio = 1.0
+AR_in = 1.0
+AR_body = 1.0
+AR_solar = 0.3333333333333333
+A_body = 0.01
+A_in = 0.01
+A_ref = 0.0
+A_prop = 0.0035
+A_in_drag = 0.0065
+A_solar = 0.06
+A_rad = 0.0
+t_solar = 0.00083
+t_rad = 0.0
+L_in = 0.0
+L_body = 0.3
+epsilon_body = 0.0
+epsilon_in = 0.0
+epsilon_in_norm = 0.0
+epsilon_solar = 0.0
+epsilon_rad = 0.0
+
+[solar]
+av_aligment = 0.0
+
+[thermal]
+T_des = 300.0
+
+[refueling]
+coll_eff = 0.35
+m_flow = 0.0
+
+[mission_profile]
+active_refueling = false
+

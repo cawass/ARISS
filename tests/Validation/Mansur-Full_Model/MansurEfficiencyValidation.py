@@ -49,7 +49,7 @@ from ariss.core.simulation import run_sizing_loop
 # Configuration
 # ------------------------------------------------------------------------------ #
 
-CONFIG_PATH = Path(__file__).with_name("MansurVerification.toml")
+CONFIG_PATH = Path(__file__).with_name("MansurValidation.toml")
 
 COLLECTION_EFFICIENCIES = (0.35, 0.40, 0.45)
 

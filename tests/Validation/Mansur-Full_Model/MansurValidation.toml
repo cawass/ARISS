@@ -11,7 +11,7 @@
 #      Validation configuration for the Mansur/Tisaev-style sweep case.
 #
 #  Project:        ARISS
-#  Module:         MansurVerification.toml
+#  Module:         MansurValidation.toml
 #  Author:         Carlos Carrasco Requejo, Lucas Calderon del Rio
 # ============================================================================== #
 

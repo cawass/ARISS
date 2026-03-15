@@ -8,10 +8,10 @@
 #        ARISS - Atmospheric Refueling Iterative System Solver
 # ============================================================================== #
 #  Description:
-#      Validation entry point for the Mansur reference configuration.
+#      Validation entry point for the EULO reference configuration.
 #
 #  Project:        ARISS
-#  Module:         MansurVerification.py
+#  Module:         EULOValidation.py
 # ============================================================================== #
 
 import sys
@@ -41,7 +41,7 @@ from ariss.core.simulation import run_sizing_loop
 # Configuration
 # ------------------------------------------------------------------------------ #
 
-CONFIG_PATH = Path(__file__).with_name("MansurVerification.toml")
+CONFIG_PATH = Path(__file__).with_name("EULO.toml")
 
 MAX_ITERATIONS = 200
 MASS_TOLERANCE = 1e-3
@@ -53,7 +53,7 @@ SHOW_UI = True
 # Run the Mansur validation case
 # ------------------------------------------------------------------------------ #
 
-def run_mansur_verification():
+def run_EULO_verification():
 
     spacecraft = load_spacecraft_from_base_config(CONFIG_PATH)
 
@@ -88,4 +88,4 @@ def run_mansur_verification():
 # ------------------------------------------------------------------------------ #
 
 if __name__ == "__main__":
-    run_mansur_verification()
+    run_EULO_verification()

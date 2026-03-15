@@ -1,0 +1,1559 @@
+Crandall and Wirz ﻿                                                                                                    Journal of Electric Propulsion
+Journal of Electric Propulsion  (2022) 1:12
+https://doi.org/10.1007/s44205-022-00009-8
+
+
+
+
+ RESEARCH                                                                                                                                           Open Access
+
+Air‑breathing electric propulsion: mission
+characterization and design analysis
+Patrick Crandall* and Richard E. Wirz*
+
+
+*Correspondence:
+pcran@ucla.edu; wirz@ucla.edu        Abstract
+Department of Mechanical             Air breathing electric propulsion (atmosphere-breathing electric propulsion) (ABEP)
+and Aerospace Engineering,           has attracted significant interest as an enabling technology for long duration space
+University of California, Los        missions in very low Earth orbit (VLEO) altitudes below about 300 km. The ABEP space-
+Angeles, 420 Westwood Plaza,
+Los Angeles 90095, CA, USA           craft and mission analysis model developed allows parametric characterization of key
+                                     spacecraft geometry and thruster performance parameters such as spacecraft length-
+                                     to-diameter, the ratio of solar array span to spacecraft diameter, thrust-to-power,
+                                     effective exhaust velocity, and inlet efficiency. For the missions analyzed ABEP generally
+                                     outperforms conventional electric propulsion (EP) below 250 km altitude. Using a 6U
+                                     spacecraft architecture the model shows that below 220 km ABEP is the only viable
+                                     propulsion option for desirable mission lifetimes. Parametric evaluations of key space-
+                                     craft and ABEP characteristics show that the most significant technological improve-
+                                     ments to ABEP spacecraft performance and range of applicability for VLEO missions will
+                                     come from advancements in inlet efficiency, low drag materials, solar array efficiency,
+                                     and thrust-to-power.
+                                     Keywords: Air-breathing electric propulsion, VLEO, ABEP, Atmosphere-breathing
+                                     electric propulsion
+
+                                   Introduction
+                                   Recently, many mission designers are considering very low Earth orbit (VLEO) below
+                                   450km for individual spacecraft missions and large spacecraft constellations due to
+                                   several mission benefits including ease of orbital access, reduced debris environment,
+                                   a reduced radiation environment, improved communication link budgets, increased
+                                   resolution and performance for Earth observation sensors, and the possibility of using
+                                   aerodynamic surfaces for orbital maneuvers, attitude control, and momentum wheel
+                                   desaturation [1]. Orbits below 450 km require drag compensation to avoid orbit decay.
+                                   At orbital altitudes between 150 - 300 km atmospheric drag is the dominant perturbing
+                                   force on a spacecraft orbit [2]. Operating in VLEO is difficult due to the large impact
+                                   atmospheric drag has on the orbit, and onboard propulsion is required to compen-
+                                   sate for drag and maintain the orbit. High efficiency electric propulsion (EP) has been
+                                   used for drag compensation in VLEO, two notable examples being ESA’s GOCE and
+                                   JAXA’s SLATS missions which both employed high Isp gridded ion thrusters [3–5]. For
+                                   long duration missions at low altitudes, propellant requirements using conventional EP
+
+                                   © The Author(s) 2022. Open Access This article is licensed under a Creative Commons Attribution 4.0 International License, which permits
+                                   use, sharing, adaptation, distribution and reproduction in any medium or format, as long as you give appropriate credit to the original
+                                   author(s) and the source, provide a link to the Creative Commons licence, and indicate if changes were made. The images or other third
+                                   party material in this article are included in the article’s Creative Commons licence, unless indicated otherwise in a credit line to the mate-
+                                   rial. If material is not included in the article’s Creative Commons licence and your intended use is not permitted by statutory regulation or
+                                   exceeds the permitted use, you will need to obtain permission directly from the copyright holder. To view a copy of this licence, visit http://​
+                                   creat​iveco​mmons.​org/​licen​ses/​by/4.​0/.
+Crandall and Wirz ﻿Journal of Electric Propulsion   (2022) 1:12                                                  Page 2 of 31
+
+
+
+
+                   technology become prohibitively large. Air-breathing EP (ABEP) aims to remove these
+                   propellant constraints by collecting air from the local atmosphere to use as propellant.
+                   Multiple organizations are currently developing ABEP technologies based on a variety of
+                   EP devices [6].
+                      Several ABEP thruster and inlet systems have been investigated in the literature, pro-
+                   viding a range of feasible performance metrics for these systems [7–12]. Performance
+                   metrics such as inlet and thruster efficiency can be connected to overall spacecraft per-
+                   formance via system analysis. An initial system level analysis was performed by ESA
+                   which investigated the altitude range where ABEP would become favorable over con-
+                   ventional EP and found that above 250km altitude, conventional EP provides adequate
+                   performance and ABEP is not needed [13]. In 2010, Jackson estimated the operating
+                   altitudes of standard CubeSat bus geometries by finding the power limited and thrust
+                   limited orbital altitudes [14]. Singh presented a VLEO air collection feasibility study in
+                   2014 providing performance equations for multiple ABEP architectures including stored
+                   propellant concepts[15]. In 2019 SITAEL presented a system optimization for their
+                   ABEP concept [16]. This work yielded three feasible spacecraft geometries for different
+                   operational altitudes. Tisaev et al. presents more general analysis of ABEP performance
+                   demonstrating the impact of thrust to power, Isp, inlet efficiency, and other performance
+                   metrics on operational altitudes [17]. The authors also determine a maximum operating
+                   altitude by setting a minimum gas density for thruster operation. Additionally, a thruster
+                   controller was developed to maintain orbital altitude and avoid divergent altitude enve-
+                   lopes. Many of the previous ABEP studies have been focused on a specific concept and
+                   are not generally applicable. While the analysis presented by Tisaev et al. is general to
+                   arbitrary spacecraft, it is limited to dawn-dusk Sun-synchronous orbits. The objective
+                   of this paper is to extend the work done by Tisaev et al. to arbitrary orbits which may
+                   not always be in sunlight and elliptical orbits which extend to lower altitudes at perigee.
+                   Additionally, this work relates spacecraft geometry scaling relations to operational per-
+                   formance independent of the overall size of the spacecraft thus making this analysis gen-
+                   eral to CubeSats as well as conventionally sized spacecraft. Spacecraft heating is ignored
+                   for this analysis as previous authors have shown that heating only becomes an issue at
+                   altitudes lower than those investigated in this paper [17, 18]. Additionally, Earth oblate-
+                   ness perturbations are ignored in this study for simplicity and drag is assumed to be the
+                   only orbital perturbation.
+                      As ABEP technology moves forward in development, mission planners will require
+                   first order analytical tools to evaluate ABEP spacecraft performance, and ABEP develop-
+                   ers require direction for which technological areas will yield the best results. We have
+                   developed a model for ABEP spacecraft performance dependence on spacecraft geom-
+                   etry and thruster parameters by a combination of spacecraft drag models, atmosphere
+                   models, a simple EP thruster model, and basic orbital dynamics. A parametric sweep is
+                   performed to determine the optimal geometry and thruster type for an ABEP spacecraft.
+                   ABEP spacecraft performance is then compared to conventional EP performance to
+                   determine where ABEP becomes favorable in comparison to conventional EP. A discus-
+                   sion of the sensitivity of performance metrics is provided to guide future development of
+                   ABEP technology.
+Crandall and Wirz ﻿Journal of Electric Propulsion   (2022) 1:12                                                               Page 3 of 31
+
+
+
+
+                     Fig. 1 Atmospheric composition over a range of VLEO altitudes. The primary atmospheric constituents at
+                     VLEO altitudes are atomic oxygen and diatomic nitrogen. Produced using the NRLMSISE-00 model
+
+
+
+
+                   Approach
+                   To maintain a persistent orbit and avoid semi major axis decay, the propulsion system
+                   must provide thrust to counteract the non-conservative force of drag on the spacecraft.
+                   Therefore, to examine ABEP performance for drag compensation we compare solar-
+                   powered ABEP thrust against spacecraft drag as described in the following subsec-
+                   tions. For this analysis, we do not explicitly account for second order effects such as J2
+                   perturbations.
+
+                   VLEO environment
+                   Drag is the most significant consideration for VLEO orbits due to the significant interac-
+                   tions between the spacecraft and Earth’s upper atmosphere. Atmospheric conditions in
+                   VLEO can be found using one of the many Earth atmosphere models. Popular atmos-
+                   pheric models are the 1976 U.S. Standard Atmosphere, Jacchia 1977, NRLMSISE-00, and
+                   GOST, all with their own strengths and weaknesses [19–23]. The NRLMSISE-00 model
+                   was chosen for this analysis as it provides accurate information on atmospheric compo-
+                   sition, which is useful for ABEP analysis and is shown as Fig. 1 [24].
+                     Atmospheric density at VLEO altitudes is largely dependent on solar activity, but
+                   also varies significantly with latitude, longitude, and geomagnetic activity. Variations in
+                   density are milder at VLEO altitudes than at higher altitudes with density changing by
+                   roughly a factor of 2 between solar minimum and solar maximum and varying by up to
+                   25% from the mean density in latitude and longitude [25].
+                     With these considerations, our analysis uses an average value for density across all lati-
+                   tude and longitudes and is constrained to median geomagnetic activity (Ap = 8). Where
+                   stated, three solar activity conditions will be investigated: solar minimum (10.7cm flux =
+                   62 SFU), mean solar activity (10.7cm flux = 114SFU), and solar maximum (10.7 cm flux
+                   = 200 SFU). 10.7 cm solar radio flux has historically reached up to 250 SFU, but 200 SFU
+Crandall and Wirz ﻿Journal of Electric Propulsion    (2022) 1:12                                                                     Page 4 of 31
+
+
+
+
+                     Fig. 2 Historical 10.7 cm radio flux showing the 11 year solar cycle. Marked values for solar minimum,
+                     average solar conditions, and solar maximum are marked at 62 SFU, 114 SFU, and 200 SFU. Data taken from
+                     [26]
+
+
+
+
+                   offers a realistic mean for sustained solar activity across multiple solar cycles as shown
+                   in Fig. 2.
+
+                   ABEP thrust analysis
+                   ABEP thruster systems consist of an inlet which collects air from the atmosphere and an
+                   EP thruster which ionizes and accelerates the propellant collected by the inlet as shown
+                   in Fig. 3. Air is made up of multiple species, so thrust is given as a summation of the
+                   individual thrust contribution from each species:
+
+                         T = ηm γ           ṁs cs                                                                             (1)
+                                        s
+
+
+
+                     where cs is the exhaust velocity of each species, ṁs is the exhaust mass flow rate of each
+                   species, ηm takes into account neutral particles lost due to diffusion out of the thruster
+                   which contribute negligible thrust, and γ is a loss factor which takes into account thrust
+                   reduction caused by beam divergence and the presence of doubly charged ions. This
+                   mass flow rate can be expressed as the product of particle flow rate, Ṅs, and the indi-
+                   vidual particle mass, M, such that ṁs = Ṅs Ms. Generally, molecular species are not
+                   conserved due to dissociation and recombination in the thruster. Ṅs is dependent on
+                   thruster geometry and plasma conditions inside the thruster, and accurately computing
+                   Ṅs requires a reacting plasma code which is outside the scope of this work. This analysis
+                   will assume frozen flow throughout the thruster such that Ṅcollecteds = Ṅexhausts The par-
+                   ticle flow rate effectively captured by the inlet can be expressed as,
+
+                          Ṅs = ηin nas u∞ Ain                                                                                 (2)
+Crandall and Wirz ﻿Journal of Electric Propulsion   (2022) 1:12                                                             Page 5 of 31
+
+
+
+
+                     Fig. 3 Block diagram of an ABEP thruster and inlet system showing mass flow through the system
+
+
+
+
+                     The inlet efficiency ηin is defined as the ratio of incident mass flux that is transmitted
+                   through the inlet to the propulsion system [27]:
+
+                                  Ṅtr
+                         ηin =                                                                                        (3)
+                                  Ṅ∞
+
+                     The incident mass flux not transmitted through the inlet, Ṅreflected is reflected back out
+                   of the front of the inlet. Inlet efficiency, ηin, is the key performance parameter for the
+                   inlet of an ABEP device and sensitivity of this parameter to ABEP performance mission
+                   capabilities will be assessed in the forthcoming analysis. While active inlets have been
+                   shown to achieve high ηin and high compression ratio, passive inlets are more widely
+                   covered in the literature; thus, this analysis will be limited to passive inlets [28, 29]. Pas-
+                   sive inlets generally rely on two capture methods: diffuse capture with collimators and
+                   an accumulator chamber and specular capture with a conical or parabolic inlet [14, 30,
+                   31]. Atomic oxygen adsorption on surfaces leads to surface roughening and more dif-
+                   fuse scattering over time [32]. Specular collection methods rely on materials which can
+                   resist surface roughening and maintain persistent specular reflection. Such materials are
+                   currently under investigation [33], but none currently exist, so this work will be limited
+                   to diffuse collimator-accumulator designs [10, 27]. Previous investigations have shown
+                   that for passive collimator-accumulator type inlets ηin varies with inlet geometry and is
+                   inversely proporational to compression ratio of the inlet [12, 34]. Collimator-accumula-
+                   tor type inlets have been proposed in literature with ηin ranging from 20% to >45% [30,
+                   31]. Higher inlet efficiencies can be achieved at the cost of gas compression but this is
+                   generally considered undesirable [12, 34]. For this work ηin=0.35 is assumed to be a rea-
+                   sonable estimate for applicable to a wide range of systems [27, 29, 35].
+                     Ain in Eq. 2 can be replaced with (Ain−AexΘ) to capture the effect of particles pass-
+                   ing completely through the inlet and thruster system and exiting out the back of the
+                   spacecraft without colliding with the spacecraft or another particle. Θ is the line-of-
+                   sight open area fraction at the exhaust plane. ABEP designs with no direct line-of-sight
+                   from the inlet through the thruster, such as the JAXA design described in [7], have
+                   Θ=0. Equation 2 assumes collisionless flow throughout the system. The increased air
+                   density inside the inlet and thruster system may cause collisions further reducing the
+Crandall and Wirz ﻿Journal of Electric Propulsion   (2022) 1:12                                                   Page 6 of 31
+
+
+
+
+                   number of particles which pass through the spacecraft without interacting. While the
+                   ambient flow is considered free-molecular with little inter-particle collisions, the inlet
+                   can compresses the flow to the point where inter-particle collisions become important.
+                   A multiplicative factor ζ may be applied to Aexφn to account for the gain in ṁ due to
+                   increased particle collisions, where ζ ranges between 0 and 1 for full collisional and full
+                   collisionless flow respectively. Equation 2 then becomes Ṅs = ηin nas u∞ (Ain − Aex �ζ ).
+                   For common ABEP designs inlet area is much larger than thruster exhaust area, Θ is
+                   generally small for HETs and gridded ion thrusters, and ζ is small for high compression
+                   inlets, so Ain>>AexΘζ and AexΘζ is a small correction. Under these assumptions, includ-
+                   ing AexΘζ has little impact on final ABEP performance, so for this study it is assumed
+                   that AexΘζ≈0. ABEP concepts utilizing weakly compressing inlets, large exhaust areas,
+                   or high Θ should include the expansion Ain→Ain+AexΘζ.
+                     The exhaust velocity cs for singly ionized species under electrostatic acceleration is
+                   given by:
+                              
+                                 2Vb q
+                         cs =                                                                              (4)
+                                  Ms
+
+                     Equation 4 is valid for thrusters relying on electrostatic acceleration of ionized propel-
+                   lant such as Hall-effect thrusters and gridded ion thrusters. Combining Eqs. 1, 2, and 4
+                   yields the thrust of an ABEP device assuming frozen flow:
+                                                              
+                        T = 2qVb ηm ηin γ u∞ (Ain − Aex �)           Ms nas                                 (5)
+                                                                  s
+
+                     Given a maximum mass utilization efficiency, the maximum thrust for an ABEP sys-
+                   tem can be found with Eq. 5. Maximum thrust for a given altitude is limited by thruster
+                   performance parameters, inlet size, and inlet efficiency.
+                     Additional seed gas propellant such as xenon can be mixed with the collected air to
+                   produce additional thrust or reduce the thrust to power (T/P) of the device. These air
+                   augmented thrusters can be described by an additional term in the thrust equation:
+                                                                                      
+                                                                             ṁSeed
+                       T = 2qVb ηm γ ηin u∞ (Ain − Aex �)             Ms nas + √                       (6)
+                                                                s
+                                                                                 MSeed
+
+                     In this case thrust is not limited by operating altitude and thrust can be increased by
+                   using onboard propellant. Equation 6 provides a first order description of the thrust pro-
+                   duced by an ABEP device. System analysis with mixing air and onboard propellant is
+                   outside the scope of this study, so this paper will focus on the fully air-breathing case
+                   where ṁfuel = 0 described by Eq. 5.
+
+                   Drag
+                   VLEO orbits are hallmarked by drag being the dominant perturbing force on a space-
+                   craft, therefore, understanding and properly modeling drag forces is one of the most
+                   influential elements of spacecraft performance modeling in VLEO. Drag is dependent
+                   on geometry, attitude, and surface properties. In order to create a standard drag model, a
+                   reference spacecraft bus geometry is defined as shown in Fig. 4.
+Crandall and Wirz ﻿Journal of Electric Propulsion    (2022) 1:12                                                                Page 7 of 31
+
+
+
+
+                     Fig. 4 Diagram of the reference VLEO bus geometry used in this analysis. Length overall (L), solar array
+                     thickness (tSA), and solar array length (s) are defined through ratios to the bus diameter d
+
+
+
+                     The geometry is defined by the bus diameter d, the ratio of length to diameter L/d,
+                   and the ratio of the solar array length to diameter s/d, or effectively how many folding
+                   solar array panels the geometry employs. The thickness of the solar arrays is defined by
+                   the ratio tSA/s which can be extrapolated from COTS solar array panels. This study will
+                   use tSA/s=0.0083 which was determined from CubeSat solar arrays [36]. Defining the
+                   geometry in terms of the diameter allows the spacecraft size to be scaled entirely by it’s
+                   diameter, and it will be shown in later sections that overall performance is independent
+                   of size and only dependent on L/d and s/d.
+
+                   Flow regimes and particle‑wall interactions
+                   Knudsen number (Kn) is defined as the ratio of the mean free path to a length scale. Kn
+                   is used to determine the type of flow model that is applicable to the problem [37]. Low
+                   Kn flows (Kn <0.01) are considered continuum flows and the gas-dynamics are domi-
+                   nated by particle-particle collisions. High Kn flows (Kn >10) are considered free-molec-
+                   ular where particle-wall collisions are more frequent than particle-particle collisions,
+                   and the gas-dynamics are dominated by particle-wall interactions. Statistical mechan-
+                   ics and direct simulation Monte Carlo (DSMC) methods are frequently applied to free-
+                   molecular flows [38]. Intermediate Kn values (0.1 < Kn <10) are considered transitional
+                   flows where particle-particle and particle-wall collisions are equally important.
+Crandall and Wirz ﻿Journal of Electric Propulsion    (2022) 1:12                                                   Page 8 of 31
+
+
+
+
+                     Fig. 5 CD for perpendicular and parallel incidence
+
+
+
+                     Kn remains in the free-molecular flow regime for spacecraft as large as 1 m in diam-
+                   eter for altitudes above 150 km [33]. In free-molecular flows, after impacting a wall, the
+                   incident particle is reflected specularly, diffusely, or a combination of the two [39]. Spec-
+                   ular reflection is akin to light reflecting off a mirror where the angle of incidence and the
+                   angle of reflectance are the same. Specular reflection usually occurs at clean, smooth
+                   surfaces. Rough surfaces lead to diffuse reflections where the angle of reflectance is
+                   determined by a Lambert cosine distribution. The degree to which a particle is specu-
+                   larly or diffusely reflected is determined by the accommodation coefficient σ, with σ=1
+                   corresponding to completely diffuse reflection and σ=0 corresponding to completely
+                   specular reflection [39]. Thus, σ strongly influences the drag coefficient of the spacecraft.
+
+                   Drag model
+                   The atmosphere at VLEO altitudes is rarified with large mean free path lengths leading
+                   to high Kn and free-molecular flow conditions. There are a number of analytical free-
+                   molecular flow drag models in literature [39–41]. The Storch drag model was chosen for
+                   this analysis, and the full equation for the flat plate drag coefficient is given as [39]:
+
+                                  Vw             2                                             
+                         CD = 2σn    sin2 α + √      (2 − σn ) sin2 α + σt cos2 α exp −S 2 sin2 α
+                                  u∞             πS
+                                                                                                         (7)
+                                               2       1             2
+                              + 2 (2 − σn ) sin α + 2 + σt cos α sin αerf(S sin α)
+                                                     2S
+
+                     It has been shown in the literature that spacecraft accommodation coefficients are very
+                   near 1 at VLEO altitudes due to adsorption of atomic oxygen to the surface increasing its
+                   roughness [32, 42, 43]. Applying the σn=σt=1 assumption to Eq. 7:
+
+                                    Vw           2                   1
+                         CD = 2        sin2 α + √    exp −S 2 sin2 α + 2 sin αerf(S sin α)                   (8)
+                                    u∞            πS                  S
+
+                     The reference geometry is comprised of multiple flat plate surfaces oriented either
+                   normal or parallel to the flow direction. We can then constrain Eq. 8 to only the normal
+                   incidence, α=90 deg:
+                                                                     
+                                 Vw       2                      1
+                        C D⊥ = 2     +√        exp −S 2 + 2 1 + 2 erf(S)                                (9)
+                                 u∞       πS                       S
+Crandall and Wirz ﻿Journal of Electric Propulsion   (2022) 1:12                                                    Page 9 of 31
+
+
+
+
+                      and parallel, α=0 deg, incidence angles:
+
+                                 2
+                         C D� = √                                                                          (10)
+                                 πS
+
+                     Where the speed ratio S is defined as S ≡ Vua [39]. Figure 5 shows variation in CD with
+                   altitude for the normal and parallel incidence angles. CD⊥ does not change much over
+                   the altitude range, but CD varies significantly with altitude increasing by more than 25%
+                   from 150 to 250 km altitude.
+                     Drag on the front facing inlet is due to a combination of reflected particles described
+                   by the CD⊥ given by Eq. 9 which produce a drag force of Dreflected = 21 ρu2 Ain CD⊥ and
+                   ram drag due to particles captured by the inlet. Captured particles are described as ine-
+                   lastic collisions which impart a drag force of Dinelastic=ρu2Ain. The ratio of reflected to
+                   absorbed particles is given by the inlet efficiency ηin defined by Eq. 3. Thus the total drag
+                   force on the inlet can be written as Din=(1−ηin)Dreflected+ηinDinelastic or [16, 44]:
+
+                                          1
+                          Din = (1 − ηin ) ρu2∞ Ain CD⊥ + ηin ρu2∞ Ain                                     (11)
+                                          2
+
+                     For a flat plate at normal incidence CD≈2.13 over the VLEO altitude range making the
+                   two terms in Eq. 11 almost the same, and thus ηin has little effect on drag.
+                     Drag on the full spacecraft can be broken into two components: inlet drag and skin
+                   friction drag given by D=Din+DSF. Inlet drag is necessary for ABEP operation as there
+                   must be an inlet to collect air from the atmosphere. Skin friction drag is unnecessary
+                   drag which can be reduced through the use of low drag materials with low accommoda-
+                   tion coefficients. Summing the drag force on each surface yields the total drag force on
+                   the spacecraft:
+
+                                1 2 
+                          D=     ρu 2ASA CD� + 2Abody CD� + (1 − ηin )Ain CD⊥
+                                2 ∞                                                                       (12)
+                                +2ηin Ain + 2stSA CD⊥
+
+
+
+
+                     Through the way the reference geometry was defined, the total spacecraft drag is pro-
+                   portional to Ain=d2.
+                                                        
+                             1 2           s     L           L
+                        D = ρu∞ Ain 2               C D� + 2    CD� + (1 − ηin )CD⊥
+                             2             d     d           d
+                                            
+                                       s 2 t                                                      (17)
+                                              SA
+                            +2ηin + 2               C D⊥
+                                        d      s
+Crandall and Wirz ﻿Journal of Electric Propulsion     (2022) 1:12                                                            Page 10 of 31
+
+
+
+
+                   Table 1 Percent drag contribution of each spacecraft surface for a L/d = 6 spacecraft. As altitude
+                   increases, skin friction drag becomes a larger percentage of the total drag due to an increase in CD at
+                   higher altitudes for parallel incidence surfaces
+                   Altitude [km]              Total            Inlet      SA Skin            Body Skin            SA
+                                                                                                                  Frontal
+                                                                                                                  Area
+
+                   150                        1                36%        41%                21%                  2%
+                   160                        63%              35%        42%                21%                  2%
+                   170                        42%              34%        43%                21%                  2%
+                   180                        29%              33%        43%                22%                  2%
+                   190                        20%              32%        44%                22%                  2%
+                   200                        14%              32%        44%                22%                  2%
+                   210                        11%              32%        44%                22%                  2%
+                   220                        8%               31%        45%                22%                  2%
+                   230                        6%               31%        45%                22%                  2%
+                   240                        4%               31%        45%                22%                  2%
+                   250                        3%               30%        45%                23%                  2%
+
+
+
+                     Drag can be expressed as D = 21 ρu2∞ Ain CDeff by defining an effective coefficient of
+                   drag:
+                                  s  L            
+                                                       L
+                       CDeff = 2            C D� + 2       CD� + (1 − ηin )CD⊥
+                                   d    d              d
+                                           s 2  t                                                  (18)
+                                                    SA
+                               + 2ηin + 2                C D⊥
+                                            d       s
+
+                     6A breakdown of the drag contribution from each surface for two 10cm diameter
+                   spacecraft with differing L/d is shown in Fig. 6. Doubling the L/d of the spacecraft from
+                   3 to 6 causes the skin friction drag to overtake frontal area drag as the dominant drag
+                   force on the spacecraft. Table 1 outlines the percent contribution from each drag source
+                   over the VLEO altitude range. In this table, drag is normalized to a point making drag
+                   independent of bus diameter and only dependent on L/d and s/d.
+                     Orbital speed u is mostly constant with altitude for circular orbits in the VLEO alti-
+                   tude range. Atmospheric density ρ is roughly exponentially dependent on altitude, so
+                   for a given geometry, drag is dominated by ρ∝ exp(h). ρ is determined using the NRLM-
+                   SISE-00 atmosphere model for this study.
+
+
+
+
+                     Fig. 6 Drag comparison between a 1 ×3U and a 1 ×6U CubeSat
+Crandall and Wirz ﻿Journal of Electric Propulsion    (2022) 1:12                                                                     Page 11 of 31
+
+
+
+
+                   Power model
+                   EP and ABEP spacecraft require power to drive the propulsion system. Power collected
+                   by a solar array is given by PBOL=ηcellηassyηtI0ASA cosθ where θ is the angle between solar
+                   array normal and the solar vector [45]. The reference geometry described in Drag sec-
+                   tion has two deployed solar arrays and body mounted solar panels over the entire length
+                   of the spacecraft bus which are angled ­45∘ relative to the deployed solar arrays. The max-
+                   imum available power to this reference spacecraft is given by:
+
+                        Pmax = 2ηcell ηassy ηt I0 ASA + Abody cos 45◦
+                                                                     
+                                                                                                           (19)
+
+                     Similarly to drag in Drag model section, Pmax∝d2. Typically, spacecraft will employ
+                   a combination of gimballed solar arrays and attitude control to point the solar arrays
+                   directly at the sun and collect maximum power. This is not an option in VLEO since
+                   the spacecraft must remain oriented with the minimum surface area in the direction of
+                   the velocity vector to keep drag at a minimum. At most, a compromise can be struck by
+                   rotating the spacecraft about its velocity vector as shown in Fig. 7. The optimum space-
+                   craft attitude for maximum power collection was derived by Singh [15].
+                     The β angle is frequently used in spacecraft power analysis to determine the duration
+                   of eclipse periods and is defined as the angle between the orbital plane and the solar
+                   vector. Assuming the solar arrays can be rotated arbitrarily about the spacecraft veloc-
+                   ity vector to collect the maximum amount of power, the collected solar array power
+                   is proportional to the magnitude of the cross product of the velocity unit vector and
+                   the solar unit vector: P∝ sinψ where ψ is the angle between the solar vector and the
+
+
+
+
+                     Fig. 7 Diagram showing the optimal spacecraft attitude which maximizes collected power while keeping
+                     the spacecraft oriented for minimum drag. Spacecraft velocity vector is shown in red, solar array normal is
+                     shown in blue, orbit normal is shown in purple, and the sun vector is shown in yellow. β is the angle between
+                     the sun vector and the orbital plane
+Crandall and Wirz ﻿Journal of Electric Propulsion    (2022) 1:12                                                                  Page 12 of 31
+
+
+
+
+                   velocity vector. At points 1 and 2 the spacecraft can be rotated such that the solar arrays
+                   are directly facing the sun and maximum power is collected. At point 3 the solar arrays
+                   make an angle π2 − β to the sun. Assuming ψ varies sinusoidally between beta and pi/2
+                   over the course of the orbit we can determine ψ:
+                                π                        π
+                                   2 −β                        +β
+                         ψ=                     cos(2ν) + 2                                                                (20)
+                                      2                        2
+
+                     Instantaneous spacecraft power available when the spacecraft is not in eclipse is then
+                   computed as:
+
+                           P
+                               = sin ψ                                                                                     (21)
+                          Pmax
+
+                     Beta angle analysis can then be applied to determine the eclipse fraction fE of the orbit
+                   [46].
+                                       √             
+                              1    −1      h2 + 2Rh
+                         fE = cos                                                                         (22)
+                             π          (R + h) cos β
+
+                     Figure 8 shows the normalized power collected over two complete orbits including
+                   eclipse periods where no power is collected. Integrating over mean anomaly ν yields the
+                   mean power over the orbit as a function of the beta angle shown in Fig. 9.
+                                        �      �                        
+                                             fE
+                                  1  π 1− 2
+                                      �                    � 2π
+                          P̄
+                              =                   sin ψdν + πf sin ψdν                               (23)
+                        Pmax     2π    0                      2
+                                                               E
+
+
+
+
+                     Average power can be reduced by as much as 70% from a sun-synchronous orbit lead-
+                   ing to significant decreases in spacecraft performance. The results shown in Figs. 8 and 9 are
+
+
+
+
+                     Fig. 8 Power collected over two complete β=30∘, 200 km altitude orbits showing eclipse periods in grey
+                     and power reduction due to solar array cosine losses. Power is normalized to the maximum power collected.
+                     These results were verified using the Systems Toolkit software [47]
+Crandall and Wirz ﻿Journal of Electric Propulsion    (2022) 1:12                                                                       Page 13 of 31
+
+
+
+
+                     Fig. 9 Normalized mean power collected vs β. High β orbits are in constant sunlight can do not have any
+                     eclipse periods. Low β orbits experience significantly reduced average power due to long eclipse periods and
+                     high cosine losses. This figure is computed for 200 km altitude, but the results do not vary significantly over
+                     the VLEO altitude range
+
+
+
+
+                   computed for a 200 km altitude circular orbit, but the results do not change significantly
+                   over the VLEO altitude range. This study will be limited to circular orbits and slightly
+                   elliptical orbits where the power analysis does not vary significantly from the circular
+                   case.
+
+                   VLEO orbit types
+                   ABEP spacecraft may operate in circular or elliptical orbits. Depending on mission
+                   needs, elliptical orbits can provide higher orbit apogee to reduce orbit average drag or
+                   allow a lower perigee for improved Earth proximity during part of the orbit. More highly
+                   elliptical orbits can be considered to further reduce the minimum operating altitude
+                   beyond what is possible with orbits entirely in the range of VLEO. These orbits can have
+                   apogee at a higher altitude where drag is reduced and dip to low altitudes near the Earth
+                   at perigee. These “Super Low Perigee Orbits” (SuLPO) can provide benefits to certain
+                   space missions by bringing the spacecraft very close to Earth for a portion of the orbit.
+
+                   Results
+                   Power limited altitude
+                   A power-limited minimum operating altitude of any EP spacecraft can be determined
+                   through a power balance between the power required to compensate for drag, which
+                   is dependent on altitude, and the average power collected by the solar arrays over each
+                   orbit. Power required to compensate for drag is determined from the T/P of the propul-
+                   sion system:
+                                            −1
+                                         T
+                          P̄ = D ∗                                                                                              (24)
+                                         P
+Crandall and Wirz ﻿Journal of Electric Propulsion   (2022) 1:12                                                             Page 14 of 31
+
+
+
+
+                     Fig. 10 Power limited minimum altitude for various geometries and T/P. T/P has the largest effect on
+                     minimum operating altitude
+
+
+
+                     For a given geometry, average power available can be computed from the power model
+                   described in Power model section, and drag can be determined as a function of altitude
+                   using Eq. 12. T/P is typically determined for each individual ABEP technology. Using
+                   the drag model, the power model, and an atmosphere model to relate atmospheric tem-
+                   perature and density to altitude, then the power limited minimum altitude can be deter-
+                   mined by numerically solving Eq. 24 for altitude.
+                     As shown in Drag model and Power model sections both power available and drag are
+                   proportional to d2. Scaling spacecraft diameter increases drag, but also scales the solar
+                   array size providing more power collected to compensate for drag. This scaling effect
+                   cancels in Eq. 24 decoupling spacecraft performance from spacecraft diameter. Thus
+                   performance is only a function of dL and ds . For example, a 3U CubeSat with 20cm long
+                   solar arrays (10 cm ×10 cm ×30 cm, L/d = 3, ds = 2) can operate at the same altitudes as
+                   a larger scaled 1m ×1 m ×3 m, L/d = 3, ds = 2 spacecraft provided T/P is the same for
+                   both propulsion systems. In practice, for a given type of thruster, larger thruster systems
+                   typically offer greater efficiency than smaller EP thrusters. Figure 10 show the power
+                   limited minimum operating altitude for an EP or ABEP VLEO spacecraft with varying
+                   geometry and T/P.
+                     Conventional HETs and gridded ion thrusters typically have high T/P in the 30 - 65
+                   mN/kW range [48, 49] while ABEP propulsion has lower T/P in the 10 – 30 mN/kW
+                   range [8, 10] due to decreased performance from atmospheric propellants. Higher
+                   L/d spacecraft with larger solar arrays are able to collect more power and operate at
+                   lower altitudes. T/P has the greatest impact on the power limited minimum altitude,
+                   and improving T/P for the propulsion system leads to large decreases in operating
+                   altitude. Figure 11 shows how improving T/P reduces the power limited minimum
+                   altitude for a reference 6U geometry shown in Fig. 6 at different solar activity levels.
+                   For this geometry, minimum operating altitude varies by up to 20 km over the solar
+                   cycle. Increasing T/P yields diminishing returns at lower altitudes approaching 150
+                   km where atmospheric density increases rapidly as shown in Fig. 1. Another concern
+                   is larger spacecraft operating at lower altitudes can approach the threshold for the
+                   transitional flow regime leading to further increases in drag not accounted for by
+                   this model.
+Crandall and Wirz ﻿Journal of Electric Propulsion   (2022) 1:12                                                                      Page 15 of 31
+
+
+
+
+                     Fig. 11 T/P vs power limited minimum operating altitude for the 6U reference geometry shown in
+                     Fig. 6 (L/d=6,s=2). Current air-breathing gridded ion thrusters achieve T/P = 10 mN/kW, inductive plasma
+                     thrusters can achieve T/P = 20 mN/kW [8, 50], and current air-breathing HET thrusters can achieve T/P = 30
+                     mN/kW [10]. Minimum altitude varies by up to 20 km over the solar cycle for this geometry
+
+
+
+
+                   Thrust to drag ratio
+                   In order for a spacecraft to maintain a stable orbit and avoid semi-major axis decay, ade-
+                   quate thrust must be produced to compensate for drag T≥D, or T/D≥1. Equation 5 gives
+                   the thrust produced by an ABEP system, and Eq. 17 gives the drag on the spacecraft.
+                                                               √
+                   Combining Eqs. 5 and 17 and substituting Ms nas = √ρMs where ρs is the partial density
+                                                                                            s
+                   given as ρs = Cs ρ:
+                                                                   −1/2
+                          T   2 2qV b ηm ηin γ (Ain − Aex �n ) s Cs Ms
+                            =                                                                                                 (25)
+                          D                    u∞ Ain CDeff
+
+                     Cs is the mass fraction of each species in the atmosphere. The ρ dependence has
+                   dropped out of Eq. 25 removing any strong dependence on altitude. u∞ varies slightly
+                   over the VLEO altitude range, and CDeff is also weakly dependent on altitude through
+                   the speed ratio S and the ambient mean thermal velocity Va. Ms varies slightly over the
+                   altitude range due to composition changes in the atmosphere. Therefore T/D is mostly
+                   constant with altitude shown in Fig. 12. Additionally, if AexΘn<<Ain, which is generally
+                   desirable to minimize propellant loss, then dependence on Ain also drops out of Eq. 25.
+                     As L/d and s/d increases, drag increases as well, but the maximum thrust produced
+                   remains constant due to the constant inlet size. High L/d and s/d ABEP spacecraft have
+                   T/D<1 and therefore cannot maintain a stable orbit. High power spacecraft are desirable
+                   to reduce the power limited minimum operating altitude, but high power spacecraft also
+                   suffer from low T/D which could make the geometry unviable if T/D<1.
+Crandall and Wirz ﻿Journal of Electric Propulsion                                                (2022) 1:12                                                                                                                                                                                            Page 16 of 31
+
+
+
+
+                     Fig. 12 T/D vs altitude for a range of L/d. T/D is mostly constant with altitude with some variation due to
+                     small changes in CDeff and u∞ with altitude
+
+
+
+
+                   Parameter sweep
+                   The power limited minimum altitude model and the T/D model can be applied in a
+                   parameter sweep over a range of spacecraft geometries, thruster T/P, and orbit β angles
+                   to map these inputs to minimum operating altitude and T/D. Geometries with L/d
+                   between 3 and 10 and between 1 and 4 solar array panels are investigated. L/d>10 and
+                   s/d>4 are considered unrealistic and not structurally sound. Current gridded ion thrust-
+                   ers running on atmospheric propellants achieve T/P≈ 10 mN/kW while current Hall
+                   thrusters running on atmospheric propellants can achieve T/P≈ 30 mN/kW [8, 10]. A
+                   range of T/P between 10 - 30 mN/kW is chosen to encompass the full range of current
+                   ABEP technology. β angles ranging from 0          ­ 0∘ encompasses the entire range of pos-
+                                                              ­ ∘ to 9
+                   sible orbit cases. For each combination of inputs, the minimum T/D is checked to ensure
+                   T/D≥1. T/D is roughly constant with altitude, so only checking the minimum is consid-
+                   ered sufficient for this analysis. Minimum operating altitude is then determined by the
+                   power limited minimum altitude analysis described in Power limited altitude section.
+                   T/D is computed for the power limited minimum altitude.
+                                                                                                                                                                                                                                                                                                  230
+                                         1 230.1   224.1   220     216.9   214.6   212.8   211.4   210.1   216.8   211.2   207.2   204.3    202     200.4   198.9   197.7   207.2   201.8   198     195.3   193.2   191.5   190.1   189   194.6 189.9 186.7 184.1 182.3 181.1 179.8       178.9
+
+
+                      T/P =       2 219.6 214.4 210.8 208.3 206.3 204.9 203.6                              206.8   201.8   198.6   196      194.2 192.8     191.5           197.8   193.3   190.1   187.9   186.1   184.7   183.6         187.2 183.2 180.7 178.7 177.3 176.2 175.3
+
+                      10mN/kW s/d 3 214.1 209.4 206.1 203.8                                                201.6   197.1   194.1   191.9                                    193.2   188.8   186.1   184.1                                 183.4   180   177.8 176.2                               220
+
+
+                                         4   211   206.5   203.4                                           198.7   194.4   191.5                                            190.5   186.5   183.8                                         181.4 178.4 176.2
+
+
+                                         1 216.4   210.6   206.8   203.8   201.6   199.8   198.4   197.3   203.8   198.4   194.6   191.9    189.7 188.1     186.7   185.6   194.8   189.5   186.1   183.4   181.4   180     178.7 177.7 182.9 178.6 175.5 173.2 171.5 170.3 169.2         168.3
+                                                                                                                                                                                                                                                                                                  210
+
+                      T/P =       2 206.5 201.4 198 195.7 193.7 192.3 191.2                                194.4   189.7   186.5   184.1    182.5 181.1     180             185.9   181.6   178.7   176.6   175     173.7   172.6          176    172.4 169.9 168.1 166.8 165.8    165
+
+                      15mN/kW s/d
+                                  3 201.1 196.6 193.5 191.4                                                189.5   185.2   182.3   180.4                                    181.4   177.7   175     173                                   172.6 169.4 167.2 165.8
+                                                                                                                                                                                                                                                                                                  200
+                                         4 198.2   193.9   191                                             186.7   182.7   180                                              178.9   175.3   172.8                                         170.6 167.7 165.8
+
+
+                                         1 207.2   201.6   197.8   195     193     191.2   189.7   188.6   195.1   189.9   186.3   183.6    181.6   180     178.7   177.7   186.5   181.4   178.2   175.7   173.7   172.3   171     170.1 175.3   171   168.1 165.9 164.3 163.1 162.2     161.3
+
+                      T/P =       2 197.5 192.8 189.5 187.2 185.4                  184     182.7           186.1   181.6   178.6   176.4    174.6 173.3     172.3           178     173.9   171.2   169     167.6   166.3   165.4         168.6 165.2 162.9 161.3     160   158.9 158.2           190
+
+                      20mN/kW s/d 3 192.4 188.1 185.2 183.1                                                181.4   177.3   174.6   172.6                                    173.9   170.1   167.6   165.8                                 165.4 162.3 160.4 158.9
+
+
+                                         4 189.5   185.6   182.7                                           178.7   175     172.3                                            171.5   167.9   165.6                                         163.6 160.9 158.9
+                                                                                                                                                                                                                                                                                                  180
+                                         1 200.2   195     191.2   188.5   186.3   184.7   183.4   182.2   188.6   183.6   180     177.5    175.5 174.1     172.8   171.7   180.2   175.5   172.3   169.9   168.1   166.7   165.4 164.5 169.5 165.4 162.7 160.7 159.3       158   156.9   156.2
+
+
+                      T/P =       2 191 186.3 183.1 180.9 179.1 177.7 176.6                                179.8   175.5   172.6   170.5    168.8 167.6     166.5           172.3   168.3   165.6   163.6   162.2   160.9   160           163.2   160   157.8 156.2   155   154.1 153.3
+
+                      25mN/kW s/d 3 186.1 181.8 178.9 176.9                                                175.3   171.5   168.8   167                                      168.3   164.7   162.2   160.5                                 160.2 157.3 155.3 154.1
+                                                                                                                                                                                                                                                                                                  170
+
+
+                                         4 183.2   179.3   176.6                                           172.8   169.2   166.7                                            165.9   162.5   160.4                                         158.6 155.9 154.1
+
+
+                                         1 194.8   189.5   185.9   183.2   181.3   179.6   178.4   177.3   183.4   178.6   175.1   172.8    170.8 169.4     168.1   167     175.5   170.8   167.7   165.4   163.6   162.3   161.1 160.2 165.2 161.3 158.6 156.6 155.1 154.1 153.2         152.3
+                                                                                                                                                                                                                                                                                                  160
+
+                      T/P =       2 185.8 181.3 178.2 175.9 174.2                  173     171.9           175.1   170.8   168.1   165.9    164.3 163.2     162.2           167.7   164     161.3   159.5   158     156.9   155.9         159.1 155.9 153.9 152.3 151.2 150.3 149.5
+                      30mN/kW s/d
+                                  3 180.9 176.9 174.1 172.1                                                170.6   166.8   164.3   162.5                                    163.8   160.4   158     156.4                                 156.2 153.3 151.5 150.3
+                                                                                                                                                                                                                                                                                                  150
+                                         4 178.4   174.4   171.9                                           168.3   164.7   162.3                                            161.6   158.4   156.2                                         154.6 151.9 150.3
+                                                                                                                                                                                                                                                                                                  NaN
+
+                                              3      4       5       6         7     8       9      10       3       4      5       6        7       8       9       10      3        4      5        6      7       8       9       10     3      4     5      6     7      8      9      10
+                                                                         L/d                                                               L/d                                                            L/d                                                       L/d
+
+
+
+                     Fig. 13 Minimum operating altitude for a range of spacecraft geometries, T/P, and β for an ABEP with
+                     Vb=1500 V, ηm=0.85,ηin=0.35,γ=1. Cases with T/D<1 are blacked out. High β orbits offer lower altitude
+                     operation since they offer more power to the spacecraft
+Crandall and Wirz ﻿Journal of Electric Propulsion                                             (2022) 1:12                                                                                                                                                                                          Page 17 of 31
+
+
+
+
+                                       1 2.521 2.208 1.966 1.773 1.616 1.484 1.373 1.277 2.502 2.196 1.959                    1.769 1.614 1.484      1.374 1.279     2.491 2.189 1.956 1.769         1.615 1.486 1.377     1.283 2.478 2.185 1.956 1.772         1.62   1.493 1.385 1.291
+
+
+                      T/P =            2 2.028 1.736 1.519 1.351 1.216 1.107 1.015                    2.019 1.732 1.518       1.352 1.219    1.11    1.02            2.015 1.732     1.52    1.356   1.224 1.115   1.025         2.013 1.735 1.526 1.363 1.231 1.123 1.033                   2.4
+
+
+                      10mN/kW    s/d 3 1.678 1.417 1.227 1.083                                        1.674 1.417     1.23    1.087                                  1.673 1.419     1.233 1.091                                 1.676 1.424     1.24    1.098
+
+
+                                       4 1.417 1.187 1.022                                            1.415 1.188 1.025                                              1.416 1.191     1.029                                       1.419 1.197 1.035
+                                                                                                                                                                                                                                                                                             2.2
+                                       1 2.502 2.195 1.959 1.769 1.614 1.484 1.374 1.279 2.487 2.188 1.955                    1.769 1.616 1.488      1.379 1.285     2.479 2.185 1.956 1.773         1.621 1.494 1.386     1.292 2.472 2.186 1.962 1.781 1.632 1.506 1.399 1.306
+
+                      T/P =            2 2.019 1.732 1.518 1.352         1.22    1.111   1.02         2.014 1.733 1.522       1.358 1.226 1.118      1.028           2.013 1.736     1.527 1.365     1.234 1.126 1.036           2.017 1.744 1.538 1.376 1.246 1.138 1.048
+
+                      15mN/kW    s/d 3 1.674 1.417       1.23    1.087                                1.674 1.421 1.236       1.094                                  1.676 1.426     1.243 1.102                                 1.683 1.436 1.253 1.112                                     2
+
+                                       4 1.415 1.188 1.025                                            1.417 1.193 1.032                                              1.42    1.199   1.039                                       1.428 1.208 1.048
+
+
+                                       1 2.491 2.189 1.956 1.769 1.615 1.487 1.377 1.283 2.479 2.185 1.956                    1.772 1.621 1.494      1.386 1.292     2.473 2.185     1.96    1.779   1.629 1.503 1.396     1.303 2.471 2.191     1.97    1.792 1.644 1.519 1.412      1.32
+
+                                                                                                                                                                                                                                                                                             1.8
+                      T/P =            2 2.015 1.732 1.521 1.356 1.224 1.116             1.026        2.013 1.736 1.528       1.365 1.234 1.127      1.037           2.016 1.742     1.536 1.375     1.245 1.137 1.047           2.023 1.754     1.55    1.39    1.26   1.153 1.062
+
+                      20mN/kW    s/d   3 1.673   1.42    1.234 1.092                                  1.676 1.427 1.243       1.102                                  1.682 1.435     1.252 1.112                                 1.692 1.447 1.266 1.126
+
+
+                                       4 1.416 1.192     1.03                                         1.421    1.2    1.039                                          1.427 1.208     1.048                                       1.437 1.219 1.061
+                                                                                                                                                                                                                                                                                             1.6
+
+                                       1 2.483 2.186 1.955       1.77    1.618   1.49    1.382 1.288 2.474 2.185 1.959        1.777 1.627 1.501      1.393    1.3    2.471 2.187 1.965 1.786         1.637 1.512 1.405     1.313 2.473 2.197 1.979 1.803 1.656 1.532 1.426 1.333
+
+
+                      T/P =            2 2.013 1.734 1.524 1.361 1.229 1.122 1.031                    2.015 1.741 1.534       1.373 1.243 1.135      1.045           2.019 1.749     1.545 1.385     1.255 1.148 1.058           2.03    1.764 1.562 1.402 1.273 1.166 1.075
+
+                      25mN/kW    s/d 3 1.675 1.423 1.239 1.097                                        1.68    1.433 1.251     1.11                                   1.688 1.443     1.262 1.122                                 1.701 1.459 1.278 1.138
+                                                                                                                                                                                                                                                                                             1.4
+
+
+
+                                       4 1.418 1.196 1.035                                            1.425 1.206 1.047                                              1.434 1.216     1.058                                       1.446   1.23    1.072
+
+
+                                       1 2.479 2.185 1.956 1.773 1.621 1.494 1.386 1.293 2.472 2.186 1.962                    1.782 1.633 1.507       1.4    1.308   2.471 2.191 1.971 1.793         1.646 1.521 1.415     1.322 2.476 2.203 1.988 1.813 1.667 1.544 1.437 1.346
+                                                                                                                                                                                                                                                                                             1.2
+                      T/P =            2 2.013 1.736 1.528 1.366 1.235 1.127 1.037                    2.017 1.746 1.541       1.38     1.251 1.143   1.054           2.024 1.756     1.554 1.394     1.265 1.158 1.068           2.038 1.775 1.573 1.415 1.285 1.178 1.088
+                      30mN/kW    s/d 3 1.677 1.427 1.244 1.103                                        1.685 1.439 1.258       1.118                                  1.694 1.451     1.271 1.132                                 1.71    1.469 1.289     1.15
+
+
+                                       4 1.421    1.2    1.04                                         1.43    1.213 1.054                                            1.441 1.225     1.067                                       1.455 1.241 1.082
+                                                                                                                                                                                                                                                                                             NaN
+
+                                            3      4       5       6         7     8      9      10     3       4      5        6       7      8      9       10       3       4       5       6      7      8      9       10     3       4       5       6      7      8      9     10
+                                                                       L/d                                                            L/d                                                          L/d                                                         L/d
+
+
+
+                     Fig. 14 T/D for a range of spacecraft geometries, T/P, and β for an ABEP spacecraft with Vb=1500 V, ηm=0.85,
+                     ηin=0.35,γ=1. Cases with T/D<1 are blacked out
+
+
+
+                     Figures 13 and 14 show the results of the parameter sweep with Vb=1500 V and
+                   Figs. 15 and 16 show the results of the parameter sweep with Vb=500 V. Current ABEP
+                   gridded ion thrusters have a T/P of 10 mN/kW and can support an ABEP spacecraft at a
+                   minimum of 175 km. ABEP HETs have a T/P of 30 mN/kW, but cannot provide as high
+                   T/D due to lower effective exhaust velocity per Eq. 25 and can support a spacecraft to as
+                   low as 155 km. Geometries with T/D=1 are viable, but spacecraft designers may wish
+                   to use designs with slightly higher T/D to improve maneuverability and spacecraft sur-
+                   vivability in unexpected environmental conditions. Aerodynamic maneuvering and orbit
+                   changing requires T/D>1 to accommodate increased drag during these maneuvers.
+                     Actuated solar arrays can be retracted during eclipse periods when they do not collect
+                   power to reduce drag. The mean drag over a complete orbit is computed as a weighted
+
+
+
+                                                                                                                                                                                                                                                                                             230
+                                       1 230.1   224.1   220     216.9                                216.8   211.2   207.2 204.3                                    207.2   201.8   198     195.3                               194.6 189.9     186.7   184.1
+
+
+                       T/P =           2 219.6   214.4                                                206.8   201.8                                                  197.8   193.3                                               187.2 183.2
+
+                       10mN/kW   s/d 3
+                                                                                                                                                                                                                                                                                             220
+
+                                       4
+
+
+                                       1 216.4   210.6   206.8   203.8                                203.8   198.4   194.6 191.9                                    194.8   189.5   186.1 183.4                                 182.9 178.6     175.5   173.2
+
+                       T/P =           2 206.5   201.4                                                194.4   189.7                                                  185.9   181.6                                               176     172.4
+                                                                                                                                                                                                                                                                                             210
+
+
+                       15mN/kW   s/d 3
+                                       4
+                                                                                                                                                                                                                                                                                             200
+
+                                       1 207.2   201.6   197.8   195                                  195.1   189.9   186.3 183.6                                    186.5   181.4   178.2 175.7                                 175.3   171     168.1   165.9
+
+                       T/P =           2 197.5   192.8                                                186.1   181.6                                                  178     173.9                                               168.6 165.2
+
+                       20mN/kW   s/d 3                                                                                                                                                                                                                                                       190
+
+
+                                       4
+
+
+                                       1 200.2   195     191.2   188.5                                188.6   183.6   180     177.5                                  180.2   175.5   172.3 169.9                                 169.5 165.4     162.7   160.7
+                                                                                                                                                                                                                                                                                             180
+                       T/P =           2   191   186.3                                                179.8   175.5                                                  172.3   168.3                                               163.2   160
+
+                       25mN/kW   s/d 3
+                                       4                                                                                                                                                                                                                                                     170
+
+
+                                       1 194.8   189.5   185.9   183.2                                183.4   178.6   175.1 172.8                                    175.5   170.8   167.7 165.4                                 165.2 161.3     158.6   156.6
+
+                       T/P =           2 185.8   181.3                                                175.1   170.8                                                  167.7   164                                                 159.1 155.9
+                       30mN/kW   s/d 3                                                                                                                                                                                                                                                       160
+
+
+
+                                       4
+                                                                                                                                                                                                                                                                                             NaN
+
+                                            3      4       5       6         7     8      9      10     3       4      5        6       7      8      9       10       3       4      5        6      7      8      9       10    3       4       5       6       7      8     9      10
+                                                                       L/d                                                            L/d                                                          L/d                                                         L/d
+
+
+
+                     Fig. 15 Minimum operating altitude for a range of spacecraft geometries, T/P, and β for an ABEP with
+                     Vb=500 V, ηm=0.85,ηin=0.35, and γ=1. Cases with T/D<1 are blacked out. High β orbits offer lower altitude
+                     operation since they offer more power to the spacecraft. Note for Vb=500 V lower T/D is achievable than the
+                     high Vb case shown in Fig. 13 and only low drag geometries are feasible
+Crandall and Wirz ﻿Journal of Electric Propulsion                                 (2022) 1:12                                                                                                                                                    Page 18 of 31
+
+
+
+
+                                                                                                                                                                                                                                          1.45
+                                   1 1.456 1.275 1.136 1.025                            1.446 1.269 1.132 1.022                           1.439 1.265   1.13   1.022                    1.432 1.262     1.13    1.024
+
+
+                     T/P =         2 1.172 1.003                                        1.167   1.001                                     1.164 1.001                                   1.163   1.002
+
+                     10mN/kW   s/d 3                                                                                                                                                                                                      1.4
+
+
+                                   4
+
+                                   1 1.445 1.268 1.132 1.022                            1.437 1.264     1.13   1.022                      1.432 1.262   1.13   1.024                    1.428 1.263     1.134   1.029                     1.35
+
+                     T/P =         2 1.167 1.001                                        1.164   1.001                                     1.163 1.003                                   1.165   1.007
+                     15mN/kW   s/d 3                                                                                                                                                                                                      1.3
+
+
+                                   4
+
+
+                                   1 1.439 1.265   1.13   1.022                         1.432 1.262     1.13   1.024                      1.429 1.262 1.132    1.028                    1.428 1.266     1.138   1.035
+                                                                                                                                                                                                                                          1.25
+
+                     T/P =         2 1.164 1.001                                        1.163   1.003                                     1.165 1.007                                   1.169   1.013
+                     20mN/kW   s/d 3
+                                                                                                                                                                                                                                          1.2
+
+                                   4
+
+
+                                   1 1.435 1.263   1.13   1.023                         1.43    1.262 1.132 1.027                         1.428 1.264 1.135    1.032                    1.429 1.269     1.144   1.041
+                                                                                                                                                                                                                                          1.15
+                     T/P =         2 1.163 1.002                                        1.164   1.006                                     1.167 1.011                                   1.173   1.019
+
+                     25mN/kW   s/d 3
+                                                                                                                                                                                                                                          1.1
+                                   4
+
+
+                                   1 1.432 1.262   1.13   1.024                         1.428 1.263 1.134 1.029                           1.428 1.266 1.139    1.036                    1.431 1.273     1.149   1.048
+
+                     T/P =         2 1.163 1.003                                        1.165   1.009                                     1.169 1.015                                   1.177   1.025
+                                                                                                                                                                                                                                          1.05
+
+
+                     30mN/kW   s/d 3
+                                   4
+                                                                                                                                                                                                                                          NaN
+
+                                       3     4      5       6         7   8   9    10    3       4       5      6        7   8   9   10    3      4      5      6      7   8   9   10    3       4       5       6      7   8   9   10
+                                                                L/d                                                    L/d                                          L/d                                              L/d
+
+
+
+                     Fig. 16 T/D for a range of spacecraft geometries, T/P, and β for an ABEP spacecraft with Vb=500 V,
+                     ηm=0.85,ηin=0.35, and γ=1. Cases with T/D<1 are blacked out
+
+
+
+
+                   average of the total spacecraft drag with the solar arrays deployed and the total drag with
+                   the solar arrays retracted:
+
+                          D = (1 − fE )DSA Deployed + fE DSA Retracted                                                                                                                                                                   (26)
+
+                     where the weighting factor fE is the eclipse period computed from a beta angle analy-
+                   sis. Retracting solar arrays reduces minimum operating altitude by up to 10km for geom-
+                   etries with large solar arrays. The added mass and complexity of actuated solar arrays
+                   may outweigh the relatively minor benefits. Additionally, atmospheric density is usually
+                   reduced on the eclipse side of the Earth further reducing the benefit of retracting the
+                   solar arrays during eclipse periods. Equation 26 is only valid for circular orbits. Elliptical
+                   orbits may benefit more from retracting the solar arrays for certain portions of the orbit,
+                   but that analysis is outside the scope of this study.
+
+                   Comparison between conventional EP and ABEP
+                   Conventional EP spacecraft operating in VLEO can be analyzed using the drag model
+                   from Drag model section, and propellant requirements can be determined from mis-
+                   sion lifetime and drag compensation requirements. The parametric analysis in Param-
+                   eter sweep section shows that a spacecraft with L/d = 6 and s/D=2 is found to perform
+                   well. A 6U ABEP CubeSat shown in Fig. 17 can be directly compared to a conventional
+                   EP 6U spacecraft using the same bus. This analysis is similar to the analysis of a high ΔV
+                   CubeSat [51].
+
+                   6U cubeSat with conventional EP
+                   A total volume of 6U is provided by the spacecraft bus, and the subsystem layout is
+                   shown in Fig. 18. The propulsion unit is assumed to occupy 1.6U of volume based on
+                   commercial CubeSat EP thrusters [52]. COMMS, ADCS, and EPS are estimated to
+                   occupy 1.5U of volume in the spacecraft [51]. EPS mass is estimated to be 0.14 kg [53].
+                   This leaves 2.9U for propellant and payload. The propellant tank is assumed to be at
+Crandall and Wirz ﻿Journal of Electric Propulsion   (2022) 1:12                                                                    Page 19 of 31
+
+
+
+
+                     Fig. 17 6U CubeSat (10 cm ×10 cm ×60 cm, s=20 cm). The ABEP variation has the air inlet on the front as
+                     shown. The conventional EP case has a flat front. Both configurations have similar drag
+
+
+
+
+                   a temperature of 322 K and pressure of 161 bar [51]. As the propellant requirements
+                   grow, the propellant tank grows as a sphere until it is 9 cm in diameter, then it becomes
+                   stretched to become a cylinder [51].
+                     Figure 19 shows the effect on payload volume vs spacecraft altitude and mission lifetime.
+                   At lower altitudes, the remaining payload volume decreases until there is no payload volume
+
+
+
+
+                     Fig. 18 Block diagram of the subsystem layout in the 6U EP spacecraft. As propellant requirements increase,
+                     the propellant tank grows, reducing payload volume
+Crandall and Wirz ﻿Journal of Electric Propulsion   (2022) 1:12                                                                    Page 20 of 31
+
+
+
+
+                     Fig. 19 Payload volume of the 6U CubeSat operating in VLEO with a 2000 s Isp EP propulsion system. The kink
+                     seen at 2U payload volume is where the propellant tank switches from expanding as a sphere to stretching
+                     as a cylinder
+
+
+
+
+                     Fig. 20 Wet mass of the 6U CubeSat operating in VLEO with a 2000 s Isp EP propulsion system. The CubeSat
+                     has a dry mass of 5.3 kg not including propellant tank mass
+
+
+
+                   remaining and the spacecraft reaches its minimum altitude. The lifetimes shown in Fig. 19
+                   are in agreement with previous studies [9, 13] Similarly to high ΔV spacecraft, thruster Isp has
+                   a major impact on propellant requirements. Spacecraft wet mass increases at lower altitudes
+                   and longer mission lifetimes due to the increased propellant mass required for low altitude
+                   and long mission lifetimes. The 6U reference spacecraft has an estimated 5.3 kg dry mass
+                   not including propellant tank mass. Figure 20 shows how wet mass increases with increasing
+                   mission lifetime and decreasing operating altitude. The reference spacecraft can collect 96
+                   W at peak solar power. For orbits that are not sun-synchronous with low β angles, the mean
+                   power collected is reduced by eclipse periods and non-optimal solar array pointing as shown
+                   in Power model section. Lower altitude orbits require more thruster power to compensate
+Crandall and Wirz ﻿Journal of Electric Propulsion   (2022) 1:12                                                              Page 21 of 31
+
+
+
+
+                     Fig. 21 Power available to the payload and other subsystems for a 6U CubeSat operating in VLEO with a
+                     T/P=30 mN/kW EP propulsion system [52]
+
+
+
+
+                     Fig. 22 Block diagram of the 6U ABEP CubeSat Layout. This layout is similar to ABEP CubeSat layouts
+                     described by Jackson [14]
+
+
+
+
+                   for drag leaving less power available to the payload and other systems. Figure 21 shows the
+                   remaining power available to the spacecraft for a variety of orbit types. Lower altitude orbits
+                   leave very little power remaining for subsystems, and the power limited minimum altitude is
+                   considered where all of the available power is sent to the propulsion system to compensate
+                   for drag and the remaining power is zero. In practice, the minimum operating altitude will be
+                   above the power limited minimum altitude due to power draws from other subsystems.
+
+                   6U ABEP CubeSat
+                   The same 6U bus is now investigated for an ABEP propulsion system. Again, the bus pro-
+                   vides 6U of total volume with 1.5U allotted to electronics and 1.6U allotted to the pro-
+                   pulsion unit. The air handling system (AHS) includes the inlet and a tube that runs the
+                   length of the spacecraft to deliver air from the inlet in the front of the spacecraft to the
+Crandall and Wirz ﻿Journal of Electric Propulsion      (2022) 1:12                                                         Page 22 of 31
+
+
+
+
+                   Table 2 Conventional EP (240 km, 3 year mission life) and ABEP Allocated Mass Budgets
+                   Subsystem                         Component                       Conventional EP           ABEP
+                                                                                     Mass (kg)                 Mass (kg)
+
+                   Propulsion
+                                                     Thruster System                 1.40                      1.40
+                                                     Tank                            0.34                      –
+                                                     Plumbing & Flow Control         0.20                      –
+                                                     Propellant                      0.68                      –
+                                                     AHS                             –                         0.32
+                   Structure
+                                                     Primary Structure               1.10                      1.10
+                                                     10x10 cm Panels                 0.70                      0.70
+                                                     Brackets                        0.15                      0.15
+                   Power
+                                                     EPS                             0.14                      0.14
+                                                     Battery                         0.15                      0.15
+                                                     Solar Panels                    0.80                      0.80
+                   ADCS
+                                                     Integrated ADCS Board           0.62                      0.62
+                   Thermal                                                           0.15                      0.15
+                   CDH
+                                                     CDH Board                       0.10                      0.10
+                   COMM
+                                                     COMM Board                      0.10                      0.10
+                                                     Antenna                         0.10                      0.10
+                   20% Contingency                                                   1.35                      1.17
+                   15% Margin                                                        1.21                      1.05
+                   Total                                                             9.29                      8.05
+
+
+
+                   Table 3 Conventional EP (240km, 3 year mission life) and ABEP Allocated Volume Budgets
+                   Subsystem                        Component                  Conventional EP             ABEP
+                                                                               Volume (U)                  Volume (U)
+
+                   Propulsion
+                                                    Thruster System            1.6                         1.6
+                                                    Tank                       1.7                         –
+                                                    AHS                        –                           0.5
+                   Bus                                                         1.5                         1.5
+                   Payload                                                     1.2                         2.4
+                   Total                                                       6                           6
+
+
+
+
+                   thruster in the back as shown in Fig. 22. ABEP spacecraft designers will need to take the
+                   AHS into consideration when planning spacecraft layout. AHS volume was estimated
+                   to be 0.54U. The remaining payload volume is then determined to be a constant 2.36U.
+                   The mass of the spacecraft is estimated using data from [51, 52] to be 8.05 kg including a
+                   standard mass margin [54]. ABEP spacecraft are lighter and less complicated than con-
+                   ventional EP spacecraft operating at similar altitudes since ABEP does not require heavy
+Crandall and Wirz ﻿Journal of Electric Propulsion    (2022) 1:12                                                                     Page 23 of 31
+
+
+
+
+                     Fig. 23 Power remaining for spacecraft subsystems and payload. At lower altitudes more power must be
+                     supplied to the propulsion system to compensate for drag. At low β average power collected is significantly
+                     reduced due to long eclipse periods and high cosine losses
+
+
+
+
+                     Fig. 24 Power limited minimum perigee altitude for SuLPO orbits. T/P = 10 mN/kW, Apogee = 300 km, and
+                     s/d = 2 unless otherwise stated in the figure. These figures assume β=90∘
+
+
+
+
+                   propellant, tankage or plumbing. Tables 2 and 3 show the complete mass and volume
+                   allocation for both the ABEP and conventional EP 6U reference spacecraft.
+                     Figure 23 shows the remaining power available to the payload and other onboard sys-
+                   tems. The minimum altitude is where the power available goes to zero and the spacecraft
+                   sends all available power to the propulsion system. High β orbits are favorable to provide
+                   larger amounts of power to the spacecraft and allow for lower altitude operation.
+
+                   Super low perigee orbit analysis
+                   The power limited minimum altitude of a SuLPO spacecraft can be found using an
+                   energy balance between the average power collected on orbit and the energy lost to drag
+                   over the orbit:
+                          T              T
+                               P̄ dt =         Drag ∗ u dt                                                                    (27)
+                           0               0
+
+                     Where P ̄ is given by Eq. 23 and drag is given by Eq. 17. Figure 24 shows the power lim-
+                   ited minimum altitude for a range of geometries and apogee altitudes. SuLPO can have
+Crandall and Wirz ﻿Journal of Electric Propulsion   (2022) 1:12                                                                 Page 24 of 31
+
+
+
+
+                     Fig. 25 Instantaneous power required for SuLPO orbits with perigee altitudes of 140, 150, and 160 km and
+                     apogee at 300 km. The spacecraft bus is 50 cm ×50 cm ×250 cm. SuLPO spacecraft will need advanced
+                     high-power propulsion and power processing systems
+
+
+
+                   extreme instantaneous power requirements as shown in Fig. 25. These instantaneous
+                   power requirements can limit the minimum altitude above the energy limited minimum
+                   altitude. Advanced, high-power propulsion technologies such as capacitor driven MPD
+                   thrusters may be desirable for SuLPO missions.
+
+                   Discussion
+                   The model results show that ABEP spacecraft can provide a unique and desirable mis-
+                   sion capability for VLEO below 250 km. In contrast, conventional EP is favorable for
+                   shorter mission lifetimes at higher altitudes. The primary restrictions for EP for lower
+                   altitudes and longer mission lifetimes is due to propellant tank volume significantly
+                   reducing usable payload volume, as well as increasing overall mass of the spacecraft.
+                   Therefore, high Isp EP is still the favorable choice for moderate mission lengths at higher
+                   altitudes. At lower altitudes and longer mission lifetimes, ABEP provides more payload
+                   volume than conventional EP, albeit less payload power. At lower altitudes ABEP is lim-
+                   ited to high β orbits due to a combination of long eclipse times and SA cosine losses.
+                   Sun-synchronous orbits offer the highest ABEP performance, but as low as β=30∘ orbits
+                   are still viable for low-power payloads. β=0 offers the worst ABEP performance and
+                   mission designers should avoid these orbits if possible.
+                     Spacecraft with high L/d and large solar arrays are favorable for ABEP spacecraft
+                   allowing them to collect large amounts of power to feed the propulsion system. There is a
+                   limit to the maximum wetted area of the spacecraft as the thrust is fixed for a given pro-
+                   pulsion system and inlet area, and spacecraft designers must check to ensure that their
+                   spacecraft geometry can achieve T/D≥1. Higher T/D may be desirable to ensure space-
+                   craft survivability at higher-than-expected atmospheric density or to allow for improved
+                   maneuverability. A linear 6U form factor with a 2 panel SA was determined to perform
+                   well for an ion thruster based ABEP system offering a T/D=1.35 and a minimum altitude
+                   of 179 km in a SSO. HET based ABEP systems benefit from improved T/P relative to ion
+                   thrusters but suffer from reduced thrust due to the reduced effective exhaust velocity.
+Crandall and Wirz ﻿Journal of Electric Propulsion   (2022) 1:12                                                         Page 25 of 31
+
+
+
+
+                   A 4U spacecraft with 1 solar array panel offers the best performance for a HET ABEP
+                   system with T/D=1.27 and a minimum altitude of 161 km in an SSO. Larger spacecraft
+                   with the same geometry scaling provide the same performance provided that the pro-
+                   pulsion system offers the same T/P. Larger propulsion systems typically provide higher
+                   efficiency which could improve ABEP performance for larger spacecraft.
+                      Compression ratio is a concern for operating ABEP thrusters as a minimum gas den-
+                   sity must be maintained inside the thruster for proper operation. This gas density limit
+                   constrains the range of possible inlet efficiencies and also sets an upper altitude limit on
+                   ABEP operation as described in [17]. Deterioration of ABEP thruster components is a
+                   concern due to the highly reactive propellant, and oxygen resistant materials must be
+                   chosen to resist thruster erosion. Lotz performed grid erosion measurements a modi-
+                   fied RIT-10 thruster and measured minimal erosion with titanium grids over a 500 hour
+                   test. Extended lifetime testing and accurate grid modeling is required to ensure thruster
+                   operation for longer durations.
+                      ABEP performance can be improved with higher T/P propulsion, improved SA effi-
+                   ciency, low drag materials, and highly efficient inlet designs. Higher T/P enables lower
+                   altitude operation for ABEP spacecraft and leaves more power for the payload as less
+                   power is required to maintain the orbit. Figure 10 shows the dependence of minimum
+                   operating altitude on thruster T/P. HET based ABEP offers higher T/P than gridded
+                   ion ABEP, but ABEP HETs are limited to smaller bus sizes due to the reduced effec-
+                   tive exhaust velocity. Improved solar array efficiency is desirable for almost every space
+                   mission, but ABEP missions benefit by having more power available to the propulsion
+                   system and enabling lower altitude operation. Figure 26 shows the minimum operating
+                   altitude of an example 6U spacecraft with increasing solar cell efficiency. Low drag mate-
+                   rials offer reductions in skin friction drag by retaining a low accommodation coefficient
+                   in VLEO altitudes and are currently being investigated by ESA’s SOAR spacecraft [33].
+
+
+
+
+                     Fig. 26 Power limited minimum operating altitude for an ABEP spacecraft with T/P = 10 mN/kW with
+                     varying solar array efficiency
+Crandall and Wirz ﻿Journal of Electric Propulsion   (2022) 1:12                                                           Page 26 of 31
+
+
+
+
+                     Fig. 27 Power limited minimum operating altitude for an ABEP spacecraft with T/P = 10 mN/kW with
+                     varying accommodation coefficients. An accommodation coefficient of 0 leads to CD� = 0 and no skin
+                     friction drag. The remaining drag is due to frontal area drag
+
+
+
+
+                   Decreasing accommodation coefficient can facilitate up to a 25 km decrease in operating
+                   altitude as shown in Fig. 27. Low drag materials also decrease propellant requirements
+                   for low-altitude conventional EP spacecraft. Improvements to inlet efficiency provides
+                   higher propellant flow rates to the ABEP propulsion system improving T/D. Increas-
+                   ing ηin from 35% to 45% increases T/D from 1.4 to 1.8 for the 6U reference spacecraft
+                   (Vb=1500 V). Higher T/D improves spacecraft maneuverability and improves perfor-
+                   mance for aerodynamic attitude control and orbital maneuvers.
+
+                   Conclusion
+                   A model was developed to determine ABEP spacecraft performance based on spacecraft
+                   geometry and propulsion performance for VLEO orbits. It was found that spacecraft
+                   performance is not directly dependent on overall spacecraft size but rather on important
+                   non-dimensional geometric ratios such as spacecraft length-to-diameter (L/d) and solar
+                   array span to spacecraft diameter (s/d). Power collected on orbit was shown to be heavily
+                   dependent on β angle, leading to up to 70% reductions in average power collected from
+                   the SSO case for a VLEO spacecraft. The major drivers of ABEP spacecraft performance
+                   were shown to be T/D,ηin,L/d, and s/d. A parametric sweep was applied to find geom-
+                   etries which lead to the lowest operating altitude. Given a geometry optimized for low
+                   altitude operation, increasing T/P is the most fruitful way to further reduce the mini-
+                   mum operating altitude. Implementing high-efficiency solar arrays and low drag materi-
+                   als decreases minimum operating altitude as well, but not as significantly as T/D.
+Crandall and Wirz ﻿Journal of Electric Propulsion   (2022) 1:12                                               Page 27 of 31
+
+
+
+
+                     ABEP CubeSat performance was compared with a conventional EP CubeSat with the
+                   same bus geometry to determine mission scenarios which favor ABEP over conventional
+                   EP. It was found that for missions of 3 years or longer, payload volume becomes severely
+                   reduced for EP spacecraft below 240 km and ABEP spacecraft become favorable, which
+                   is in agreement with previous studies [13]. An eccentric orbit type with perigee below
+                   about 160 km, Super Low Perigee Orbits (SuLPO), were presented and characterized
+                   as an advanced ABEP mission design. SuLPO missions present a difficult technical
+                   challenge due to the high peak power requirements on the order of multiple kWs, but
+                   SuLPO may prove to be favorable for certain applications as ABEP and spacecraft power
+                   technology matures.
+
+                   Nomenclature
+                   Acronyms
+
+                   ABEP Air-Breathing Electric Propulsion
+                   ADCS Attitude Determination and Control System
+                   AHS Air Handling System
+                   COMMS Communication Subsystems
+                   COTS Commercial Off-the-Shelf
+                   DSMC Direct Simulation Monte Carlo
+                   EP Electric Propulsion
+                   EPS Electrical Power System
+                   ESA European Space Agency
+                   GOCE Gravity Field and Steady-State Ocean Circulation Explorer
+                   HET Hall Effect Thruster
+                   JAXA Japan Aerospace Exploration Agency
+                   LEO Low Earth Orbit
+                   SLATS Super Low Altitude Test Satellite (Tsubame)
+                   SuLPO Super Low Perigee Orbit
+                    U A 10cm x 10cm x 10cm “Unit”
+                   VLEO Very Low Earth Orbit
+
+                      Variables
+
+                          A area, m­ 2
+                          a semimajor axis, km
+                          Ap geomagnetic index
+                          c effective exhaust velocity, m/s
+
+                          c ̄ mean thermal velocity, m/s
+                          CD drag coefficient
+
+                          Cs mass fraction
+                          D drag, N
+                          d diameter, m
+                          ΔV change in velocity, km/s
+                          E total specific orbital energy, J/kg
+Crandall and Wirz ﻿Journal of Electric Propulsion   (2022) 1:12                                     Page 28 of 31
+
+
+
+
+                          fE eclipse fraction
+                          h altitude, km
+                          I0 incident solar flux, W/m2
+                          Isp specific impulse, s
+                          kb Boltzmann Constant, J/K
+                          Kn Knudesn Number
+                          L length, m
+                          M mean molecular mass, kg
+                          ṁ mass flow rate, kg/s
+                          n number density, m −3
+                          Ṅ particle flow rate, s −1
+                          P Power, W
+                          q electron charge, coulombs
+                          R radius of the Earth, km
+                          S speed ratio
+                          s solar array length
+                          T thrust, N
+                          t thickness, m
+                          Tth thruster temperature, K
+                          u flow velocity, m/s
+                          Va most probable thermal velocity, m/s
+                          Vb beam voltage, V
+                          Vw wall thermal velocity, m/s
+                          α angle of attack, rad
+                          β orbit beta angle, rad
+                          η efficiency
+                          μ Earth gravitational parameter, ­km3s −2
+                          ν mean anomaly, rad
+                          φ transparency
+                          ψ angle between the spacecraft velocity vector and the solar vector
+                          ρ density, kg/m3
+                          σ accommodation coefficient
+                          σn normal direction accommodation coefficient
+                          σt tangential direction accommodation coefficient
+                          θ angle between the solar vector and SA normal, rad
+                          Θ line-of-sight open area fraction
+                          ζ factor for contribution of collisions to collected particle flow rate
+
+                      Subscripts
+
+                      a ambient
+                      b assembly
+                      c spacecraft body
+                      d beginning of life
+                      e solar cell
+Crandall and Wirz ﻿Journal of Electric Propulsion       (2022) 1:12                                                                               Page 29 of 31
+
+
+
+
+                      f effective
+                      g exhaust
+                      h ion
+                      i inlet
+                      j freestream conditions
+                      k mass
+                      l maximum
+                      m neutral
+                      n parallel to the freestream
+                      o perpendicular to the freestream
+                      p reflected
+                      q solar array
+                      r seed gas
+                      s thermal
+                      t transmitted
+
+                   Code availability
+                   Custom scripts were used for the presented analysis, and are available from the corresponding author on reasonable
+                   request. Systems Toolkit by Analytical Graphics was used to confirm custom script results where stated.
+
+
+                   Authors’ contributions
+                   All authors contributed to the study conception and design. Material preparation and analysis were performed by Patrick
+                   Crandall. The first draft of the manuscript was written by Patrick Crandall and all authors commented on previous ver-
+                   sions of the manuscript. All authors read and approved the final manuscript.
+
+                   Funding
+                   This effort was funded by the Air Force Office of Scientific Research (Award No. FA9550-21-1-0067) and The Aerospace
+                   Corporation (University Partnership Program 4600007031).
+
+                   Availability of data and materials
+                   The datasets generated during and/or analysed during the current study are available from the corresponding author on
+                   reasonable request.
+
+
+                   Declarations
+                   Competing interests
+                   The authors declare that they have no competing interests.
+
+                   Received: 16 May 2022 Accepted: 12 July 2022
+
+
+
+
+                   References
+                   1. Crisp, Roberts, Livadiotti, Oiko, Edmondson, Haigh, Huyton, Sinpetru, Smith, Worrall, Becedas, Domínguez, González
+                       (2020) The benefits of very low earth orbit for earth observation missions. Prog Aerosp Sci 117. https://​doi.​org/​10.​
+                       1016/j.​paero​sci.​2020.​100619.
+                   2. Spektor R, Jones KL (2021) A breath of fresh air: Air-scooping electric propulsion in very low earth orbit. Cent Space
+                       Policy Strateg.
+                   3. ESA Earth Observation Portal (2021) GOCE (Gravity Field and Steady-state Ocean Circulation Explorer). https://​direc​
+                       tory.​eopor​tal.​org/​web/​eopor​tal/​satel​lite-​missi​ons/g/​goce. Accessed 09 Nov 2021.
+                   4. Steiger C, Romanazzo M, Emanuelli P, Floberghagen R, Fehringer M (2014) The deorbiting of esa’s gravity mission
+                       goce - spacecraft operations in extreme drag conditions In: 13th International Conference on Space Operations.
+                       American Insititute of Aeronautics and Astronautics, Reston. https://​csps.​aeros​pace.​org/​papers/​game-​chang​er-​
+                       breath-​fresh-​air-​air-​scoop​ing-​elect​ric-​propu​lsion-​very-​low-​earth-​orbit.
+                   5. ESA Earth Observation Portal (2021) SLATS (Super Low Altitude Test Satellite) / Tsubame. https://​direc​tory.​eopor​tal.​
+                       org/​web/​eopor​tal/​satel​lite-​missi​ons/s/​slats. Accessed 09 Nov 2021.
+                   6. Zheng P, Wu J, Zhang Y, Wu B (2020) A comprehensive review of atmosphere-breathing electric propulsion systems.
+                       Int J Aerosp Eng 2020. https://​doi.​org/​10.​1155/​2020/​88118​47.
+Crandall and Wirz ﻿Journal of Electric Propulsion           (2022) 1:12                                                                                       Page 30 of 31
+
+
+
+
+                   7.    Fujita K (2005) Air intake performance of air breathing ion engines. J Jpn Soc Aeronaut Space Sci 52. https://​doi.​org/​
+                         10.​2322/​jjsass.​52.​514.
+                   8.    Lotz B (2013) Plasma physical and material physical aspects of the application of atmospheric gases as a propellant
+                         for ion-thruster of the rit-type. Dissertation, University of Giessen, Gießen.
+                   9.    Shabshelowitz A (2013) Study of rf plasma technology applied to air-breathing electric propulsion. Dissertation,
+                         University of Michigan, Ann Arbor.
+                   10.   Busek Company (2012) Atmospheric Breathing Electric Thruster for Planetary Exploration. https://​www.​nasa.​gov/​
+                         pdf/​63689​9main_​Hohman_​Prese​ntati​on.​pdf. Accessed 09 Nov 2021.
+                   11.   Andreussi T, Cifali G, Giannetti V, Piragino A, Ferrato E, Rossodivita A, Andrenucci M (2017) Development and experi-
+                         mental validation of a hall effect thruster ram-ep concept In: 35th International Electric Propulsion Conference,
+                         IEPC-2017-377. Electric Rocket Propulsion Society, Cleveland.
+                   12.   Parodi P (2019) Analysis and simulation of an intake for air-breathing electric propulsion systems. Dissertation,
+                         University of Pisa, Pisa.
+                   13.   Cara DD, del Amo JG, Santovincenzo A, Dominguez BC, Arcioni M, Caldwell A, Roma I (2007) Ram electric propulsion
+                         for low earth orbit operation: an esa study In: 30th International Electric Propulsion Conference, 2007–162. Univer-
+                         sity of Pisa, Pisa.
+                   14.   Jackson SW (2017) Design of an air-breathing electric thruster for cubesat applications. Dissertation, University of
+                         Colorado, Boulder.
+                   15.   Singh LA (2014) Very low earth orbit propellant collection feasibility assessment. Dissertation, Georgia Institute of
+                         Technology, Atlanta.
+                   16.   Ferrato E, Giannetti V, Piragino A, Andrenucci M, Andreussi T (2019) Development roadmap of sitael’s ram-ep system
+                         In: 36th International Electric Propulsion Conference, IEPC-2019-886. Electric Rocket Propulsion Society, Cleveland.
+                   17.   Tisaev M, Ferrato E, Giannetti V, Paissoni C, Baresi N, Fabris AL, Andreussi T (2022) Air-breathing electric propul-
+                         sion: Flight envelope identification and development of control for long-term orbital stability. Acta Astronaut 191.
+                         https://​doi.​org/​10.​1016/j.​actaa​stro.​2021.​11.​011.
+                   18.   Young M, Muntz EP, Wang J (2001) Maintaining continuous low orbit flight by using in-situ atmospheric gases for
+                         propellant In: Rarefied Gas Dynamics: 22nd International Symposium. American Institute of Physics, Melville.
+                   19.   Vallado DA (2007) Fundamentals of Astrodynamics and Applications. Microcosm Press, Torrance.
+                   20.   (1976) U.S. Standard Atmosphere, 1976.
+                   21.   Jacchia LG (1977) Thermospheric temperature, density, and composition: New models. Technical report, National
+                         Aeronautics and Space Administration. https://​ntrs.​nasa.​gov/​citat​ions/​19770​016704.
+                   22.   Picone JM, Hedin AE, Drob DP (2002) Nrlmsise-00 empirical model of the atmosphere:statistical comparisons and
+                         scientific issues. J Geophys Res 107. https://​doi.​org/​10.​1029/​2002J​A0094​30.
+                   23.   Cefola P, Volkov II, Suevalov VV (2008) Description of the Russian Upper Atmosphere Density Model GOST-2004 In:
+                         37th COSPAR Scientific Assembly, vol. 37, 476. European Space Agency, Paris.
+                   24.   MathWorks (2021) Atmosnrlmsise00. https://​www.​mathw​orks.​com/​help/​aerot​bx/​ug/​atmos​nrlms​ise00.​html.
+                         Accessed 09 Nov 2021.
+                   25.   Walterscheid RL (1989) Solar cycle effects on the upper atmosphere - implications for satellite drag. J Spacecr
+                         Rocket 26. https://​doi.​org/​10.​2514/3.​26089.
+                   26.   National Oceanic and Atmospheric Administration (2021) Penticton 10.7cm Solar Radio Flux. https://​www.​ngdc.​
+                         noaa.​gov/​stp/​space-​weath​er/​solar-​data/​solar-​featu​res/​solar-​radio/​noont​ime-​flux/​penti​cton/​penti​cton_​obser​ved/.
+                         Accessed 09 Nov 2021.
+                   27.   Binder T, Boldini P, Romano F, Herdrich G (2016) Transmission probabilities of rarefied flows in the application of
+                         atmosphere-breathing electric propulsion In: 30th International Symposium on Rarefied Gas Dynamics: RGD 30.
+                   28.   Li Y, Chen X, Li D, Xiao Y, Dai P, Gong C (2015) Design and analysis of vacuum air-intake device used in air-breathing
+                         electric propulsion. Vacuum 120. https://​doi.​org/​10.​1016/j.​vacuum.​2015.​06.​011.
+                   29.   Romano F, Binder T, Herdrich G, Fasoulas S (2015) Air-intake design investigation for an air-breathing electric propul-
+                         sion system In: 34th International Electric Propulsion Conference. Electric Rocket Propulsion Society, Cleveland.
+                   30.   Romano F, Espinosa-Orozco J, Pfeiffer M, Herdrich G, Crisp NH, Roberts PCE, Holmes BEA, Edmondson S, Haigh S,
+                         Livadiotti S, Macario-Rojas A, Oiko VTA, Sinpetru LA, Smith K, Becedas J, Sulliotti-Linner V, Bisgaard M, Christensen
+                         S, Hanessian V, Jensen TK, Nielsen J, Chan Y-A, Fasoulas S, Traub C, García-Almiñana D, Rodríguez-Donaire S, Sureda
+                         M, Kataria D, Belkouchi B, Conte A, Seminari S, Villain R (2021) Intake design for an atmosphere-breathing electric
+                         propulsion system (abep). Acta Astronaut 187. https://​doi.​org/​10.​1016/j.​actaa​stro.​2021.​06.​033.
+                   31.   Zheng P, Wu J, Zhang Y, Zhao Y (2022) Design and optimization of vacuum intake for atmosphere-breathing electric
+                         propulsion (abep) system. Vacuum 195. https://​doi.​org/​10.​1016/j.​vacuum.​2021.​110652.
+                   32.   Moe MM, Wallace SD, Moe K (1995) Recommended drag coefficients for aeronomic satellites. Geophys Monogr
+                         Ser 87. https://​agupu​bs.​onlin​elibr​ary.​wiley.​com/​doi/​abs/​10.​1029/​GM087​p0349.
+                   33.   Crisp NH, Roberts PCE, Livadiotti S, Macario Rojas A, Oiko VTA, Edmondson S, Haigh SJ, Holmes BEA, Sinpetru LA,
+                         Smith KL, Becedas J, Domínguez RM, Sulliotti-Linner V, Christensen S, Nielsen J, Bisgaard M, Chan Y-A, Fasoulas S,
+                         Herdrich GH, Romano F, Traub C, García-Almiñana D, Rodríguez-Donaire S, Sureda M, Kataria D, Belkouchi B, Conte
+                         A, Seminari S, Villain R (2021) In-orbit aerodynamic coefficient measurements using soar (satellite for orbital aerody-
+                         namics research). Acta Astronautica 180:85–99. https://​doi.​org/​10.​1016/j.​actaa​stro.​2020.​12.​024.
+                   34.   Ferrato E, Giannetti V, Tisaev M, Lucca Fabris A, Califano F, Andreussi T (2022) Rarefied flow simulation of conical
+                         intake and plasma thruster for very low earth orbit spaceflight. Front Phys 10:823098. https://​doi.​org/​10.​3389/​fphy.​
+                         2022.​823098.
+                   35.   Parodi P, Quang DL, Bariselli F (2019) Study of a collector-intake system for vleo air-breathing platforms In: Inter-
+                         national Conference on Flight Vehicles, Aerothermodynamics and Re-entry Missions and Engineering (FAR). ESA
+                         Conference Bureau, Noordwijk.
+                   36.   Clyde Space (2020) Solar Panels Photon. https://​www.​aac-​clyde.​space/​wp-​conte​nt/​uploa​ds/​2021/​11/​AAC_​DataS​
+                         heet_​Photon_​origi​nal.​pdf. Accessed 09 Nov 2021.
+                   37.   Panton RL (2013) Incompressible Flow. Wiley. Wiley Publishing, Hoboken.
+Crandall and Wirz ﻿Journal of Electric Propulsion        (2022) 1:12                                                                                 Page 31 of 31
+
+
+
+
+                   38. Prasanth P, Kakkassery J (2006) Direct simulation monte carlo (dsmc): A numerical method for transition-regime
+                       flows - a review. J Indian Inst Sci 86:169.
+                   39. Storch JA (2002) Aerodynamic disturbances on spacecraft in free-molecular flow. https://​apps.​dtic.​mil/​sti/​citat​ions/​
+                       ADA41​0696.
+                   40. Sentman LH (1961) Free molecule flow theory and its application to the determination of aerodynamic forces.
+                       Technical report, Aerospace Corporation, El Segundo, CA. https://​apps.​dtic.​mil/​sti/​citat​ions/​AD026​5409.
+                   41. Schamberg R (1959) Analytic representation of surface interaction for free molecule flow with application to drag of
+                       various bodies. Technical report, RAND Corporation Santa Monica, CA.
+                   42. Pilinski MD, Argrow BM, Palo SE (2010) Semiempirical model for satellite energy-accommodation coefficients. J
+                       Spacecr Rocket 47. https://​doi.​org/​10.​2514/1.​49330.
+                   43. Pardini C, Anselmo L, Moe K, Moe MM (2009) Drag and energy accommodation coefficients during sunspot maxi-
+                       mum. Adv Space Res 45. https://​doi.​org/​10.​1016/j.​asr.​2009.​08.​034.
+                   44. Andreussi T, Ferrato E, Piragino A, Cifali G, Rossodivita A, Andrenucci M (2018) Development and experimental vali-
+                       dation of a hall effect thruster ram-ep concept In: 35th International Electric Propulsion Conference 2017. Electric
+                       Rocket Propulsion Society, Cleveland.
+                   45. Wertz JR, Larson WJ (1999) Space Mission Analysis and Design (Space Technology Library). Springer, Netherlands.
+                   46. Chobotov VA (2002) Orbital Mechanics (AIAA Education Series). American Institute of Aeronautics and
+                       Astronautics, Reston.
+                   47. Analytical Graphics, Inc (2021) Systems Tool Kit (STK). https://​www.​agi.​com/​produ​cts/​stk. Accessed 09 Nov 2021.
+                   48. Busek Company (2021) Hall Thrusters. https://​www.​busek.​com/​hall-​thrus​ters. Accessed 09 Nov 2021.
+                   49. National Aeronautics and Space Administration (2021) Gridded Ion Thrusters (NEXT-C). https://​www1.​grc.​nasa.​gov/​
+                       space/​sep/​gridd​ed-​ion-​thrus​ters-​next-c/. Accessed 09 Nov 2021.
+                   50. Schönherr T, Komurasaki K, Romano F, Massuti-Ballester B, Herdrich G (2015) Analysis of atmosphere-breathing
+                       electric propulsion. IEEE Trans Plasma Sci 43(1):287–294. https://​doi.​org/​10.​1109/​TPS.​2014.​23640​53.
+                   51. Samples S, Wirz R (2021) Parametric analysis of high-delta-v cubesat missions with a miniature ion thruster. J
+                       Spacecr Rocket 58. https://​doi.​org/​10.​2514/1.​A34827.
+                   52. Busek Company (2021) RF Ion Thrusters. https://​www.​busek.​com/​r f-​ion-​thrus​ters. Accessed 09 Nov 2021.
+                   53. Ibeos (2021) Standard Products. https://​www.​ibeos.​com/​stand​ard-​produ​cts. Accessed 09 Nov 2021.
+                   54. (2015) American National Standard Mass Properties Control for Space Systems. American Institute of Aeronautics
+                       and Astronautics, Reston.
+
+
+                   Publisher’s Note
+                   Springer Nature remains neutral with regard to jurisdictional claims in published maps and institutional affiliations.
+
