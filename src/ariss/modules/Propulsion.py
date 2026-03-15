@@ -51,6 +51,15 @@ def _section_perimeter(width: float, height: float, shape_code: str) -> float:
     return 2.0 * (width + height)
 
 
+def _panel_front_area(total_area: float, aspect_ratio: float, thickness: float) -> float:
+    if total_area <= 0.0 or aspect_ratio <= 0.0 or thickness <= 0.0:
+        return 0.0
+    area_each = 0.5 * total_area
+    chord = np.sqrt(area_each / aspect_ratio)
+    span = area_each / chord
+    return 2.0 * span * thickness
+
+
 @dataclass(frozen=True)
 class PropulsionDiagnostics:
     rho: float
@@ -88,12 +97,16 @@ def _drag_reference_area_sum(sc) -> float:
     #   Sum of Cd*A contributions seen by the propulsion balance [m^2].
 
     body_side_area, inlet_side_area = _side_areas(sc.geometry)
-    cd_s_solar = sc.drag.cd_solar * sc.geometry.A_solar
-    cd_s_rad = sc.drag.cd_rad * sc.geometry.A_rad
+    solar_front_area = _panel_front_area(sc.geometry.A_solar, sc.geometry.AR_solar, sc.geometry.t_solar)
+    rad_front_area = _panel_front_area(sc.geometry.A_rad, sc.geometry.AR_rad, sc.geometry.t_rad)
+    cd_s_solar = sc.drag.cd_solar * (2.0 * sc.geometry.A_solar)
+    cd_s_solar_front = sc.drag.cd_solar_front * solar_front_area
+    cd_s_rad = sc.drag.cd_rad * (2.0 * sc.geometry.A_rad)
+    cd_s_rad_front = sc.drag.cd_rad_front * rad_front_area
     cd_s_body = sc.drag.cd_body_side * body_side_area
     cd_s_inlet_side = sc.drag.cd_inlet_side * inlet_side_area
     cd_s_inlet_front = sc.drag.cd_inlet_front * sc.geometry.A_in_drag
-    return cd_s_solar + cd_s_rad + cd_s_body + cd_s_inlet_side + cd_s_inlet_front
+    return cd_s_solar + cd_s_solar_front + cd_s_rad + cd_s_rad_front + cd_s_body + cd_s_inlet_side + cd_s_inlet_front
 
 
 def _update_refueling_capture(sc, exhaust_velocity: float) -> None:
@@ -149,6 +162,9 @@ def _update_orbit_from_density(sc) -> None:
             msis_date=sc.orbit.msis_date,
             msis_f107=sc.orbit.msis_f107,
             msis_ap=sc.orbit.msis_ap,
+            latitude=sc.orbit.latitude,
+            longitude=sc.orbit.longitude,
+            use_average=sc.orbit.use_average,
         )
     )
 
@@ -231,13 +247,25 @@ def _update_drag_outputs(sc) -> None:
     #   Updates drag forces in place using the current dynamic pressure.
 
     body_side_area, inlet_side_area = _side_areas(sc.geometry)
+    solar_front_area = _panel_front_area(sc.geometry.A_solar, sc.geometry.AR_solar, sc.geometry.t_solar)
+    rad_front_area = _panel_front_area(sc.geometry.A_rad, sc.geometry.AR_rad, sc.geometry.t_rad)
     q = 0.5 * sc.orbit.density * sc.orbit.velocity ** 2
-    sc.drag.drag_solar = q * sc.drag.cd_solar * sc.geometry.A_solar
-    sc.drag.drag_rad = q * sc.drag.cd_rad * sc.geometry.A_rad
+    sc.drag.drag_solar = q * sc.drag.cd_solar * (2.0 * sc.geometry.A_solar)
+    sc.drag.drag_solar_front = q * sc.drag.cd_solar_front * solar_front_area
+    sc.drag.drag_rad = q * sc.drag.cd_rad * (2.0 * sc.geometry.A_rad)
+    sc.drag.drag_rad_front = q * sc.drag.cd_rad_front * rad_front_area
     sc.drag.drag_body_side = q * sc.drag.cd_body_side * body_side_area
     sc.drag.drag_inlet_side = q * sc.drag.cd_inlet_side * inlet_side_area
     sc.drag.drag_inlet_front = q * sc.drag.cd_inlet_front * sc.geometry.A_in_drag
-    sc.drag.drag_total = sc.drag.drag_solar + sc.drag.drag_rad + sc.drag.drag_body_side + sc.drag.drag_inlet_side + sc.drag.drag_inlet_front
+    sc.drag.drag_total = (
+        sc.drag.drag_solar
+        + sc.drag.drag_solar_front
+        + sc.drag.drag_rad
+        + sc.drag.drag_rad_front
+        + sc.drag.drag_body_side
+        + sc.drag.drag_inlet_side
+        + sc.drag.drag_inlet_front
+    )
 
 
 def _update_force_balance_outputs(sc, exhaust_velocity: float) -> None:

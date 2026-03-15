@@ -30,6 +30,9 @@ R_spec = 287.0                    # [J/(kg*K)] Specific gas constant.
 msis_date = "2000-01-01T00:00:00" # [ISO-8601] MSIS reference UTC date.
 msis_f107 = 140.0                 # [sfu] MSIS daily F10.7 solar flux.
 msis_ap = 15.0                    # [-] MSIS Ap geomagnetic index.
+latitude = 0.0                    # [deg] Latitude for point-sampled atmosphere queries.
+longitude = 0.0                   # [deg] Longitude for point-sampled atmosphere queries.
+use_average = false               # [bool] If true, use latitude/longitude-averaged atmosphere.
 
 [geometry]
 S_in = "c"                        # [str] Intake shape code ("c/e" round, "s/r" rectangular).
@@ -57,6 +60,8 @@ A_in_drag = 0                     # [m^2] Intake area producing drag only (non-u
 A_body = 1.1                      # [m^2] Body cross-sectional area.
 A_solar = 0                       # [m^2] Deployable solar-array area.
 A_rad = 0.0                       # [m^2] Radiator area.
+t_solar = 0.0                     # [m] Solar panel thickness for frontal-edge drag.
+t_rad = 0.0                       # [m] Radiator panel thickness for frontal-edge drag.
 L_in = 3.575                      # [m] Intake length along spacecraft axis.
 L_body = 0.825                    # [m] Body length along spacecraft axis.
 X_solar = 2.0                     # [m] Solar panel axial center from thruster-side butt.
@@ -114,13 +119,17 @@ epsilon_therm_rad = 0.9           # [-] Radiator thermal emissivity.
 
 [drag]
 cd_solar = 0.2                    # [-] Solar-panel drag coefficient.
+cd_solar_front = 0.2              # [-] Solar-panel frontal-edge drag coefficient.
 cd_rad = 0.2                      # [-] Radiator drag coefficient.
+cd_rad_front = 0.2                # [-] Radiator frontal-edge drag coefficient.
 cd_body_side = 0.2                # [-] Body-side drag coefficient.
 cd_inlet_side = 0.2               # [-] Inlet-side drag coefficient.
 cd_inlet_front = 0.2              # [-] Inlet-front drag coefficient.
 drag_total = 1.0                  # [N] Total aerodynamic drag force.
 drag_solar = 0.2                  # [N] Solar drag force contribution.
+drag_solar_front = 0.2            # [N] Solar frontal-edge drag force contribution.
 drag_rad = 0.2                    # [N] Radiator drag force contribution.
+drag_rad_front = 0.2              # [N] Radiator frontal-edge drag force contribution.
 drag_body_side = 0.2              # [N] Body-side drag force contribution.
 drag_inlet_side = 0.2             # [N] Inlet-side drag force contribution.
 drag_inlet_front = 0.2            # [N] Inlet-front drag force contribution.

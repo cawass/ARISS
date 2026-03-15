@@ -24,8 +24,12 @@ from contextlib import redirect_stdout
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[2]
-CONFIG_DIR = Path(__file__).parent / "configs"
+ROOT = Path(__file__).resolve().parents[3]
+CONFIG_DIR = (
+    Path(__file__).parent / "configs"
+    if (Path(__file__).parent / "configs").exists()
+    else ROOT / "tests" / "Verification" / "configs"
+)
 XLSX_PATH = Path(__file__).parent / "sweep_results.xlsx"
 
 
@@ -50,7 +54,7 @@ def run_sweep_cases(config_dir: Path, max_iterations: int, mass_tolerance: float
     try:
         for config in configs:
 
-            sc = SpacecraftState.from_toml(r"src\ariss\core\base_config.toml")
+            sc = SpacecraftState.from_toml(ROOT / "src" / "ariss" / "core" / "base_config.toml")
             sc.update_from_toml(config)
 
             with redirect_stdout(io.StringIO()):

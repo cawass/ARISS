@@ -99,6 +99,9 @@ class OrbitState:
     msis_date: str = "2000-01-01T00:00:00"  # [UTC ISO-8601] Input: atmosphere model timestamp.
     msis_f107: float = 140.0  # [sfu] Input: solar radio flux index for the atmosphere model.
     msis_ap: float = 15.0  # [-] Input: geomagnetic activity index for the atmosphere model.
+    latitude: float = 0.0  # [deg] Input: latitude used for point-sampled atmosphere queries.
+    longitude: float = 0.0  # [deg] Input: longitude used for point-sampled atmosphere queries.
+    use_average: bool = False  # [bool] Input: if true, use a latitude/longitude-averaged atmosphere.
 
 
 @dataclass(frozen=False)
@@ -134,6 +137,8 @@ class GeometryState:
     A_body: float = 0.5  # [m^2] Input/derived: spacecraft body frontal area.
     A_solar: float = 5  # [m^2] Input: total deployed solar array area.
     A_rad: float = 0.0  # [m^2] Input/derived: total radiator area.
+    t_solar: float = 0.0  # [m] Input: solar panel thickness used for frontal-edge drag.
+    t_rad: float = 0.0  # [m] Input: radiator panel thickness used for frontal-edge drag.
 
     L_in: float = 2.5  # [m] Input: intake length along the spacecraft axis.
     L_body: float = 2.5  # [m] Input: body length along the spacecraft axis.
@@ -243,14 +248,18 @@ class DragState:
     """Drag coefficients and force outputs for each exposed surface."""
 
     cd_solar: float = 0.2  # [-] Derived: solar array drag coefficient.
+    cd_solar_front: float = 0.2  # [-] Derived: solar array frontal-edge drag coefficient.
     cd_rad: float = 0.2  # [-] Derived: radiator drag coefficient.
+    cd_rad_front: float = 0.2  # [-] Derived: radiator frontal-edge drag coefficient.
     cd_body_side: float = 0.2  # [-] Derived: body-side drag coefficient.
     cd_inlet_side: float = 0.2  # [-] Derived: inlet-side drag coefficient.
     cd_inlet_front: float = 0.2  # [-] Derived: inlet-front drag coefficient.
 
     drag_total: float = 1  # [N] Derived: total aerodynamic drag force.
     drag_solar: float = 0.2  # [N] Derived: solar array drag force.
+    drag_solar_front: float = 0.2  # [N] Derived: solar array frontal-edge drag force.
     drag_rad: float = 0.2  # [N] Derived: radiator drag force.
+    drag_rad_front: float = 0.2  # [N] Derived: radiator frontal-edge drag force.
     drag_body_side: float = 0.2  # [N] Derived: body-side drag force.
     drag_inlet_side: float = 0.2  # [N] Derived: inlet-side drag force.
     drag_inlet_front: float = 0.2  # [N] Derived: inlet-front drag force.

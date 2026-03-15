@@ -16,11 +16,6 @@
 #  Author:         Carlos Carrasco Requejo
 #
 #  Notes:
-#      Refactor performed to:
-#        - enforce true equal-scale 3D axes in Matplotlib,
-#        - reduce repeated panel-drawing logic,
-#        - remove unused helper functions,
-#        - add comments around the less obvious geometry/plotting paths.
 # ============================================================================
 
 from __future__ import annotations
@@ -45,18 +40,11 @@ from matplotlib import cm, colors
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-try:  # pragma: no cover - UI optional in test environments
-    import tkinter as tk
-    from tkinter import ttk
-except Exception:  # pragma: no cover
-    tk = None
-    ttk = None
+import tkinter as tk
+from tkinter import ttk
 
-from ariss.core.simulation import (
-    compute_drag_diagnostics,
-    load_spacecraft_from_base_config,
-    run_sizing_loop,
-)
+
+from ariss.core.simulation import (compute_drag_diagnostics,load_spacecraft_from_base_config,run_sizing_loop)
 from ariss.core.spacecraft import GeometryState, SpacecraftState
 from ariss.modules.Thermal import ThermalDiagnostics, thermal_model
 from ariss.utils import constants as const
@@ -79,25 +67,14 @@ WAKE_NORM = colors.Normalize(vmin=0.0, vmax=1.0)
 
 PlotSpec = tuple[str | Sequence[str], str, bool]
 SpacecraftInput = SpacecraftState | str | PathLike[str]
-DEFAULT_HISTORY_SPECS: list[PlotSpec] = [
-    ("orbit.altitude", "ORBITAL HEIGHT", False),
-    (["power.Power_total", "power.Power_in", "power.Power_body", "power.Power_solar", "power.Power_rad", "power.Power_prop", "power.Power_ADCS", "power.Power_payload", "power.Power_refprop"], "POWER BUDGETS", False),
-    (["mass.Mass_total", "mass.Mass_in", "mass.Mass_body", "mass.Mass_solar", "mass.Mass_rad", "mass.Mass_prop", "mass.Mass_ADCS", "mass.Mass_payload", "mass.Mass_refprop"], "MASS BUDGETS", False),
-    (["geometry.A_body", "geometry.A_in", "geometry.A_in_drag", "geometry.A_prop", "geometry.A_solar", "geometry.L_body", "geometry.L_in"], "KEY GEOMETRY", False),
-]
+DEFAULT_HISTORY_SPECS: list[PlotSpec] = [("orbit.altitude", "ORBITAL HEIGHT", False),(["power.Power_total", "power.Power_in", "power.Power_body", "power.Power_solar", "power.Power_rad", "power.Power_prop", "power.Power_ADCS", "power.Power_payload", "power.Power_refprop"], "POWER BUDGETS", False),(["mass.Mass_total", "mass.Mass_in", "mass.Mass_body", "mass.Mass_solar", "mass.Mass_rad", "mass.Mass_prop", "mass.Mass_ADCS", "mass.Mass_payload", "mass.Mass_refprop"], "MASS BUDGETS", False),(["geometry.A_body", "geometry.A_in", "geometry.A_in_drag", "geometry.A_prop", "geometry.A_solar", "geometry.L_body", "geometry.L_in"], "KEY GEOMETRY", False),]
 
 ATMOSPHERE_SPECS: list[PlotSpec] = [("orbit.altitude", "ALTITUDE", False), ("orbit.density", "DENSITY", True), ("orbit.temperature", "TEMPERATURE", False), ("orbit.molar_mass", "MOLAR MASS", True), ("orbit.velocity", "ORBITAL VELOCITY", False), ("drag.drag_total", "TOTAL DRAG", True)]
-
 BUDGET_SPECS: list[PlotSpec] = [("mass.Mass_total", "TOTAL MASS", False), ("mass.Mass_in", "INLET MASS", False), ("mass.Mass_solar", "SOLAR ARRAY MASS", False), ("power.Power_total", "TOTAL POWER", False), ("power.Power_prop", "PROPULSION POWER", True), ("power.Power_solar", "SOLAR POWER", True)]
-
 DIMENSION_SPECS: list[PlotSpec] = [("geometry.A_in", "INTAKE AREA", False), ("geometry.A_in_drag", "DRAG INTAKE AREA", False), ("geometry.A_prop", "PROPULSIVE AREA", False), ("geometry.A_solar", "SOLAR AREA", False), ("geometry.L_in", "INTAKE LENGTH", False), ("geometry.L_body", "BODY LENGTH", False), ("geometry.AR_in", "INTAKE ASPECT RATIO", False)]
-
 DRAG_SPECS: list[PlotSpec] = [("drag.drag_total", "TOTAL DRAG", True), ("drag.drag_body_side", "BODY SIDE DRAG", True), ("drag.drag_inlet_side", "INLET SIDE DRAG", True), ("drag.drag_inlet_front", "INLET FRONT DRAG", True), ("drag.drag_solar", "SOLAR DRAG", True), ("geometry.A_in_drag", "DRAG INTAKE AREA", False), ("orbit.density", "DENSITY", True)]
-
 POWER_SPECS: list[PlotSpec] = [("power.Power_total", "TOTAL POWER", False), ("power.Power_prop", "PROPULSION POWER", True), ("power.Power_solar", "SOLAR POWER", True), ("geometry.A_solar", "SOLAR ARRAY AREA", False), ("solar.eta_power", "POWER EFFICIENCY", False), ("solar.av_aligment", "ARRAY ALIGNMENT", False)]
-
 PROPULSION_SPECS: list[PlotSpec] = [("geometry.A_prop", "REQUIRED PROPULSIVE AREA", False), ("geometry.A_in", "INTAKE AREA", False), ("geometry.A_in_drag", "DRAG INTAKE AREA", False), ("thruster.power", "POWER REQUIRED", True), ("thruster.thrust", "THRUST", True), ("thruster.m_flow", "PROPELLANT MASS FLOW", True), ("orbit.density", "INFERRED DENSITY", True)]
-
 SIM_BUDGET_SPECS: list[PlotSpec] = [("mass.Mass_total", "TOTAL MASS", False), ("power.Power_total", "TOTAL POWER", False), ("drag.drag_total", "TOTAL DRAG", True), ("drag.drag_inlet_front", "FRONT INLET DRAG", True), ("geometry.A_prop", "PROPULSIVE AREA", False), ("orbit.altitude", "ALTITUDE", False), ("orbit.density", "DENSITY", True)]
 
 
@@ -109,7 +86,6 @@ class _SectionShape:
     semi_z: float
     is_square: bool
 
-
 # ---------------------------------------------------------------------------
 # History and data flattening helpers
 # ---------------------------------------------------------------------------
@@ -119,11 +95,7 @@ def run_sizing_with_history(
     mass_tolerance: float = 1.0e-3,
 ) -> tuple[SpacecraftState, bool, list[SpacecraftState]]:
     """Run the same sizing loop as ``simulation.py`` and retain its history."""
-    return run_sizing_loop(
-        sc,
-        max_iterations=max_iterations,
-        mass_tolerance=mass_tolerance,
-    )
+    return run_sizing_loop(sc, max_iterations=max_iterations, mass_tolerance=mass_tolerance)
 
 
 def _flatten_numeric(prefix: str, value: Any, out: dict[str, float]) -> None:
@@ -1658,6 +1630,9 @@ class _HistoryPlotterUI:
             str(getattr(state.orbit, "msis_date", "2000-01-01T00:00:00")),
             _safe_float(getattr(state.orbit, "msis_f107", 140.0)),
             _safe_float(getattr(state.orbit, "msis_ap", 15.0)),
+            _safe_float(getattr(state.orbit, "latitude", 0.0)),
+            _safe_float(getattr(state.orbit, "longitude", 0.0)),
+            bool(getattr(state.orbit, "use_average", False)),
         )
         cached = self.atmosphere_profile_cache.get(key)
         if cached is not None:
@@ -1669,6 +1644,9 @@ class _HistoryPlotterUI:
             msis_date=key[0],
             msis_f107=key[1],
             msis_ap=key[2],
+            latitude=key[3],
+            longitude=key[4],
+            use_average=key[5],
         )
         cached = {
             "altitude_km": np.asarray(altitude_km, dtype=float),
@@ -1904,6 +1882,9 @@ class _HistoryPlotterUI:
                 msis_date=state.orbit.msis_date,
                 msis_f107=state.orbit.msis_f107,
                 msis_ap=state.orbit.msis_ap,
+                latitude=state.orbit.latitude,
+                longitude=state.orbit.longitude,
+                use_average=state.orbit.use_average,
             )
             profile = self._get_atmosphere_profile(state)
             axes = figure.subplots(2, 1, sharex=True, squeeze=True)

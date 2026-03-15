@@ -147,6 +147,9 @@ def run_sizing_loop(
         msis_date=loop_sc.orbit.msis_date,
         msis_f107=loop_sc.orbit.msis_f107,
         msis_ap=loop_sc.orbit.msis_ap,
+        latitude=loop_sc.orbit.latitude,
+        longitude=loop_sc.orbit.longitude,
+        use_average=loop_sc.orbit.use_average,
     )
     loop_sc = replace(loop_sc, orbit=replace(loop_sc.orbit, **orbit_updates))
 
