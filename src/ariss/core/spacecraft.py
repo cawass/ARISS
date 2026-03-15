@@ -199,6 +199,7 @@ class ThrusterState:
     thrust: float = 0.1039  # [N] Derived: thrust produced by the intake-fed thruster.
     specific_impulse: float = 4500  # [s] Input/derived: thruster specific impulse.
     eff: float = 0.5  # [-] Input: thruster efficiency.
+    thermal_eff: float = 0.8 # [-] Input: thruster thermal efficiency
     power: float = 5000.0  # [W] Input: electrical power available to the thruster.
     propellant_mass: float = 0.0  # [kg/s] Derived: propellant throughput inferred from intake capture.
     m_flow: float = 1e-3  # [kg/s] Derived: thruster propellant mass flow rate.

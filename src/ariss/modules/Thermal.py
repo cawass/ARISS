@@ -28,6 +28,8 @@ class ThermalDiagnostics:
 
     Attributes
     ----------
+    Ae_total: float
+        Total area emissivity product excluding radiators [m2]
     Q_drag : float
         Drag heating [W]
     Q_sun : float
@@ -40,11 +42,8 @@ class ThermalDiagnostics:
         Internal heating [W]
     Q_radiated : float
         Heat radiated by spacecraft excluding radiators [W]
-    T_max : float
-        Maximum experienced temperature
-    T_min : float
-        Minimum experienced temperature
     """
+    Ae_total: float = 0.0
 
     Q_drag: float = 0.0
     Q_sun: float = 0.0
@@ -53,20 +52,33 @@ class ThermalDiagnostics:
     Q_internal: float = 0.0
     Q_radiated: float = 0.0
 
-    T_max: float = 0.0
-    T_min: float = 0.0
-
 
 def thermal_model(sc: SpacecraftState):
     """
-    Thermal model for the spacecraft
-    TODO Elaborate docstring
-    """
+    Thermal model for the spacecraft using a 1-node homogenous temperature assumption.
 
-    # Keep inlet geometry consistent with ratio-mode cases loaded from TOML.
-    if sc.geometry.use_intake_area_ratio:
-        sc.geometry.A_in = sc.geometry.intake_area_ratio * sc.geometry.A_body
-        sc.geometry.A_in_drag = sc.geometry.A_in - sc.geometry.A_prop - sc.geometry.A_ref
+    This function calculates the heat balance for a spacecraft by considering all heat
+    sources (solar radiation, Earth albedo, Earth infrared, internal dissipation, and
+    drag heating) and heat sinks (thermal radiation). It computes the required radiator
+    area to maintain the desired design temperature and provides detailed thermal
+    diagnostics for post-processing and analysis.
+
+    Parameters
+    ----------
+    sc : SpacecraftState
+        The spacecraft state object containing orbital, geometric, thermal, power,
+        and propulsion parameters.
+
+    Returns
+    -------
+    ThermalDiagnostics
+        A dataclass containing detailed thermal outputs
+
+    Updates
+    -----
+    sc : SpacecraftState
+        Updates the sc.geometry.A_rad with the required radiator area [m²]
+    """
 
     # Geometry Calculations
     H_in = np.sqrt(sc.geometry.A_in /  sc.geometry.AR_in) # Intake height
@@ -102,22 +114,22 @@ def thermal_model(sc: SpacecraftState):
     #  Earth infrared heating - assuming side of the spacecraft is hit at 90 degrees
     Q_ir = const.EARTH_IR_EMISSION * np.square((const.EARTH_RADIUS / (const.EARTH_RADIUS + sc.orbit.altitude))) * A_earth * sc.thermal.epsilon_therm_body
     #  Internal heating - due to devices on board
-    Q_internal = sc.power.Power_total - sc.power.Power_prop * sc.thruster.eff - sc.power.Power_refprop * sc.refueling.eta_refuel
+    Q_internal = sc.power.Power_total - sc.power.Power_prop * sc.thruster.thruster_thermal_eff - sc.power.Power_refprop * sc.refueling.eta_refuel
     
     # Heat output at desired temperature excluding potential radiators
     Q_radiated = Ae_total * sc.thermal.T_des**4 * const.STEFAN_BOLTZMANN
 
+    Q_in_total = Q_drag + Q_sun + Q_albedo + Q_ir + Q_internal
     # Final Area - assuming radiators don't absorb anything and back of solar panels are radiators
-    sc.geometry.A_rad = max(((Q_drag + Q_sun + Q_albedo + Q_ir + Q_internal - Q_radiated)/ (const.STEFAN_BOLTZMANN * sc.thermal.T_des**4 * sc.thermal.epsilon_therm_body) - sc.geometry.A_solar)/2, 0.0)
+    sc.geometry.A_rad = max(((Q_in_total - Q_radiated)/ (const.STEFAN_BOLTZMANN * sc.thermal.T_des**4 * sc.thermal.epsilon_therm_rad) - sc.geometry.A_solar)/2, 0.0)
     
     diagnostics = ThermalDiagnostics(
+        Ae_total=Ae_total,
         Q_drag=Q_drag,
         Q_sun=Q_sun,
         Q_albedo=Q_albedo,
         Q_ir=Q_ir,
         Q_internal=Q_internal,
         Q_radiated=Q_radiated,
-        T_max=0.0,
-        T_min=0.0,
     )
-    return diagnostics
+    return diagnostics  
