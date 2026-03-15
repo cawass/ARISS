@@ -4,7 +4,7 @@ Atmospheric Refueling Iterative System Solver.
 
 ARISS is a Python codebase for sizing and evaluating very-low-Earth-orbit spacecraft with a coupled atmosphere, drag, propulsion, power, thermal, refueling, and budget model.
 
-This README is written around the code that is currently in this repository. The commands below are based on the actual entry points in `src/ariss/__main__.py`, the base spacecraft definition in `src/ariss/core/base_config.toml`, and the test and validation layout under `tests/`.
+This README is written for the way this repository is actually used: inside VS Code, with the repository opened as a workspace, a selected Python interpreter, and the main workflows run from the editor, the Test Explorer, or the integrated terminal.
 
 ## What ARISS does
 
@@ -18,13 +18,7 @@ ARISS solves a spacecraft state iteratively. The core loop updates:
 - thermal
 - mass and power budgets
 
-The main solver entry point is:
-
-- `src/ariss/core/simulation.py`
-  - `load_spacecraft_from_base_config(...)`
-  - `run_sizing_loop(...)`
-
-The main subsystem modules live in:
+Main subsystem modules:
 
 - `src/ariss/modules/Drag.py`
 - `src/ariss/modules/Propulsion.py`
@@ -52,47 +46,9 @@ ARISS/
     Validation/              script-style literature and case validations
 ```
 
-## Environment setup
+### Required Python packages
 
-### 1. Work from the repository root
-
-All commands below assume the current working directory is the repo root:
-
-```powershell
-cd C:\Users\carlo\OneDrive\Escritorio\ARISS
-```
-
-### 2. Activate the virtual environment
-
-If you are using the repo-local virtual environment:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-If PowerShell blocks activation, you can still use the Python executable directly:
-
-```powershell
-.\.venv\Scripts\python.exe --version
-```
-
-### 3. Put `src` on `PYTHONPATH`
-
-This repository uses a `src` layout. The safest way to run the CLI and ad hoc scripts is:
-
-```powershell
-$env:PYTHONPATH = "src"
-```
-
-If you do not set this, direct imports such as `import ariss` may fail with:
-
-- `ModuleNotFoundError: No module named 'ariss'`
-
-This is the single most common setup issue.
-
-### 4. Required Python packages
-
-This repository does not currently ship a full installable package definition. In practice, the code expects a Python environment with at least these packages available:
+At minimum, the environment should provide:
 
 - `numpy`
 - `scipy`
@@ -101,158 +57,33 @@ This repository does not currently ship a full installable package definition. I
 - `openpyxl`
 - `pytest`
 
-If `pymsis` is missing, atmosphere-dependent verification and validation runs will skip or fail.
+## Core concepts
 
-### 5. Optional: use a non-GUI backend for plot scripts
+### First run
+For intial testing and characterization with the program, it is recomended to run 
+- `src/ariss/core/simulation_ui.py`
+- `src/ariss/core/simulation.py`
 
-If you only want files written to disk and do not want windows opening:
+You can desing your own spacecraft using the 
+- `src/ariss/core/base_config.py`
 
-```powershell
-$env:MPLBACKEND = "Agg"
-```
+### The spacecraft class
+Every spacecraft in ARISS is represented by `SpacecraftState` in `src/ariss/core/spacecraft.py`.
 
-Do not set `MPLBACKEND=Agg` if you want to use the interactive Tk UI.
+In practice, you do not build this class by hand in Python. You define the spacecraft in a TOML file, and ARISS loads that TOML into the nested dataclasses automatically.
 
-## Quick start
+Important point:
 
-### Run the default simulation
+- `src/ariss/core/base_config.toml` already contains every field
+- a normal case file only overrides the values you want to change
+- many fields are solver outputs, so you usually do not need to edit them directly
 
-```powershell
-$env:PYTHONPATH = "src"
-python -m ariss sim
-```
-
-This loads the default spacecraft from:
-
-- `src/ariss/core/base_config.toml`
-
-### Run a specific spacecraft case override
-
-```powershell
-$env:PYTHONPATH = "src"
-python -m ariss sim tests\Verification\configs\case_cc_equal_area_ar2_fixed_body_ratio.toml
-```
-
-### Get JSON output instead of the text summary
-
-```powershell
-$env:PYTHONPATH = "src"
-python -m ariss sim tests\Verification\configs\case_cc_equal_area_ar2_fixed_body_ratio.toml --json
-```
-
-### Launch the history UI
-
-```powershell
-$env:PYTHONPATH = "src"
-python -m ariss ui
-```
-
-Or with a specific case:
-
-```powershell
-$env:PYTHONPATH = "src"
-python -m ariss ui tests\Validation\Mansur-Full_Model\MansurVerification.toml
-```
-
-### Inspect a spacecraft file
-
-```powershell
-$env:PYTHONPATH = "src"
-python -m ariss spacecraft tests\Verification\configs\case_cc_equal_area_ar2_fixed_body_ratio.toml
-```
-
-## CLI reference
-
-The project currently exposes three CLI commands:
-
-```powershell
-python -m ariss ui
-python -m ariss sim
-python -m ariss spacecraft
-```
-
-### `python -m ariss ui`
-
-Launches the simulation history UI.
-
-Arguments:
-
-- `spacecraft`: optional TOML or JSON path
-- `--max-iterations`
-- `--mass-tolerance`
-
-Example:
-
-```powershell
-$env:PYTHONPATH = "src"
-python -m ariss ui tests\Validation\CrandallWirz2022-Drag_Simplified_Trust\CrandallWirz2022_6U.toml --max-iterations 100
-```
-
-### `python -m ariss sim`
-
-Runs the solver without the UI and prints a compact summary.
-
-Arguments:
-
-- `spacecraft`: optional TOML or JSON path
-- `--max-iterations`
-- `--mass-tolerance`
-- `--json`
-
-Example:
-
-```powershell
-$env:PYTHONPATH = "src"
-python -m ariss sim tests\Validation\Thermodiver-Full_Model\IEPC2025Validation.toml --max-iterations 200 --json
-```
-
-### `python -m ariss spacecraft`
-
-Loads a spacecraft file and prints the resolved dataclass as JSON.
-
-Example:
-
-```powershell
-$env:PYTHONPATH = "src"
-python -m ariss spacecraft tests\Validation\CrandallWirz2022-Drag_Simplified_Trust\CrandallWirz2022_6U.toml
-```
-
-## Spacecraft configuration model
-
-ARISS uses a base-plus-override model.
-
-### Base config
-
-The complete spacecraft definition lives in:
-
-- `src/ariss/core/base_config.toml`
-
-This file defines every field in the `SpacecraftState` hierarchy.
-
-### Case override files
-
-A case file usually overrides only the fields that differ from the base config.
-
-Example location:
-
-- `tests/Verification/configs/case_cc_equal_area_ar2_fixed_body_ratio.toml`
-
-Case files are loaded like this:
-
-1. load `src/ariss/core/base_config.toml`
-2. apply the override file on top of it
-
-This is done by:
-
-- `load_spacecraft_from_base_config(...)` in `src/ariss/core/simulation.py`
-
-### Common sections in TOML files
-
-Typical sections are:
+The top-level TOML tables map directly to the top-level `SpacecraftState` fields:
 
 - `[orbit]`
 - `[geometry]`
 - `[thruster]`
+- `[rate]`
 - `[mass]`
 - `[power]`
 - `[solar]`
@@ -261,242 +92,225 @@ Typical sections are:
 - `[refueling]`
 - `[mission_profile]`
 
-## Using ARISS from Python
+Below is what each section means and the units expected by the code.
 
-The top-level API is in:
+#### `[orbit]`
+Orbital environment and atmosphere settings.
 
-- `src/ariss/__init__.py`
+Main inputs:
 
-Main helpers:
+- `altitude` `[km]`: mission altitude used as the starting orbit altitude
+- `alpha` `[rad]`: incidence angle used by drag and thermal models
+- `p_orb` `[Pa]`: ambient pressure used by the refueling compression model
+- `gamma` `[-]`: gas specific-heat ratio
+- `R_spec` `[J/kg/K]`: specific gas constant
+- `msis_date` `[ISO-8601 UTC string]`: date used for the MSIS atmosphere call
+- `msis_f107` `[sfu]`: F10.7 solar flux
+- `msis_ap` `[-]`: geomagnetic activity index
+- `latitude` `[deg]`: latitude for point-sampled atmosphere queries
+- `longitude` `[deg]`: longitude for point-sampled atmosphere queries
+- `use_average` `[bool]`: if `true`, use a latitude/longitude-averaged atmosphere instead of a single point
 
-- `load_spacecraft(...)`
-- `run_simulation(...)`
-- `plot_simulation_history(...)`
-- `launch_history_ui(...)`
+Mostly solver-derived outputs:
 
-Example:
+- `velocity` `[m/s]`
+- `density` `[kg/m^3]`
+- `temperature` `[K]`
+- `molar_mass` `[kg/mol]`
 
-```python
-from ariss import run_simulation
+#### `[geometry]`
+Body, inlet, solar array, and radiator geometry.
 
-spacecraft, converged, history = run_simulation(
-    sc="tests/Verification/configs/case_cc_equal_area_ar2_fixed_body_ratio.toml",
-    max_iterations=200,
-    mass_tolerance=1e-3,
-)
+Main inputs:
 
-print(converged)
-print(spacecraft.orbit.altitude)
-print(spacecraft.mass.Mass_total)
-```
+- `S_in`, `S_body` `[shape code]`: cross-section type, typically circular/elliptic or square/rectangular
+- `use_intake_area_ratio` `[bool]`: whether to enforce `A_in = intake_area_ratio * A_body`
+- `fixed_body` `[bool]`: whether body area is fixed in ratio mode
+- `intake_area_ratio` `[-]`: intake-to-body frontal area ratio
+- `AR_in`, `AR_body`, `AR_solar`, `AR_rad` `[-]`: aspect ratios
+- `epsilon_in`, `epsilon_body`, `epsilon_solar`, `epsilon_rad`, `epsilon_in_norm` `[-]`: drag accommodation-related coefficients used by the drag model
+- `wake_in`, `wake_body`, `wake_solar`, `wake_radiator` `[-]`: exposed fractions or wake factors
+- `A_in`, `A_body`, `A_solar`, `A_rad` `[m^2]`: frontal or planform areas
+- `t_solar`, `t_rad` `[m]`: panel thicknesses used for frontal-edge drag
+- `L_in`, `L_body` `[m]`: inlet and body lengths
+- `X_solar`, `X_rad` `[m]`: panel/radiator longitudinal placement
 
-If you are running this outside `pytest`, make sure `src` is on `PYTHONPATH`.
+Usually solver-updated:
 
-## Running the UI
+- `A_ref` `[m^2]`: intake area allocated to refueling
+- `A_prop` `[m^2]`: intake area allocated to propulsion
+- `A_in_drag` `[m^2]`: intake area contributing drag only
 
-The interactive UI is implemented in:
+#### `[thruster]`
+Propulsion operating point.
 
-- `src/ariss/core/simulation_ui.py`
+Main inputs:
 
-Safest way to launch it:
+- `specific_impulse` `[s]`
+- `eff` `[-]`: thruster efficiency
+- `thermal_eff` `[-]`: thruster thermal efficiency
+- `power` `[W]`: electrical power delivered to the thruster
 
-```powershell
-$env:PYTHONPATH = "src"
-Remove-Item Env:MPLBACKEND -ErrorAction SilentlyContinue
-python -m ariss ui tests\Validation\CrandallWirz2022-Drag_Simplified_Trust\CrandallWirz2022_6U.toml
-```
+Often solver-updated or checked after the solve:
 
-Notes:
+- `thrust` `[N]`
+- `m_flow` `[kg/s]`
+- `propellant_mass` `[kg/s]`
+- `propulsive_ram_load` `[N]`
+- `refueling_ram_load` `[N]`
+- `required_load` `[N]`
+- `force_residual` `[N]`
 
-- the UI expects an interactive Matplotlib backend
-- `tkinter` must be available in the Python installation
-- if you previously set `MPLBACKEND=Agg`, unset it before launching the UI
+#### `[rate]`
+Sizing-law coefficients used by the budgets model.
 
-## Running verification tests
+Inputs:
 
-The automated verification suite lives under:
+- `R_mass_volume_in` `[kg/m^3]`
+- `R_mass_volume_body` `[kg/m^3]`
+- `R_mass_surface_solar` `[kg/m^2]`
+- `R_mass_surface_rad` `[kg/m^2]`
 
-- `tests/Verification`
+#### `[mass]`
+Subsystem mass bookkeeping.
 
-Main groups:
+Typical direct inputs:
 
-- `Drag`
-- `Power`
-- `Propulsion`
-- `Refueling`
-- `Sizing`
-- `Thermal`
-- `full simulation loop`
+- `Mass_prop` `[kg]`
+- `Mass_ADCS` `[kg]`
+- `Mass_payload` `[kg]`
+- `Mass_refprop` `[kg]`
 
-### Run the full verification suite
+Typically solver-derived:
 
-```powershell
-$env:PYTHONPATH = "src"
-python -m pytest tests\Verification -q
-```
+- `Mass_in`, `Mass_body`, `Mass_solar`, `Mass_rad`, `Mass_total` `[kg]`
 
-### Run one verification module
+#### `[power]`
+Subsystem power bookkeeping.
 
-```powershell
-$env:PYTHONPATH = "src"
-python -m pytest tests\Verification\Propulsion -q
-```
+Typical direct inputs:
 
-### Run one specific file
+- `Power_ADCS` `[W]`
+- `Power_payload` `[W]`
 
-```powershell
-$env:PYTHONPATH = "src"
-python -m pytest tests\Verification\Power\test_power.py -q
-```
+Typically solver-derived:
 
-### About `pytest` path handling
+- `Power_in`, `Power_body`, `Power_solar`, `Power_rad`, `Power_prop`, `Power_refprop`, `Power_total` `[W]`
 
-`pyproject.toml` already configures:
+#### `[solar]`
+Solar conversion and pointing assumptions.
 
-- `testpaths = ["tests"]`
-- `pythonpath = ["src"]`
+Inputs:
 
-So `pytest` usually works even when `PYTHONPATH` is not set. Setting it explicitly is still the safest option for consistency with direct script execution.
+- `av_aligment` `[deg]`: average sun-pointing alignment angle
+- `eta_solar` `[-]`: solar-cell efficiency
+- `eta_power` `[-]`: power-chain efficiency
 
-## Running validation scripts
+#### `[thermal]`
+Thermal design and optical properties.
 
-The validation area is different from verification.
+Inputs:
 
-- `tests/Verification`: automated pass/fail tests
-- `tests/Validation`: script-style reproductions, sweeps, and literature comparisons
+- `T_des` `[K]`: design temperature
+- `alpha_body`, `alpha_solar` `[-]`: absorptivity values
+- `epsilon_therm_in`, `epsilon_therm_body`, `epsilon_therm_solar`, `epsilon_therm_rad` `[-]`: emissivity values
 
-Most validation scripts are not pytest tests. They are regular Python scripts that generate figures or tables.
+#### `[drag]`
+Drag coefficients and drag force outputs.
 
-Validation folders currently include:
+These are usually diagnostic outputs, not primary case inputs.
 
-- `tests/Validation/CrandallWirz2022-Drag_Simplified_Trust`
-- `tests/Validation/EULO-Full_Model`
-- `tests/Validation/GOCEE-Drag`
-- `tests/Validation/Mansur-Full_Model`
-- `tests/Validation/Spacecraft-Sweep`
-- `tests/Validation/Thermodiver-Full_Model`
+Coefficients:
 
-### Example: Crandall and Wirz reduced validation
+- `cd_solar`, `cd_solar_front`, `cd_rad`, `cd_rad_front`, `cd_body_side`, `cd_inlet_side`, `cd_inlet_front` `[-]`
 
-```powershell
-$env:PYTHONPATH = "src"
-$env:MPLBACKEND = "Agg"
-python tests\Validation\CrandallWirz2022-Drag_Simplified_Trust\CrandallWirz2022Validation.py
-```
+Forces:
 
-### Example: individual Crandall and Wirz figure scripts
+- `drag_total`, `drag_solar`, `drag_solar_front`, `drag_rad`, `drag_rad_front`, `drag_body_side`, `drag_inlet_side`, `drag_inlet_front` `[N]`
 
-```powershell
-$env:PYTHONPATH = "src"
-$env:MPLBACKEND = "Agg"
-python tests\Validation\CrandallWirz2022-Drag_Simplified_Trust\CrandallWirz2022_Fig26_SolarEfficiency.py
-python tests\Validation\CrandallWirz2022-Drag_Simplified_Trust\CrandallWirz2022_Fig27_Accommodation.py
-```
+#### `[refueling]`
+Atmospheric collection and tanking settings.
 
-### Example: EULO full-model validation
+Inputs:
 
-```powershell
-$env:PYTHONPATH = "src"
-$env:MPLBACKEND = "Agg"
-python tests\Validation\EULO-Full_Model\EULO.py
-```
+- `coll_eff` `[-]`: useful collection efficiency
+- `t_refuel` `[s]`: time allowed for refueling
+- `eta_refuel` `[-]`: compression efficiency
+- `p_tank` `[Pa]`: tank pressure
+- `V_prop` `[m^3]`: propellant tank volume
 
-### Example: Mansur full-model validation
+Usually solver-updated:
 
-```powershell
-$env:PYTHONPATH = "src"
-$env:MPLBACKEND = "Agg"
-python tests\Validation\Mansur-Full_Model\MansurValidation.py
-```
+- `m_flow` `[kg/s]`: refueling mass flow
 
-### Example: validation sweep to Excel
+#### `[mission_profile]`
+Mission-level settings.
 
-```powershell
-$env:PYTHONPATH = "src"
-python tests\Validation\Spacecraft-Sweep\create_sweep_excel.py
-```
+Inputs:
 
-This writes:
+- `active_refueling` `[bool]`
+- `delta_v` `[m/s]`
 
-- `tests/Validation/Spacecraft-Sweep/sweep_results.xlsx`
+Usually solver-updated:
 
-## Typical workflows
+- `required_fuel` `[kg]`
 
-### Workflow 1: inspect a case and run it
+#### Practical rule
+When creating a new spacecraft case, most of the time you only need to edit:
 
-```powershell
-$env:PYTHONPATH = "src"
-python -m ariss spacecraft tests\Verification\configs\case_cc_equal_area_ar2_fixed_body_ratio.toml
-python -m ariss sim tests\Verification\configs\case_cc_equal_area_ar2_fixed_body_ratio.toml --json
-```
+- `[orbit]`
+- `[geometry]`
+- `[thruster]`
+- `[solar]`
+- `[thermal]`
+- `[refueling]`
+- `[mission_profile]`
 
-### Workflow 2: iterate on the UI
+and sometimes a few direct subsystem masses or powers.
 
-```powershell
-$env:PYTHONPATH = "src"
-Remove-Item Env:MPLBACKEND -ErrorAction SilentlyContinue
-python -m ariss ui tests\Validation\Thermodiver-Full_Model\IEPC2025Validation.toml
-```
+You usually do not need to hand-edit the drag outputs, total mass, total power, or other quantities that ARISS recomputes during the solve.
 
-### Workflow 3: run verification after changing a module
+### Base config + case override
 
-```powershell
-$env:PYTHONPATH = "src"
-python -m pytest tests\Verification\Propulsion -q
-python -m pytest "tests\Verification\full simulation loop" -q
-```
+ARISS uses a base-plus-override model.
 
-### Workflow 4: regenerate validation plots headlessly
+Base spacecraft definition:
 
-```powershell
-$env:PYTHONPATH = "src"
-$env:MPLBACKEND = "Agg"
-python tests\Validation\CrandallWirz2022-Drag_Simplified_Trust\CrandallWirz2022Validation.py
-```
+- `src/ariss/core/base_config.toml`
 
-## Troubleshooting
+Case files usually override only the fields that change.
 
-### `ModuleNotFoundError: No module named 'ariss'`
+Example case:
 
-Cause:
+- `tests/Verification/configs/case_cc_equal_area_ar2_fixed_body_ratio.toml`
 
-- `src` is not on `PYTHONPATH`
-- or the script is being run from the wrong working directory
+Load order:
 
-Fix:
+1. load `base_config.toml`
+2. apply the case override on top of it
 
-```powershell
-cd C:\Users\carlo\OneDrive\Escritorio\ARISS
-$env:PYTHONPATH = "src"
-```
+That logic is implemented in:
 
-### The UI does not open
+- `load_spacecraft_from_base_config(...)` in `src/ariss/core/simulation.py`
 
-Check:
+## Validation folders and what they are for
 
-- `MPLBACKEND` is not set to `Agg`
-- `tkinter` is available
-- you are using `python -m ariss ui ...` from the repo root
+### `CrandallWirz2022-Drag_Simplified_Trust`
 
-### Validation scripts print lots of atmosphere debug lines
+Use this for reduced drag and power-limited validation against Crandall and Wirz style figures.
 
-That comes from the pymsis debug print currently inside the atmosphere helper. For headless batch runs, redirect stdout or use wrapper scripts that already suppress it where needed.
+### `Mansur-Full_Model`
 
-### `pytest tests/Validation` says no tests ran
+Use this for Mansur-style full-model validation and sweeps.
 
-That is expected for this repository. The validation folder contains plot and analysis scripts, not pytest test functions.
+### `EULO-Full_Model`
 
-## Recommended files to know first
+Use this for the integrated EULO validation runs and parameter sweeps.
 
-If you are new to the codebase, read these in order:
+### `GOCEE-Drag`
 
-1. `src/ariss/core/spacecraft.py`
-2. `src/ariss/core/base_config.toml`
-3. `src/ariss/core/simulation.py`
-4. `src/ariss/modules/Drag.py`
-5. `src/ariss/modules/Propulsion.py`
-6. `src/ariss/core/simulation_ui.py`
+Use this for GOCE-like drag validation and drag-coefficient comparisons.
 
-## Current status of the README
+### `Thermodiver-Full_Model`
 
-This README documents how to run the code as it exists now. It does not attempt to describe every modeling assumption in the literature-validation scripts. Those assumptions belong in the validation folders next to the scripts that use them.
+Use this for the IEPC 2025 style integrated validation case.
