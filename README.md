@@ -8,17 +8,7 @@ This README is written for the way this repository is actually used: inside VS C
 
 ## What ARISS does
 
-ARISS solves a spacecraft state iteratively. The core loop updates:
-
-- atmosphere and orbit state
-- drag
-- propulsion
-- refueling
-- power
-- thermal
-- mass and power budgets
-
-Main subsystem modules:
+ARISS solves a spacecraft state iteratively. The main subsystem modules are the following:
 
 - `src/ariss/modules/Drag.py`
 - `src/ariss/modules/Propulsion.py`
@@ -50,12 +40,7 @@ ARISS/
 
 At minimum, the environment should provide:
 
-- `numpy`
-- `scipy`
-- `matplotlib`
-- `pymsis`
-- `openpyxl`
-- `pytest`
+- `numpy`, `scipy`, `matplotlib`, `pymsis`, `openpyxl`, `pytest`, `tkinter`
 
 ## Core concepts
 
@@ -67,7 +52,131 @@ For intial testing and characterization with the program, it is recomended to ru
 You can desing your own spacecraft using the 
 - `src/ariss/core/base_config.py`
 
-### The spacecraft class
+## Spacecraft types
+There are two main clasification of ABEP spacecraft for ARISS, Refueling and Geometry:
+### Refueling
+#### Refueling Spacecraft
+This is any case with:
+
+- `[mission_profile].active_refueling = true`
+
+In this mode, the propulsion model allocates part of the intake to refueling:
+
+- `A_ref` becomes non-zero
+- `refueling.m_flow` is solved
+- the propulsion branch also includes the refueling ram load in the required force balance
+
+You normally configure these cases through:
+
+- `[mission_profile]`
+  - `active_refueling`
+  - `delta_v`
+- `[refueling]`
+  - `coll_eff`
+  - `t_refuel`
+  - `eta_refuel`
+  - `p_tank`
+
+Use this mode when the spacecraft is meant to collect atmospheric mass for storage and later mission use, not just immediate drag compensation.
+
+#### Non-Refuelign Spacecraft
+This is any case with:
+
+- `[mission_profile].active_refueling = false`
+
+In this mode:
+
+- `A_ref = 0`
+- `refueling.m_flow = 0`
+- the intake is only split between useful propulsion capture and drag-only intake area
+
+This is the simpler and more common mode for drag-compensation studies, verification cases, and literature reproductions that do not include tank refill.
+
+### Geometry
+#### Geometry Model 1 - Fixed Body and Free Inlet AR
+This corresponds to:
+
+- `[geometry].use_intake_area_ratio = false`
+
+This is the `free intake` propulsion branch in `src/ariss/modules/Propulsion.py`.
+
+Behavior:
+
+- `A_body` stays as the user-defined body frontal area
+- `A_in` is not imposed by a fixed intake/body ratio
+- the solver finds the useful propulsion area first
+- then it reconstructs the total intake from collection efficiency
+
+Use this when:
+
+- you want the body geometry fixed
+- but you do not want to force the intake to follow a prescribed area ratio
+
+#### Geometry Model 2 - Fixed Body Fixed Inlet AR
+This corresponds to:
+
+- `[geometry].use_intake_area_ratio = true`
+- `[geometry].fixed_body = true`
+
+This is the `fixed body ratio mode` branch in `src/ariss/modules/Propulsion.py`.
+
+Behavior:
+
+- `A_body` is fixed by the case file
+- `A_in` is imposed by:
+  - `A_in = intake_area_ratio * A_body`
+- body and inlet frontal dimensions are therefore fixed by the input case
+- the solver uses collection efficiency to split the fixed intake into:
+  - `A_prop`
+  - `A_ref`
+  - `A_in_drag`
+
+Use this when:
+
+- you want the cleanest fixed-geometry study
+- the intake size should stay tied to the body through a prescribed ratio
+
+This mode has a caveat, an is that as the geometry is over constrained the solver also has to solve for ISP, so in this mode your ISP will change
+
+#### Geometry Model 3 - Free Body Fixed Inlet AR
+This corresponds to:
+
+- `[geometry].use_intake_area_ratio = true`
+- `[geometry].fixed_body = false`
+
+This is the `variable body ratio mode` branch in `src/ariss/modules/Propulsion.py`.
+
+Behavior:
+
+- the intake/body area ratio is fixed
+- but `A_body` is allowed to move
+- the solver reconstructs `A_in`
+- then updates:
+  - `A_body = A_in / intake_area_ratio`
+
+So this mode preserves the ratio, not the absolute body area.
+
+Use this when:
+
+- you want to enforce a geometric scaling rule between body and intake
+- but you want the body size itself to be solved rather than prescribed
+
+#### Circular or Rectangular Intakes
+Cross-section type is controlled by:
+
+- `[geometry].S_in`
+- `[geometry].S_body`
+
+Codes accepted by the geometry utilities:
+
+- round / elliptic:
+  - `"c"`
+  - `"e"`
+- rectangular:
+  - `"s"`
+  - `"r"`
+
+## The spacecraft class
 Every spacecraft in ARISS is represented by `SpacecraftState` in `src/ariss/core/spacecraft.py`.
 
 In practice, you do not build this class by hand in Python. You define the spacecraft in a TOML file, and ARISS loads that TOML into the nested dataclasses automatically.
@@ -94,7 +203,7 @@ The top-level TOML tables map directly to the top-level `SpacecraftState` fields
 
 Below is what each section means and the units expected by the code.
 
-#### `[orbit]`
+### `[orbit]`
 Orbital environment and atmosphere settings.
 
 Main inputs:
@@ -118,7 +227,7 @@ Mostly solver-derived outputs:
 - `temperature` `[K]`
 - `molar_mass` `[kg/mol]`
 
-#### `[geometry]`
+### `[geometry]`
 Body, inlet, solar array, and radiator geometry.
 
 Main inputs:
@@ -141,7 +250,7 @@ Usually solver-updated:
 - `A_prop` `[m^2]`: intake area allocated to propulsion
 - `A_in_drag` `[m^2]`: intake area contributing drag only
 
-#### `[thruster]`
+### `[thruster]`
 Propulsion operating point.
 
 Main inputs:
@@ -161,7 +270,7 @@ Often solver-updated or checked after the solve:
 - `required_load` `[N]`
 - `force_residual` `[N]`
 
-#### `[rate]`
+### `[rate]`
 Sizing-law coefficients used by the budgets model.
 
 Inputs:
@@ -171,7 +280,7 @@ Inputs:
 - `R_mass_surface_solar` `[kg/m^2]`
 - `R_mass_surface_rad` `[kg/m^2]`
 
-#### `[mass]`
+### `[mass]`
 Subsystem mass bookkeeping.
 
 Typical direct inputs:
@@ -185,7 +294,7 @@ Typically solver-derived:
 
 - `Mass_in`, `Mass_body`, `Mass_solar`, `Mass_rad`, `Mass_total` `[kg]`
 
-#### `[power]`
+### `[power]`
 Subsystem power bookkeeping.
 
 Typical direct inputs:
@@ -197,7 +306,7 @@ Typically solver-derived:
 
 - `Power_in`, `Power_body`, `Power_solar`, `Power_rad`, `Power_prop`, `Power_refprop`, `Power_total` `[W]`
 
-#### `[solar]`
+### `[solar]`
 Solar conversion and pointing assumptions.
 
 Inputs:
@@ -206,7 +315,7 @@ Inputs:
 - `eta_solar` `[-]`: solar-cell efficiency
 - `eta_power` `[-]`: power-chain efficiency
 
-#### `[thermal]`
+### `[thermal]`
 Thermal design and optical properties.
 
 Inputs:
@@ -215,7 +324,7 @@ Inputs:
 - `alpha_body`, `alpha_solar` `[-]`: absorptivity values
 - `epsilon_therm_in`, `epsilon_therm_body`, `epsilon_therm_solar`, `epsilon_therm_rad` `[-]`: emissivity values
 
-#### `[drag]`
+### `[drag]`
 Drag coefficients and drag force outputs.
 
 These are usually diagnostic outputs, not primary case inputs.
@@ -228,7 +337,7 @@ Forces:
 
 - `drag_total`, `drag_solar`, `drag_solar_front`, `drag_rad`, `drag_rad_front`, `drag_body_side`, `drag_inlet_side`, `drag_inlet_front` `[N]`
 
-#### `[refueling]`
+### `[refueling]`
 Atmospheric collection and tanking settings.
 
 Inputs:
@@ -243,7 +352,7 @@ Usually solver-updated:
 
 - `m_flow` `[kg/s]`: refueling mass flow
 
-#### `[mission_profile]`
+### `[mission_profile]`
 Mission-level settings.
 
 Inputs:
@@ -255,7 +364,7 @@ Usually solver-updated:
 
 - `required_fuel` `[kg]`
 
-#### Practical rule
+### Practical rule
 When creating a new spacecraft case, most of the time you only need to edit:
 
 - `[orbit]`
@@ -269,29 +378,6 @@ When creating a new spacecraft case, most of the time you only need to edit:
 and sometimes a few direct subsystem masses or powers.
 
 You usually do not need to hand-edit the drag outputs, total mass, total power, or other quantities that ARISS recomputes during the solve.
-
-### Base config + case override
-
-ARISS uses a base-plus-override model.
-
-Base spacecraft definition:
-
-- `src/ariss/core/base_config.toml`
-
-Case files usually override only the fields that change.
-
-Example case:
-
-- `tests/Verification/configs/case_cc_equal_area_ar2_fixed_body_ratio.toml`
-
-Load order:
-
-1. load `base_config.toml`
-2. apply the case override on top of it
-
-That logic is implemented in:
-
-- `load_spacecraft_from_base_config(...)` in `src/ariss/core/simulation.py`
 
 ## Validation folders and what they are for
 
