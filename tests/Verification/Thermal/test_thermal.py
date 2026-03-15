@@ -73,7 +73,7 @@ def test_internal_heating():
     sc.power.Power_prop = 100.0
     sc.power.Power_refprop = 100.0
 
-    sc.thruster.thruster_thermal_eff = 0.8 
+    sc.thruster.thermal_eff = 0.8 
     sc.refueling.eta_refuel = 0.1
 
     diagnostics = thermal_model(sc)
