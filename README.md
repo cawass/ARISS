@@ -8,17 +8,7 @@ This README is written for the way this repository is actually used: inside VS C
 
 ## What ARISS does
 
-ARISS solves a spacecraft state iteratively. The core loop updates:
-
-- atmosphere and orbit state
-- drag
-- propulsion
-- refueling
-- power
-- thermal
-- mass and power budgets
-
-Main subsystem modules:
+ARISS solves a spacecraft state iteratively. The main subsystem modules are the following:
 
 - `src/ariss/modules/Drag.py`
 - `src/ariss/modules/Propulsion.py`
@@ -50,12 +40,7 @@ ARISS/
 
 At minimum, the environment should provide:
 
-- `numpy`
-- `scipy`
-- `matplotlib`
-- `pymsis`
-- `openpyxl`
-- `pytest`
+- `numpy`, `scipy`, `matplotlib`, `pymsis`, `openpyxl`, `pytest`, `tkinter`
 
 ## Core concepts
 
@@ -67,211 +52,9 @@ For intial testing and characterization with the program, it is recomended to ru
 You can desing your own spacecraft using the 
 - `src/ariss/core/base_config.py`
 
-### The spacecraft class
-Every spacecraft in ARISS is represented by `SpacecraftState` in `src/ariss/core/spacecraft.py`.
-
-In practice, you do not build this class by hand in Python. You define the spacecraft in a TOML file, and ARISS loads that TOML into the nested dataclasses automatically.
-
-Important point:
-
-- `src/ariss/core/base_config.toml` already contains every field
-- a normal case file only overrides the values you want to change
-- many fields are solver outputs, so you usually do not need to edit them directly
-
-The top-level TOML tables map directly to the top-level `SpacecraftState` fields:
-
-- `[orbit]`
-- `[geometry]`
-- `[thruster]`
-- `[rate]`
-- `[mass]`
-- `[power]`
-- `[solar]`
-- `[thermal]`
-- `[drag]`
-- `[refueling]`
-- `[mission_profile]`
-
-Below is what each section means and the units expected by the code.
-
-#### `[orbit]`
-Orbital environment and atmosphere settings.
-
-Main inputs:
-
-- `altitude` `[km]`: mission altitude used as the starting orbit altitude
-- `alpha` `[rad]`: incidence angle used by drag and thermal models
-- `p_orb` `[Pa]`: ambient pressure used by the refueling compression model
-- `gamma` `[-]`: gas specific-heat ratio
-- `R_spec` `[J/kg/K]`: specific gas constant
-- `msis_date` `[ISO-8601 UTC string]`: date used for the MSIS atmosphere call
-- `msis_f107` `[sfu]`: F10.7 solar flux
-- `msis_ap` `[-]`: geomagnetic activity index
-- `latitude` `[deg]`: latitude for point-sampled atmosphere queries
-- `longitude` `[deg]`: longitude for point-sampled atmosphere queries
-- `use_average` `[bool]`: if `true`, use a latitude/longitude-averaged atmosphere instead of a single point
-
-Mostly solver-derived outputs:
-
-- `velocity` `[m/s]`
-- `density` `[kg/m^3]`
-- `temperature` `[K]`
-- `molar_mass` `[kg/mol]`
-
-#### `[geometry]`
-Body, inlet, solar array, and radiator geometry.
-
-Main inputs:
-
-- `S_in`, `S_body` `[shape code]`: cross-section type, typically circular/elliptic or square/rectangular
-- `use_intake_area_ratio` `[bool]`: whether to enforce `A_in = intake_area_ratio * A_body`
-- `fixed_body` `[bool]`: whether body area is fixed in ratio mode
-- `intake_area_ratio` `[-]`: intake-to-body frontal area ratio
-- `AR_in`, `AR_body`, `AR_solar`, `AR_rad` `[-]`: aspect ratios
-- `epsilon_in`, `epsilon_body`, `epsilon_solar`, `epsilon_rad`, `epsilon_in_norm` `[-]`: drag accommodation-related coefficients used by the drag model
-- `wake_in`, `wake_body`, `wake_solar`, `wake_radiator` `[-]`: exposed fractions or wake factors
-- `A_in`, `A_body`, `A_solar`, `A_rad` `[m^2]`: frontal or planform areas
-- `t_solar`, `t_rad` `[m]`: panel thicknesses used for frontal-edge drag
-- `L_in`, `L_body` `[m]`: inlet and body lengths
-- `X_solar`, `X_rad` `[m]`: panel/radiator longitudinal placement
-
-Usually solver-updated:
-
-- `A_ref` `[m^2]`: intake area allocated to refueling
-- `A_prop` `[m^2]`: intake area allocated to propulsion
-- `A_in_drag` `[m^2]`: intake area contributing drag only
-
-#### `[thruster]`
-Propulsion operating point.
-
-Main inputs:
-
-- `specific_impulse` `[s]`
-- `eff` `[-]`: thruster efficiency
-- `thermal_eff` `[-]`: thruster thermal efficiency
-- `power` `[W]`: electrical power delivered to the thruster
-
-Often solver-updated or checked after the solve:
-
-- `thrust` `[N]`
-- `m_flow` `[kg/s]`
-- `propellant_mass` `[kg/s]`
-- `propulsive_ram_load` `[N]`
-- `refueling_ram_load` `[N]`
-- `required_load` `[N]`
-- `force_residual` `[N]`
-
-#### `[rate]`
-Sizing-law coefficients used by the budgets model.
-
-Inputs:
-
-- `R_mass_volume_in` `[kg/m^3]`
-- `R_mass_volume_body` `[kg/m^3]`
-- `R_mass_surface_solar` `[kg/m^2]`
-- `R_mass_surface_rad` `[kg/m^2]`
-
-#### `[mass]`
-Subsystem mass bookkeeping.
-
-Typical direct inputs:
-
-- `Mass_prop` `[kg]`
-- `Mass_ADCS` `[kg]`
-- `Mass_payload` `[kg]`
-- `Mass_refprop` `[kg]`
-
-Typically solver-derived:
-
-- `Mass_in`, `Mass_body`, `Mass_solar`, `Mass_rad`, `Mass_total` `[kg]`
-
-#### `[power]`
-Subsystem power bookkeeping.
-
-Typical direct inputs:
-
-- `Power_ADCS` `[W]`
-- `Power_payload` `[W]`
-
-Typically solver-derived:
-
-- `Power_in`, `Power_body`, `Power_solar`, `Power_rad`, `Power_prop`, `Power_refprop`, `Power_total` `[W]`
-
-#### `[solar]`
-Solar conversion and pointing assumptions.
-
-Inputs:
-
-- `av_aligment` `[deg]`: average sun-pointing alignment angle
-- `eta_solar` `[-]`: solar-cell efficiency
-- `eta_power` `[-]`: power-chain efficiency
-
-#### `[thermal]`
-Thermal design and optical properties.
-
-Inputs:
-
-- `T_des` `[K]`: design temperature
-- `alpha_body`, `alpha_solar` `[-]`: absorptivity values
-- `epsilon_therm_in`, `epsilon_therm_body`, `epsilon_therm_solar`, `epsilon_therm_rad` `[-]`: emissivity values
-
-#### `[drag]`
-Drag coefficients and drag force outputs.
-
-These are usually diagnostic outputs, not primary case inputs.
-
-Coefficients:
-
-- `cd_solar`, `cd_solar_front`, `cd_rad`, `cd_rad_front`, `cd_body_side`, `cd_inlet_side`, `cd_inlet_front` `[-]`
-
-Forces:
-
-- `drag_total`, `drag_solar`, `drag_solar_front`, `drag_rad`, `drag_rad_front`, `drag_body_side`, `drag_inlet_side`, `drag_inlet_front` `[N]`
-
-#### `[refueling]`
-Atmospheric collection and tanking settings.
-
-Inputs:
-
-- `coll_eff` `[-]`: useful collection efficiency
-- `t_refuel` `[s]`: time allowed for refueling
-- `eta_refuel` `[-]`: compression efficiency
-- `p_tank` `[Pa]`: tank pressure
-- `V_prop` `[m^3]`: propellant tank volume
-
-Usually solver-updated:
-
-- `m_flow` `[kg/s]`: refueling mass flow
-
-#### `[mission_profile]`
-Mission-level settings.
-
-Inputs:
-
-- `active_refueling` `[bool]`
-- `delta_v` `[m/s]`
-
-Usually solver-updated:
-
-- `required_fuel` `[kg]`
-
-#### Practical rule
-When creating a new spacecraft case, most of the time you only need to edit:
-
-- `[orbit]`
-- `[geometry]`
-- `[thruster]`
-- `[solar]`
-- `[thermal]`
-- `[refueling]`
-- `[mission_profile]`
-
-and sometimes a few direct subsystem masses or powers.
-
-You usually do not need to hand-edit the drag outputs, total mass, total power, or other quantities that ARISS recomputes during the solve.
-
-### Spacecraft types
-
+## Spacecraft types
+There are two main clasification of ABEP spacecraft for ARISS, Refueling and Geometry:
+### Refueling
 #### Refueling Spacecraft
 This is any case with:
 
@@ -296,7 +79,7 @@ You normally configure these cases through:
 
 Use this mode when the spacecraft is meant to collect atmospheric mass for storage and later mission use, not just immediate drag compensation.
 
-#### Non Refuelign Spacecraft
+#### Non-Refuelign Spacecraft
 This is any case with:
 
 - `[mission_profile].active_refueling = false`
@@ -309,7 +92,8 @@ In this mode:
 
 This is the simpler and more common mode for drag-compensation studies, verification cases, and literature reproductions that do not include tank refill.
 
-#### Geometry Model One-Fixed Body Free Inlet and dimensions
+### Geometry
+#### Geometry Model 1 - Fixed Body and Free Inlet AR
 This corresponds to:
 
 - `[geometry].use_intake_area_ratio = false`
@@ -323,19 +107,12 @@ Behavior:
 - the solver finds the useful propulsion area first
 - then it reconstructs the total intake from collection efficiency
 
-In practice:
-
-- body frontal dimensions come from `A_body`, `AR_body`, and `S_body`
-- intake frontal dimensions come from the solved `A_in`, plus `AR_in` and `S_in`
-- body length stays at `L_body`
-- intake length stays at `L_in`
-
 Use this when:
 
 - you want the body geometry fixed
 - but you do not want to force the intake to follow a prescribed area ratio
 
-#### Geometry Model Two-Fixed Body Fixed Inlet AR and dimensions
+#### Geometry Model 2 - Fixed Body Fixed Inlet AR
 This corresponds to:
 
 - `[geometry].use_intake_area_ratio = true`
@@ -354,18 +131,14 @@ Behavior:
   - `A_ref`
   - `A_in_drag`
 
-In practice:
-
-- body dimensions come from `A_body`, `AR_body`, and `S_body`
-- intake dimensions come from `A_in`, `AR_in`, and `S_in`
-- lengths stay fixed at `L_body` and `L_in`
-
 Use this when:
 
 - you want the cleanest fixed-geometry study
 - the intake size should stay tied to the body through a prescribed ratio
 
-#### Geometry Model One-Free Body Fixed Inlet AR
+This mode has a caveat, an is that as the geometry is over constrained the solver also has to solve for ISP, so in this mode your ISP will change
+
+#### Geometry Model 3 - Free Body Fixed Inlet AR
 This corresponds to:
 
 - `[geometry].use_intake_area_ratio = true`
@@ -403,60 +176,208 @@ Codes accepted by the geometry utilities:
   - `"s"`
   - `"r"`
 
-How dimensions are recovered:
+## The spacecraft class
+Every spacecraft in ARISS is represented by `SpacecraftState` in `src/ariss/core/spacecraft.py`.
 
-- round or elliptic sections use area plus aspect ratio to recover width and height from an ellipse-equivalent area
-- rectangular sections use:
-  - `area = width * height`
+In practice, you do not build this class by hand in Python. You define the spacecraft in a TOML file, and ARISS loads that TOML into the nested dataclasses automatically.
 
-Aspect ratio fields:
+Important point:
 
-- `AR_in` for the intake
-- `AR_body` for the body
+- `src/ariss/core/base_config.toml` already contains every field
+- a normal case file only overrides the values you want to change
+- many fields are solver outputs, so you usually do not need to edit them directly
 
-So the actual cross-section dimensions are determined by the combination of:
+The top-level TOML tables map directly to the top-level `SpacecraftState` fields:
 
-- area
-- aspect ratio
-- shape code
+- `[orbit]`
+- `[geometry]`
+- `[thruster]`
+- `[rate]`
+- `[mass]`
+- `[power]`
+- `[solar]`
+- `[thermal]`
+- `[drag]`
+- `[refueling]`
+- `[mission_profile]`
 
-Examples:
+Below is what each section means and the units expected by the code.
 
-- circular intake:
-  - `S_in = "c"`
-  - `AR_in = 1.0`
-- elliptical intake:
-  - `S_in = "e"`
-  - `AR_in != 1.0`
-- square intake:
-  - `S_in = "s"`
-  - `AR_in = 1.0`
-- rectangular intake:
-  - `S_in = "r"`
-  - `AR_in != 1.0`
+### `[orbit]`
+Orbital environment and atmosphere settings.
 
-### Base config + case override
+Main inputs:
 
-ARISS uses a base-plus-override model.
+- `altitude` `[km]`: mission altitude used as the starting orbit altitude
+- `alpha` `[rad]`: incidence angle used by drag and thermal models
+- `p_orb` `[Pa]`: ambient pressure used by the refueling compression model
+- `gamma` `[-]`: gas specific-heat ratio
+- `R_spec` `[J/kg/K]`: specific gas constant
+- `msis_date` `[ISO-8601 UTC string]`: date used for the MSIS atmosphere call
+- `msis_f107` `[sfu]`: F10.7 solar flux
+- `msis_ap` `[-]`: geomagnetic activity index
+- `latitude` `[deg]`: latitude for point-sampled atmosphere queries
+- `longitude` `[deg]`: longitude for point-sampled atmosphere queries
+- `use_average` `[bool]`: if `true`, use a latitude/longitude-averaged atmosphere instead of a single point
 
-Base spacecraft definition:
+Mostly solver-derived outputs:
 
-- `src/ariss/core/base_config.toml`
+- `velocity` `[m/s]`
+- `density` `[kg/m^3]`
+- `temperature` `[K]`
+- `molar_mass` `[kg/mol]`
 
-Case files usually override only the fields that change.
+### `[geometry]`
+Body, inlet, solar array, and radiator geometry.
 
-Example case:
+Main inputs:
 
-- `tests/Verification/configs/case_cc_equal_area_ar2_fixed_body_ratio.toml`
+- `S_in`, `S_body` `[shape code]`: cross-section type, typically circular/elliptic or square/rectangular
+- `use_intake_area_ratio` `[bool]`: whether to enforce `A_in = intake_area_ratio * A_body`
+- `fixed_body` `[bool]`: whether body area is fixed in ratio mode
+- `intake_area_ratio` `[-]`: intake-to-body frontal area ratio
+- `AR_in`, `AR_body`, `AR_solar`, `AR_rad` `[-]`: aspect ratios
+- `epsilon_in`, `epsilon_body`, `epsilon_solar`, `epsilon_rad`, `epsilon_in_norm` `[-]`: drag accommodation-related coefficients used by the drag model
+- `wake_in`, `wake_body`, `wake_solar`, `wake_radiator` `[-]`: exposed fractions or wake factors
+- `A_in`, `A_body`, `A_solar`, `A_rad` `[m^2]`: frontal or planform areas
+- `t_solar`, `t_rad` `[m]`: panel thicknesses used for frontal-edge drag
+- `L_in`, `L_body` `[m]`: inlet and body lengths
+- `X_solar`, `X_rad` `[m]`: panel/radiator longitudinal placement
 
-Load order:
+Usually solver-updated:
 
-1. load `base_config.toml`
-2. apply the case override on top of it
+- `A_ref` `[m^2]`: intake area allocated to refueling
+- `A_prop` `[m^2]`: intake area allocated to propulsion
+- `A_in_drag` `[m^2]`: intake area contributing drag only
 
-That logic is implemented in:
+### `[thruster]`
+Propulsion operating point.
 
-- `load_spacecraft_from_base_config(...)` in `src/ariss/core/simulation.py`
+Main inputs:
+
+- `specific_impulse` `[s]`
+- `eff` `[-]`: thruster efficiency
+- `thermal_eff` `[-]`: thruster thermal efficiency
+- `power` `[W]`: electrical power delivered to the thruster
+
+Often solver-updated or checked after the solve:
+
+- `thrust` `[N]`
+- `m_flow` `[kg/s]`
+- `propellant_mass` `[kg/s]`
+- `propulsive_ram_load` `[N]`
+- `refueling_ram_load` `[N]`
+- `required_load` `[N]`
+- `force_residual` `[N]`
+
+### `[rate]`
+Sizing-law coefficients used by the budgets model.
+
+Inputs:
+
+- `R_mass_volume_in` `[kg/m^3]`
+- `R_mass_volume_body` `[kg/m^3]`
+- `R_mass_surface_solar` `[kg/m^2]`
+- `R_mass_surface_rad` `[kg/m^2]`
+
+### `[mass]`
+Subsystem mass bookkeeping.
+
+Typical direct inputs:
+
+- `Mass_prop` `[kg]`
+- `Mass_ADCS` `[kg]`
+- `Mass_payload` `[kg]`
+- `Mass_refprop` `[kg]`
+
+Typically solver-derived:
+
+- `Mass_in`, `Mass_body`, `Mass_solar`, `Mass_rad`, `Mass_total` `[kg]`
+
+### `[power]`
+Subsystem power bookkeeping.
+
+Typical direct inputs:
+
+- `Power_ADCS` `[W]`
+- `Power_payload` `[W]`
+
+Typically solver-derived:
+
+- `Power_in`, `Power_body`, `Power_solar`, `Power_rad`, `Power_prop`, `Power_refprop`, `Power_total` `[W]`
+
+### `[solar]`
+Solar conversion and pointing assumptions.
+
+Inputs:
+
+- `av_aligment` `[deg]`: average sun-pointing alignment angle
+- `eta_solar` `[-]`: solar-cell efficiency
+- `eta_power` `[-]`: power-chain efficiency
+
+### `[thermal]`
+Thermal design and optical properties.
+
+Inputs:
+
+- `T_des` `[K]`: design temperature
+- `alpha_body`, `alpha_solar` `[-]`: absorptivity values
+- `epsilon_therm_in`, `epsilon_therm_body`, `epsilon_therm_solar`, `epsilon_therm_rad` `[-]`: emissivity values
+
+### `[drag]`
+Drag coefficients and drag force outputs.
+
+These are usually diagnostic outputs, not primary case inputs.
+
+Coefficients:
+
+- `cd_solar`, `cd_solar_front`, `cd_rad`, `cd_rad_front`, `cd_body_side`, `cd_inlet_side`, `cd_inlet_front` `[-]`
+
+Forces:
+
+- `drag_total`, `drag_solar`, `drag_solar_front`, `drag_rad`, `drag_rad_front`, `drag_body_side`, `drag_inlet_side`, `drag_inlet_front` `[N]`
+
+### `[refueling]`
+Atmospheric collection and tanking settings.
+
+Inputs:
+
+- `coll_eff` `[-]`: useful collection efficiency
+- `t_refuel` `[s]`: time allowed for refueling
+- `eta_refuel` `[-]`: compression efficiency
+- `p_tank` `[Pa]`: tank pressure
+- `V_prop` `[m^3]`: propellant tank volume
+
+Usually solver-updated:
+
+- `m_flow` `[kg/s]`: refueling mass flow
+
+### `[mission_profile]`
+Mission-level settings.
+
+Inputs:
+
+- `active_refueling` `[bool]`
+- `delta_v` `[m/s]`
+
+Usually solver-updated:
+
+- `required_fuel` `[kg]`
+
+### Practical rule
+When creating a new spacecraft case, most of the time you only need to edit:
+
+- `[orbit]`
+- `[geometry]`
+- `[thruster]`
+- `[solar]`
+- `[thermal]`
+- `[refueling]`
+- `[mission_profile]`
+
+and sometimes a few direct subsystem masses or powers.
+
+You usually do not need to hand-edit the drag outputs, total mass, total power, or other quantities that ARISS recomputes during the solve.
 
 ## Validation folders and what they are for
 
