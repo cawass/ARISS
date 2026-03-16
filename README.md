@@ -270,6 +270,171 @@ and sometimes a few direct subsystem masses or powers.
 
 You usually do not need to hand-edit the drag outputs, total mass, total power, or other quantities that ARISS recomputes during the solve.
 
+### Spacecraft types
+
+#### Refueling Spacecraft
+This is any case with:
+
+- `[mission_profile].active_refueling = true`
+
+In this mode, the propulsion model allocates part of the intake to refueling:
+
+- `A_ref` becomes non-zero
+- `refueling.m_flow` is solved
+- the propulsion branch also includes the refueling ram load in the required force balance
+
+You normally configure these cases through:
+
+- `[mission_profile]`
+  - `active_refueling`
+  - `delta_v`
+- `[refueling]`
+  - `coll_eff`
+  - `t_refuel`
+  - `eta_refuel`
+  - `p_tank`
+
+Use this mode when the spacecraft is meant to collect atmospheric mass for storage and later mission use, not just immediate drag compensation.
+
+#### Non Refuelign Spacecraft
+This is any case with:
+
+- `[mission_profile].active_refueling = false`
+
+In this mode:
+
+- `A_ref = 0`
+- `refueling.m_flow = 0`
+- the intake is only split between useful propulsion capture and drag-only intake area
+
+This is the simpler and more common mode for drag-compensation studies, verification cases, and literature reproductions that do not include tank refill.
+
+#### Geometry Model One-Fixed Body Free Inlet and dimensions
+This corresponds to:
+
+- `[geometry].use_intake_area_ratio = false`
+
+This is the `free intake` propulsion branch in `src/ariss/modules/Propulsion.py`.
+
+Behavior:
+
+- `A_body` stays as the user-defined body frontal area
+- `A_in` is not imposed by a fixed intake/body ratio
+- the solver finds the useful propulsion area first
+- then it reconstructs the total intake from collection efficiency
+
+In practice:
+
+- body frontal dimensions come from `A_body`, `AR_body`, and `S_body`
+- intake frontal dimensions come from the solved `A_in`, plus `AR_in` and `S_in`
+- body length stays at `L_body`
+- intake length stays at `L_in`
+
+Use this when:
+
+- you want the body geometry fixed
+- but you do not want to force the intake to follow a prescribed area ratio
+
+#### Geometry Model Two-Fixed Body Fixed Inlet AR and dimensions
+This corresponds to:
+
+- `[geometry].use_intake_area_ratio = true`
+- `[geometry].fixed_body = true`
+
+This is the `fixed body ratio mode` branch in `src/ariss/modules/Propulsion.py`.
+
+Behavior:
+
+- `A_body` is fixed by the case file
+- `A_in` is imposed by:
+  - `A_in = intake_area_ratio * A_body`
+- body and inlet frontal dimensions are therefore fixed by the input case
+- the solver uses collection efficiency to split the fixed intake into:
+  - `A_prop`
+  - `A_ref`
+  - `A_in_drag`
+
+In practice:
+
+- body dimensions come from `A_body`, `AR_body`, and `S_body`
+- intake dimensions come from `A_in`, `AR_in`, and `S_in`
+- lengths stay fixed at `L_body` and `L_in`
+
+Use this when:
+
+- you want the cleanest fixed-geometry study
+- the intake size should stay tied to the body through a prescribed ratio
+
+#### Geometry Model One-Free Body Fixed Inlet AR
+This corresponds to:
+
+- `[geometry].use_intake_area_ratio = true`
+- `[geometry].fixed_body = false`
+
+This is the `variable body ratio mode` branch in `src/ariss/modules/Propulsion.py`.
+
+Behavior:
+
+- the intake/body area ratio is fixed
+- but `A_body` is allowed to move
+- the solver reconstructs `A_in`
+- then updates:
+  - `A_body = A_in / intake_area_ratio`
+
+So this mode preserves the ratio, not the absolute body area.
+
+Use this when:
+
+- you want to enforce a geometric scaling rule between body and intake
+- but you want the body size itself to be solved rather than prescribed
+
+#### Circular or Rectangular Intakes
+Cross-section type is controlled by:
+
+- `[geometry].S_in`
+- `[geometry].S_body`
+
+Codes accepted by the geometry utilities:
+
+- round / elliptic:
+  - `"c"`
+  - `"e"`
+- rectangular:
+  - `"s"`
+  - `"r"`
+
+How dimensions are recovered:
+
+- round or elliptic sections use area plus aspect ratio to recover width and height from an ellipse-equivalent area
+- rectangular sections use:
+  - `area = width * height`
+
+Aspect ratio fields:
+
+- `AR_in` for the intake
+- `AR_body` for the body
+
+So the actual cross-section dimensions are determined by the combination of:
+
+- area
+- aspect ratio
+- shape code
+
+Examples:
+
+- circular intake:
+  - `S_in = "c"`
+  - `AR_in = 1.0`
+- elliptical intake:
+  - `S_in = "e"`
+  - `AR_in != 1.0`
+- square intake:
+  - `S_in = "s"`
+  - `AR_in = 1.0`
+- rectangular intake:
+  - `S_in = "r"`
+  - `AR_in != 1.0`
+
 ### Base config + case override
 
 ARISS uses a base-plus-override model.

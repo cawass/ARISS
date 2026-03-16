@@ -12,7 +12,7 @@
 #      Atmospheric refueling power model based on intake mass flow and tank
 #
 #  Project:        ARISS
-#  Module:         history_ui.py
+#  Module:         simulation_ui.py
 #  Author:         Carlos Carrasco Requejo
 #
 #  Notes:

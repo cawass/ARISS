@@ -225,6 +225,5 @@ def run_sizing_loop(
 
 
 if __name__ == "__main__":
-    case_override = Path(sys.argv[1]) if len(sys.argv) > 1 else None
-    sc = load_spacecraft_from_base_config(case_override)
+    sc = load_spacecraft_from_base_config()
     final_sc, _, _ = run_sizing_loop(sc)
