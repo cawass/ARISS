@@ -101,7 +101,7 @@ Power_total = 0.0                 # [W] Total electrical power demand.
 
 [solar]
 av_aligment = 0.0                 # [deg] Average panel alignment angle to Sun vector.
-eta_solar = 0.2                   # [-] Solar-cell conversion efficiency.
+eta_solar = 0.21                   # [-] Solar-cell conversion efficiency.
 eta_power = 1.0                   # [-] End-to-end power-chain efficiency.
 
 [thermal]

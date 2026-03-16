@@ -156,17 +156,7 @@ def _update_orbit_from_density(sc) -> None:
     # Outputs:
     #   Updates altitude, temperature, molar mass, and velocity from density.
 
-    sc.orbit.altitude, sc.orbit.temperature, sc.orbit.molar_mass, sc.orbit.velocity = itemgetter("altitude", "temperature", "molar_mass", "velocity")(
-        orbit_updates_from_density(
-            sc.orbit.density,
-            msis_date=sc.orbit.msis_date,
-            msis_f107=sc.orbit.msis_f107,
-            msis_ap=sc.orbit.msis_ap,
-            latitude=sc.orbit.latitude,
-            longitude=sc.orbit.longitude,
-            use_average=sc.orbit.use_average,
-        )
-    )
+    sc.orbit.altitude, sc.orbit.temperature, sc.orbit.molar_mass, sc.orbit.velocity = itemgetter("altitude", "temperature", "molar_mass", "velocity")(orbit_updates_from_density(sc.orbit.density,msis_date=sc.orbit.msis_date,msis_f107=sc.orbit.msis_f107,msis_ap=sc.orbit.msis_ap,latitude=sc.orbit.latitude,longitude=sc.orbit.longitude,use_average=sc.orbit.use_average,))
 
 
 def _update_intake_split_from_collection_efficiency(sc) -> None:
@@ -257,16 +247,7 @@ def _update_drag_outputs(sc) -> None:
     sc.drag.drag_body_side = q * sc.drag.cd_body_side * body_side_area
     sc.drag.drag_inlet_side = q * sc.drag.cd_inlet_side * inlet_side_area
     sc.drag.drag_inlet_front = q * sc.drag.cd_inlet_front * sc.geometry.A_in_drag
-    sc.drag.drag_total = (
-        sc.drag.drag_solar
-        + sc.drag.drag_solar_front
-        + sc.drag.drag_rad
-        + sc.drag.drag_rad_front
-        + sc.drag.drag_body_side
-        + sc.drag.drag_inlet_side
-        + sc.drag.drag_inlet_front
-    )
-
+    sc.drag.drag_total = (sc.drag.drag_solar+ sc.drag.drag_solar_front+ sc.drag.drag_rad+ sc.drag.drag_rad_front+ sc.drag.drag_body_side+ sc.drag.drag_inlet_side+ sc.drag.drag_inlet_front)
 
 def _update_force_balance_outputs(sc, exhaust_velocity: float) -> None:
     # Inputs:
