@@ -1,4 +1,4 @@
-﻿# ARISS
+# ARISS
 
 Atmospheric Refueling Iterative System Solver.
 
@@ -79,7 +79,7 @@ You normally configure these cases through:
 
 Use this mode when the spacecraft is meant to collect atmospheric mass for storage and later mission use, not just immediate drag compensation.
 
-#### Non-Refuelign Spacecraft
+#### Non-Refueling Spacecraft
 This is any case with:
 
 - `[mission_profile].active_refueling = false`
@@ -136,7 +136,7 @@ Use this when:
 - you want the cleanest fixed-geometry study
 - the intake size should stay tied to the body through a prescribed ratio
 
-This mode has a caveat, an is that as the geometry is over constrained the solver also has to solve for ISP, so in this mode your ISP will change
+One caveat of this mode is that because the geometry is overconstrained, the solver must also solve for the Specific Impulse (ISP). Consequently, the ISP will vary during the simulation.
 
 #### Geometry Model 3 - Free Body Fixed Inlet AR
 This corresponds to:
@@ -172,7 +172,7 @@ Codes accepted by the geometry utilities:
 - round / elliptic:
   - `"c"`
   - `"e"`
-- rectangular:
+- square / rectangular:
   - `"s"`
   - `"r"`
 
@@ -236,12 +236,12 @@ Main inputs:
 - `use_intake_area_ratio` `[bool]`: whether to enforce `A_in = intake_area_ratio * A_body`
 - `fixed_body` `[bool]`: whether body area is fixed in ratio mode
 - `intake_area_ratio` `[-]`: intake-to-body frontal area ratio
-- `AR_in`, `AR_body`, `AR_solar`, `AR_rad` `[-]`: aspect ratios
-- `epsilon_in`, `epsilon_body`, `epsilon_solar`, `epsilon_rad`, `epsilon_in_norm` `[-]`: drag accommodation-related coefficients used by the drag model
+- `AR_in`, `AR_body`, `AR_solar`, `AR_rad` `[-]`: aspect ratios of the intake, body, solar array, and radiator, respectively
+- `epsilon_in`, `epsilon_body`, `epsilon_solar`, `epsilon_rad`, `epsilon_in_norm` `[-]`: drag accommodation-related coefficients used by the drag model for the intake side-walls, body side-walls, solar array, radiator, and the intake normal/front-face, respectively.
 - `wake_in`, `wake_body`, `wake_solar`, `wake_radiator` `[-]`: exposed fractions or wake factors
-- `A_in`, `A_body`, `A_solar`, `A_rad` `[m^2]`: frontal or planform areas
-- `t_solar`, `t_rad` `[m]`: panel thicknesses used for frontal-edge drag
-- `L_in`, `L_body` `[m]`: inlet and body lengths
+- `A_in`, `A_body`, `A_solar`, `A_rad` `[m^2]`: frontal or planform areas for the intake, body, solar array, and radiator, respectively
+- `t_solar`, `t_rad` `[m]`: panel thicknesses used for frontal-edge drag for the solar array and radiator, respectively
+- `L_in`, `L_body` `[m]`: intake and body lengths
 - `X_solar`, `X_rad` `[m]`: panel/radiator longitudinal placement
 
 Usually solver-updated:
@@ -255,14 +255,14 @@ Propulsion operating point.
 
 Main inputs:
 
-- `specific_impulse` `[s]`
-- `eff` `[-]`: thruster efficiency
+- `specific_impulse` `[s]` : specific impulse of the thruster
+- `eff` `[-]`: Electrical-to-jet thruster efficiency.
 - `thermal_eff` `[-]`: thruster thermal efficiency
 - `power` `[W]`: electrical power delivered to the thruster
 
 Often solver-updated or checked after the solve:
 
-- `thrust` `[N]`
+- `thrust` `[N]` 
 - `m_flow` `[kg/s]`
 - `propellant_mass` `[kg/s]`
 - `propulsive_ram_load` `[N]`
@@ -275,36 +275,46 @@ Sizing-law coefficients used by the budgets model.
 
 Inputs:
 
-- `R_mass_volume_in` `[kg/m^3]`
-- `R_mass_volume_body` `[kg/m^3]`
-- `R_mass_surface_solar` `[kg/m^2]`
-- `R_mass_surface_rad` `[kg/m^2]`
+- `R_mass_volume_in` `[kg/m^3]` : Intake structural mass density scaling.
+- `R_mass_volume_body` `[kg/m^3]` : Body structural mass density scaling.
+- `R_mass_surface_solar` `[kg/m^2]` : Solar array area mass density scaling.
+- `R_mass_surface_rad` `[kg/m^2]` : Radiator area mass density scaling.
 
 ### `[mass]`
 Subsystem mass bookkeeping.
 
 Typical direct inputs:
 
-- `Mass_prop` `[kg]`
-- `Mass_ADCS` `[kg]`
-- `Mass_payload` `[kg]`
-- `Mass_refprop` `[kg]`
+- `Mass_prop` `[kg]` : Propellant mass.
+- `Mass_ADCS` `[kg]` : ADCS subsystem mass.
+- `Mass_payload` `[kg]` : Payload mass.
+- `Mass_refprop` `[kg]` : Refueling/propellant-processing subsystem mass.
 
 Typically solver-derived:
 
-- `Mass_in`, `Mass_body`, `Mass_solar`, `Mass_rad`, `Mass_total` `[kg]`
+- `Mass_in` `[kg]` : Intake subsystem mass.
+- `Mass_body` `[kg]` : Body subsystem mass.
+- `Mass_solar` `[kg]` : Solar array subsystem mass.
+- `Mass_rad` `[kg]` : Radiator subsystem mass.
+- `Mass_total` `[kg]` : Total mass.
 
 ### `[power]`
 Subsystem power bookkeeping.
 
 Typical direct inputs:
 
-- `Power_ADCS` `[W]`
-- `Power_payload` `[W]`
+- `Power_ADCS` `[W]` : ADCS subsystem power consumption.
+- `Power_payload` `[W]` : Payload subsystem power consumption.
 
 Typically solver-derived:
 
-- `Power_in`, `Power_body`, `Power_solar`, `Power_rad`, `Power_prop`, `Power_refprop`, `Power_total` `[W]`
+- `Power_in` `[W]` : Intake subsystem power consumption.
+- `Power_body` `[W]` : Body subsystem power consumption.
+- `Power_solar` `[W]` : Solar array subsystem power consumption.
+- `Power_rad` `[W]` : Radiator subsystem power consumption.
+- `Power_prop` `[W]` : Propulsion subsystem power consumption.
+- `Power_refprop` `[W]` : Refueling/propellant-processing subsystem power consumption.
+- `Power_total` `[W]` : Total power consumption.
 
 ### `[solar]`
 Solar conversion and pointing assumptions.
@@ -321,8 +331,8 @@ Thermal design and optical properties.
 Inputs:
 
 - `T_des` `[K]`: design temperature
-- `alpha_body`, `alpha_solar` `[-]`: absorptivity values
-- `epsilon_therm_in`, `epsilon_therm_body`, `epsilon_therm_solar`, `epsilon_therm_rad` `[-]`: emissivity values
+- `alpha_body`, `alpha_solar` `[-]`: absorptivity values for the body and solar array, respectively
+- `epsilon_therm_in`, `epsilon_therm_body`, `epsilon_therm_solar`, `epsilon_therm_rad` `[-]`: emissivity values for the intake, body, solar array, and radiator, respectively
 
 ### `[drag]`
 Drag coefficients and drag force outputs.
@@ -357,12 +367,12 @@ Mission-level settings.
 
 Inputs:
 
-- `active_refueling` `[bool]`
-- `delta_v` `[m/s]`
+- `active_refueling` `[bool]` : True if you are working with an active air-breathing spacecraft
+- `delta_v` `[m/s]` : Mission delta-v requirement used in the rocket equation.
 
 Usually solver-updated:
 
-- `required_fuel` `[kg]`
+- `required_fuel` `[kg]` : Derived: fuel mass required to satisfy the mission delta-v target.
 
 ### Practical rule
 When creating a new spacecraft case, most of the time you only need to edit:
