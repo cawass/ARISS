@@ -6,6 +6,7 @@ from typing import Any
 
 from ariss.core.spacecraft import SpacecraftState
 
+__version__ = "0.1.0"
 
 def load_spacecraft(source: SpacecraftState | str | PathLike[str]) -> SpacecraftState:
     # Inputs:
