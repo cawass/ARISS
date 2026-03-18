@@ -101,9 +101,9 @@ def thermal_model(sc: SpacecraftState):
 
         # Surface areas are different for other geometries unlike projected areas
         # Surface area of top of intake
-        A_in_top = 0.5 * (W_in + W_body) * np.sqrt(np.square(H_in - H_body) + np.square(sc.geometry.L_in))
+        A_in_top = 0.5 * (W_in + W_body) * np.sqrt(np.square(H_in - H_body)/4 + np.square(sc.geometry.L_in))
         # Surface area of side of intake
-        A_in_side = 0.5 * (H_in + H_body) * np.sqrt(np.square(W_in - W_body) + np.square(sc.geometry.L_in))
+        A_in_side = 0.5 * (H_in + H_body) * np.sqrt(np.square(W_in - W_body)/4 + np.square(sc.geometry.L_in))
         # Intake effective emissivity area 
         Ae_in = A_in_top * sc.thermal.epsilon_therm_solar + sc.geometry.A_in * sc.thermal.epsilon_therm_in + (A_in_top + 2 * A_in_side) * sc.thermal.epsilon_therm_body
     elif sc.geometry.S_in == "c":
@@ -115,7 +115,12 @@ def thermal_model(sc: SpacecraftState):
 
         # Surface areas are different for other geometries unlike projected areas
         # Surface area of intake
-        A_in = np.pi * (W_in + W_body) * np.sqrt(np.square(H_in - H_body) + np.square(sc.geometry.L_in)) 
+        if W_in > H_in:
+            # if wide, the base of the intake will have the diamter of the height
+            A_in = np.pi * (W_in + W_body)/2 * np.sqrt(np.square(H_in - H_body)/4 + np.square(sc.geometry.L_in)) 
+        else:
+            # if tall, the base of the intake will have the diamter of the width
+            A_in = np.pi * (W_in + W_body)/2 * np.sqrt(np.square(W_in - W_body)/4 + np.square(sc.geometry.L_in)) 
         # Intake effective emissivity area 
         Ae_in = A_in/2 * sc.thermal.epsilon_therm_solar + sc.geometry.A_in * sc.thermal.epsilon_therm_in + A_in/2 * sc.thermal.epsilon_therm_body
     elif sc.geometry.S_in == "e":
@@ -129,10 +134,19 @@ def thermal_model(sc: SpacecraftState):
         # Approximation for circumference of ellipses
         P_in = np.pi * (3*(W_in/2 + H_in/2) - np.sqrt((3*W_in/2 + H_in/2)*(W_in/2 + 3*H_in/2)))
         P_body = np.pi * (3*(W_body/2 + H_body/2) - np.sqrt((3*W_body/2 + H_body/2)*(W_body/2 + 3*H_body/2)))
-        # Surface area of top of intake
-        A_in_top = (P_in + P_body) * np.sqrt(np.square(H_in - H_body) + np.square(sc.geometry.L_in)) / 4
-        # Surface area of side of intake
-        A_in_side = (P_in + P_body) * np.sqrt(np.square(W_in - W_body) + np.square(sc.geometry.L_in)) / 4
+        # Approximation for length
+        if sc.geometry.AR_body < sc.geometry.AR_in:
+            # If body is taller than intake
+            # Surface area of top of intake
+            A_in_top = (P_in + P_body) * np.sqrt(np.square(H_in - W_body/sc.geometry.AR_in)/4 + np.square(sc.geometry.L_in)) / 4
+            # Surface area of side of intake
+            A_in_side = (P_in + P_body) * np.sqrt(np.square(W_in - W_body)/4 + np.square(sc.geometry.L_in)) / 4 
+        else:
+            # If body is wider than intake
+            # Surface area of top of intake
+            A_in_top = (P_in + P_body) * np.sqrt(np.square(H_in - H_body)/4 + np.square(sc.geometry.L_in)) / 4
+            # Surface area of side of intake
+            A_in_side = (P_in + P_body) * np.sqrt(np.square(W_in - H_body*sc.geometry.AR_in)/4 + np.square(sc.geometry.L_in)) / 4
         # Intake effective emissivity area 
         Ae_in = A_in_top * sc.thermal.epsilon_therm_solar + sc.geometry.A_in * sc.thermal.epsilon_therm_in + A_in_side * sc.thermal.epsilon_therm_body
     else:

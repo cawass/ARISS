@@ -107,7 +107,7 @@ def test_radiated_heating():
 
     diagnostics = thermal_model(sc)
 
-    assert np.isclose(diagnostics.Q_radiated, 14577.84676)
+    assert np.isclose(diagnostics.Q_radiated, 14246.0388)
 
 
 def test_radiator_area_zero_cold_case():
