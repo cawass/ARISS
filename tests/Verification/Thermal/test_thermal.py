@@ -18,6 +18,8 @@ def test_drag_heating():
 def test_sun_heating():
     """Test sun heating calculation"""
     sc = SpacecraftState()
+    sc.geometry.S_in = "s"
+    sc.geometry.S_body = "s"
     sc.geometry.AR_in = 1.0
     sc.geometry.AR_body = 1.0
     sc.geometry.A_in = 4.0387
@@ -35,6 +37,8 @@ def test_sun_heating():
 def test_albedo_heating():
     """Test earth albedo heating calculation"""
     sc = SpacecraftState()
+    sc.geometry.S_in = "s"
+    sc.geometry.S_body = "s"
     sc.geometry.AR_in = 1.0
     sc.geometry.AR_body = 1.0
     sc.geometry.A_in = 4.0387
@@ -50,6 +54,8 @@ def test_albedo_heating():
 def test_ir_heating():
     """Test earth infrared heating calculation"""
     sc = SpacecraftState()
+    sc.geometry.S_in = "s"
+    sc.geometry.S_body = "s"
     sc.geometry.AR_in = 1.0
     sc.geometry.AR_body = 1.0
     sc.geometry.A_in = 4.0387
@@ -83,6 +89,8 @@ def test_internal_heating():
 def test_radiated_heating():
     """Test radiated heat calculation"""
     sc = SpacecraftState()
+    sc.geometry.S_in = "s"
+    sc.geometry.S_body = "s"
     sc.geometry.AR_in = 1.0
     sc.geometry.AR_body = 1.0
     sc.geometry.A_in = 4.0387
