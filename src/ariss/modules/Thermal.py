@@ -43,6 +43,8 @@ class ThermalDiagnostics:
         Internal heating [W]
     Q_radiated : float
         Heat radiated by spacecraft excluding radiators [W]
+    T_max: float
+        Steady state temperature in full sunlight
     """
     Ae_total: float = 0.0
 
@@ -52,6 +54,8 @@ class ThermalDiagnostics:
     Q_ir: float = 0.0
     Q_internal: float = 0.0
     Q_radiated: float = 0.0
+    
+    T_max: float = 0.0
 
 
 def thermal_model(sc: SpacecraftState):
@@ -200,13 +204,7 @@ def thermal_model(sc: SpacecraftState):
         raise ValueError(f"Invalid body shape S_body: {sc.geometry.S_body}") 
         
     # Total effective emissivity area
-    print("A_in_side",A_in_side)
-    print("A_in_top",A_in_top)
-    print("Ae_in",Ae_in)
-    print("Ae_body",Ae_body)
-
     Ae_total = Ae_body + Ae_in + sc.geometry.A_solar * sc.thermal.epsilon_therm_solar
-    print(Ae_total)
 
     # Heat input
     #  Drag heating - it's assumed the incoming air transfers all its kinetic energy into heat and this is all the heating from drag
@@ -229,6 +227,11 @@ def thermal_model(sc: SpacecraftState):
     Q_in_total = Q_drag + Q_sun + Q_albedo + Q_ir + Q_internal
     # Final Area - assuming radiators don't absorb anything and back of solar panels are radiators
     sc.geometry.A_rad = max(((Q_in_total - Q_radiated)/ (const.STEFAN_BOLTZMANN * sc.thermal.T_des**4 * sc.thermal.epsilon_therm_rad) - sc.geometry.A_solar)/2, 0.0)
+
+    if sc.geometry.A_rad < 0.0:
+        T_max = (Q_in_total/(const.STEFAN_BOLTZMANN * Ae_total))**(1/4)
+    else:
+        T_max = sc.thermal.T_des
     
     diagnostics = ThermalDiagnostics(
         Ae_total=Ae_total,
@@ -238,5 +241,6 @@ def thermal_model(sc: SpacecraftState):
         Q_ir=Q_ir,
         Q_internal=Q_internal,
         Q_radiated=Q_radiated,
+        T_max=T_max
     )
     return diagnostics  
