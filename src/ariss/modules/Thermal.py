@@ -177,9 +177,9 @@ def thermal_model(sc: SpacecraftState):
 
         # Surface areas are different for other geometries unlike projected areas
         # Surface area of top of body
-        A_body_top = np.pi * W_body * sc.geometry.L_body
+        A_body_top = np.pi * W_body * sc.geometry.L_body / 2
         # Surface area of side of body
-        A_body_side = np.pi * H_body * sc.geometry.L_body
+        A_body_side = np.pi * H_body * sc.geometry.L_body / 2
         # body effective emissivity area 
         Ae_body = A_body_top * sc.thermal.epsilon_therm_solar + sc.geometry.A_body * sc.thermal.epsilon_therm_body + A_body_side * sc.thermal.epsilon_therm_body
     elif sc.geometry.S_body == "e":
@@ -193,14 +193,20 @@ def thermal_model(sc: SpacecraftState):
         # Approximation for circumference of ellipses
         P_body = np.pi * (3*(W_body/2 + H_body/2) - np.sqrt((3*W_body/2 + H_body/2)*(W_body/2 + 3*H_body/2)))
         # Surface area of top of body
-        A_body_top = P_body * sc.geometry.L_body
+        A_body_top = P_body * sc.geometry.L_body / 2
         # body effective emissivity area 
         Ae_body = A_body_top * sc.thermal.epsilon_therm_solar + sc.geometry.A_body * sc.thermal.epsilon_therm_body + A_body_top * sc.thermal.epsilon_therm_body
     else:
         raise ValueError(f"Invalid body shape S_body: {sc.geometry.S_body}") 
         
     # Total effective emissivity area
+    print("A_in_side",A_in_side)
+    print("A_in_top",A_in_top)
+    print("Ae_in",Ae_in)
+    print("Ae_body",Ae_body)
+
     Ae_total = Ae_body + Ae_in + sc.geometry.A_solar * sc.thermal.epsilon_therm_solar
+    print(Ae_total)
 
     # Heat input
     #  Drag heating - it's assumed the incoming air transfers all its kinetic energy into heat and this is all the heating from drag
