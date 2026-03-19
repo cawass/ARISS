@@ -18,7 +18,7 @@ name = "GOCE Thermal"
 
 [orbit]
 altitude = 250.0
-msis_date = "2004-01-01T12:00:00"
+msis_date = "2007-01-01T12:00:00"
 
 [geometry]
 S_in = "c"
@@ -29,14 +29,14 @@ AR_in = 1.0
 AR_body = 1.0
 A_in = 0.9
 A_body = 0.9
-A_solar = 5
+A_solar = 4.86
 A_rad = 0.0
 L_in = 0.0
 L_body = 5.26
 
 [thruster]
-thermal_eff = 0.53
-power = 2000.0
+thermal_eff = 0.5
+power = 600.0
 
 [mass]
 Mass_total = 1000.0
@@ -49,11 +49,18 @@ Power_total = 0.0
 
 [solar]
 av_aligment = 0.0
-eta_solar = 0.32
+eta_solar = 0.2
 eta_power = 0.95
 
 [thermal]
 T_des = 400.0
+alpha_body = 0.1 
+alpha_solar = 0.9
+
+epsilon_therm_in = 0.5
+epsilon_therm_body = 0.8
+epsilon_therm_solar = 0.85
+epsilon_therm_rad = 0.9
 
 [mission_profile]
 active_refueling = false
