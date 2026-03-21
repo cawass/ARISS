@@ -1,3 +1,43 @@
+[build-system]
+requires = ["setuptools>=68.0", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ariss"
+version = "0.1.0"
+description = "ARISS — Atmospheric Refueling Iterative System Solver"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "Carlos Carrasco Requejo" },
+    { name = "Lucas Calderon Del Rio" },
+    { name = "Jan Żuchowski" },
+]
+
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "matplotlib>=3.7",
+    "pymsis>=0.8",
+]
+
+[project.optional-dependencies]
+toml-write = ["tomli-w>=1.0"]
+dev = [
+    "pytest>=7.0",
+    "tomli-w>=1.0",
+]
+
+[project.scripts]
+ariss = "ariss.__main__:main"
+
+[project.urls]
+Repository = "https://github.com/cawass/ARISS"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
