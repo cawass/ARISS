@@ -1,0 +1,25 @@
+name = "Ext 02 Avg Atmos RR | Variable Body Ratio"
+
+[orbit]
+altitude = 205.0
+msis_date = "2014-06-01T00:00:00"
+msis_f107 = 170.0
+msis_ap = 18.0
+latitude = -10.0
+longitude = 120.0
+use_average = true
+
+[geometry]
+S_in = "r"
+S_body = "r"
+AR_in = 2.0
+AR_body = 1.0
+use_intake_area_ratio = true
+fixed_body = false
+intake_area_ratio = 1.3
+wake_in = 0.9
+wake_body = 1.1
+
+[mission_profile]
+active_refueling = false
+

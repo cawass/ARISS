@@ -1,0 +1,22 @@
+name = "Ext 05 Avg Atmos CC | Variable Body Ratio | Low F10.7"
+
+[orbit]
+altitude = 200.0
+msis_date = "2008-01-15T03:00:00"
+msis_f107 = 80.0
+msis_ap = 10.0
+latitude = 25.0
+longitude = 140.0
+use_average = true
+
+[geometry]
+S_in = "c"
+S_body = "c"
+AR_in = 0.6
+AR_body = 1.4
+use_intake_area_ratio = true
+fixed_body = false
+intake_area_ratio = 2.2
+
+[mission_profile]
+active_refueling = false

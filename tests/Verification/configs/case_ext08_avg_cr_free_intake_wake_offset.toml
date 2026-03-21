@@ -1,0 +1,27 @@
+name = "Ext 08 Avg Atmos CR | Free Intake | Wake Offset"
+
+[orbit]
+altitude = 205.0
+msis_date = "2012-04-08T11:00:00"
+msis_f107 = 125.0
+msis_ap = 8.0
+latitude = -50.0
+longitude = 10.0
+use_average = true
+
+[geometry]
+S_in = "c"
+S_body = "r"
+AR_in = 1.5
+AR_body = 1.0
+use_intake_area_ratio = false
+fixed_body = false
+intake_area_ratio = 1.0
+wake_in = 0.85
+wake_body = 1.20
+wake_solar = 0.95
+wake_radiator = 1.10
+
+[mission_profile]
+active_refueling = false
+

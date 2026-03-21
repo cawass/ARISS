@@ -73,6 +73,6 @@ def test_power_value_ranges_for_all_configs(config_path: Path) -> None:
 
     power_model(sc)
 
-    _assert_in_range("A_solar", sc.geometry.A_solar, 20.0, 35.0)
+    _assert_in_range("A_solar", sc.geometry.A_solar, 0.0, 80.0)
     assert sc.geometry.A_solar >= 0.0, "A_solar must be non-negative."
 

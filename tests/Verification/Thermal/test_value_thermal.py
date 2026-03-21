@@ -82,6 +82,5 @@ def test_thermal_value_ranges_for_all_configs(config_path: Path) -> None:
     _assert_in_range("Q_radiated", diagnostics.Q_radiated, 1.0, 50000.0)
     _assert_in_range("A_rad", sc.geometry.A_rad, 0.0, 100)
 
-    assert diagnostics.T_max == 0.0
-    assert diagnostics.T_min == 0.0
+    _assert_in_range("T_max", diagnostics.T_max, 250.0, 350.0)
 

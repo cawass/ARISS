@@ -1,0 +1,32 @@
+name = "Ext 18 Point Atmos CR | Variable Body Ratio | Refuel Low Efficiency"
+
+[orbit]
+altitude = 218.0
+msis_date = "2006-06-26T16:00:00"
+msis_f107 = 105.0
+msis_ap = 18.0
+latitude = -35.0
+longitude = 20.0
+use_average = false
+
+[geometry]
+S_in = "c"
+S_body = "r"
+AR_in = 1.0
+AR_body = 1.2
+use_intake_area_ratio = true
+fixed_body = false
+intake_area_ratio = 1.3
+
+[refueling]
+coll_eff = 0.4
+eta_refuel = 0.3
+t_refuel = 80000000.0
+
+[thermal]
+T_des = 318.0
+
+[mission_profile]
+active_refueling = true
+delta_v = 1100.0
+

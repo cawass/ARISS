@@ -16,6 +16,7 @@
 # ============================================================================
 
 import tomllib
+import math
 from dataclasses import asdict, dataclass, field, fields, is_dataclass, replace
 from os import PathLike
 from pathlib import Path
@@ -300,6 +301,310 @@ class SpacecraftState:
     drag: DragState = field(default_factory=DragState)  # [state] Derived: drag coefficient and force bundle.
     refueling: RefuelingState = field(default_factory=RefuelingState)  # [state] Input/derived: refueling performance bundle.
     mission_profile: MissionProfileState = field(default_factory=MissionProfileState)  # [state] Input/derived: mission target bundle.
+
+    def check_bounds(self) -> None:
+        """
+        Validate all spacecraft variables against explicit bounds.
+
+        Raises:
+            ValueError: if any variable is out of bounds or has the wrong type.
+        """
+
+        values = {
+            "name": self.name,
+
+            "orbit.altitude": self.orbit.altitude,
+            "orbit.velocity": self.orbit.velocity,
+            "orbit.density": self.orbit.density,
+            "orbit.p_orb": self.orbit.p_orb,
+            "orbit.temperature": self.orbit.temperature,
+            "orbit.molar_mass": self.orbit.molar_mass,
+            "orbit.alpha": self.orbit.alpha,
+            "orbit.gamma": self.orbit.gamma,
+            "orbit.R_spec": self.orbit.R_spec,
+            "orbit.msis_date": self.orbit.msis_date,
+            "orbit.msis_f107": self.orbit.msis_f107,
+            "orbit.msis_ap": self.orbit.msis_ap,
+            "orbit.latitude": self.orbit.latitude,
+            "orbit.longitude": self.orbit.longitude,
+            "orbit.use_average": self.orbit.use_average,
+
+            "geometry.S_in": self.geometry.S_in,
+            "geometry.S_body": self.geometry.S_body,
+            "geometry.use_intake_area_ratio": self.geometry.use_intake_area_ratio,
+            "geometry.fixed_body": self.geometry.fixed_body,
+            "geometry.intake_area_ratio": self.geometry.intake_area_ratio,
+            "geometry.AR_in": self.geometry.AR_in,
+            "geometry.AR_body": self.geometry.AR_body,
+            "geometry.AR_solar": self.geometry.AR_solar,
+            "geometry.AR_rad": self.geometry.AR_rad,
+            "geometry.epsilon_in": self.geometry.epsilon_in,
+            "geometry.epsilon_body": self.geometry.epsilon_body,
+            "geometry.epsilon_solar": self.geometry.epsilon_solar,
+            "geometry.epsilon_rad": self.geometry.epsilon_rad,
+            "geometry.epsilon_in_norm": self.geometry.epsilon_in_norm,
+            "geometry.wake_in": self.geometry.wake_in,
+            "geometry.wake_body": self.geometry.wake_body,
+            "geometry.wake_solar": self.geometry.wake_solar,
+            "geometry.wake_radiator": self.geometry.wake_radiator,
+            "geometry.A_in": self.geometry.A_in,
+            "geometry.A_ref": self.geometry.A_ref,
+            "geometry.A_prop": self.geometry.A_prop,
+            "geometry.A_in_drag": self.geometry.A_in_drag,
+            "geometry.A_body": self.geometry.A_body,
+            "geometry.A_solar": self.geometry.A_solar,
+            "geometry.A_rad": self.geometry.A_rad,
+            "geometry.t_solar": self.geometry.t_solar,
+            "geometry.t_rad": self.geometry.t_rad,
+            "geometry.L_in": self.geometry.L_in,
+            "geometry.L_body": self.geometry.L_body,
+            "geometry.X_solar": self.geometry.X_solar,
+            "geometry.X_rad": self.geometry.X_rad,
+
+            "rate.R_mass_volume_in": self.rate.R_mass_volume_in,
+            "rate.R_mass_volume_body": self.rate.R_mass_volume_body,
+            "rate.R_mass_surface_solar": self.rate.R_mass_surface_solar,
+            "rate.R_mass_surface_rad": self.rate.R_mass_surface_rad,
+
+            "mass.Mass_in": self.mass.Mass_in,
+            "mass.Mass_body": self.mass.Mass_body,
+            "mass.Mass_solar": self.mass.Mass_solar,
+            "mass.Mass_rad": self.mass.Mass_rad,
+            "mass.Mass_prop": self.mass.Mass_prop,
+            "mass.Mass_ADCS": self.mass.Mass_ADCS,
+            "mass.Mass_payload": self.mass.Mass_payload,
+            "mass.Mass_refprop": self.mass.Mass_refprop,
+            "mass.Mass_total": self.mass.Mass_total,
+
+            "power.Power_in": self.power.Power_in,
+            "power.Power_body": self.power.Power_body,
+            "power.Power_solar": self.power.Power_solar,
+            "power.Power_rad": self.power.Power_rad,
+            "power.Power_prop": self.power.Power_prop,
+            "power.Power_ADCS": self.power.Power_ADCS,
+            "power.Power_payload": self.power.Power_payload,
+            "power.Power_refprop": self.power.Power_refprop,
+            "power.Power_total": self.power.Power_total,
+
+            "thruster.thrust": self.thruster.thrust,
+            "thruster.specific_impulse": self.thruster.specific_impulse,
+            "thruster.eff": self.thruster.eff,
+            "thruster.thermal_eff": self.thruster.thermal_eff,
+            "thruster.power": self.thruster.power,
+            "thruster.propellant_mass": self.thruster.propellant_mass,
+            "thruster.m_flow": self.thruster.m_flow,
+            "thruster.propulsive_ram_load": self.thruster.propulsive_ram_load,
+            "thruster.refueling_ram_load": self.thruster.refueling_ram_load,
+            "thruster.required_load": self.thruster.required_load,
+            "thruster.force_residual": self.thruster.force_residual,
+
+            "refueling.coll_eff": self.refueling.coll_eff,
+            "refueling.t_refuel": self.refueling.t_refuel,
+            "refueling.eta_refuel": self.refueling.eta_refuel,
+            "refueling.m_flow": self.refueling.m_flow,
+            "refueling.p_tank": self.refueling.p_tank,
+            "refueling.V_prop": self.refueling.V_prop,
+
+            "solar.av_aligment": self.solar.av_aligment,
+            "solar.eta_solar": self.solar.eta_solar,
+            "solar.eta_power": self.solar.eta_power,
+
+            "drag.cd_solar": self.drag.cd_solar,
+            "drag.cd_solar_front": self.drag.cd_solar_front,
+            "drag.cd_rad": self.drag.cd_rad,
+            "drag.cd_rad_front": self.drag.cd_rad_front,
+            "drag.cd_body_side": self.drag.cd_body_side,
+            "drag.cd_inlet_side": self.drag.cd_inlet_side,
+            "drag.cd_inlet_front": self.drag.cd_inlet_front,
+            "drag.drag_total": self.drag.drag_total,
+            "drag.drag_solar": self.drag.drag_solar,
+            "drag.drag_solar_front": self.drag.drag_solar_front,
+            "drag.drag_rad": self.drag.drag_rad,
+            "drag.drag_rad_front": self.drag.drag_rad_front,
+            "drag.drag_body_side": self.drag.drag_body_side,
+            "drag.drag_inlet_side": self.drag.drag_inlet_side,
+            "drag.drag_inlet_front": self.drag.drag_inlet_front,
+
+            "thermal.T_des": self.thermal.T_des,
+            "thermal.alpha_body": self.thermal.alpha_body,
+            "thermal.alpha_solar": self.thermal.alpha_solar,
+            "thermal.epsilon_therm_in": self.thermal.epsilon_therm_in,
+            "thermal.epsilon_therm_body": self.thermal.epsilon_therm_body,
+            "thermal.epsilon_therm_solar": self.thermal.epsilon_therm_solar,
+            "thermal.epsilon_therm_rad": self.thermal.epsilon_therm_rad,
+
+            "mission_profile.active_refueling": self.mission_profile.active_refueling,
+            "mission_profile.delta_v": self.mission_profile.delta_v,
+            "mission_profile.required_fuel": self.mission_profile.required_fuel,
+        }
+
+        specs = {
+            "name": {"kind": "str"},
+
+            "orbit.altitude": {"min": 0.0, "max": 2000.0},
+            "orbit.velocity": {"min": 0.0, "max": 20000.0},
+            "orbit.density": {"min": 0.0, "max": 1.0},
+            "orbit.p_orb": {"min": 0.0, "max": 1.0e9},
+            "orbit.temperature": {"min": 0.0, "max": 10000.0},
+            "orbit.molar_mass": {"min": 0.0, "max": 1.0},
+            "orbit.alpha": {"min": 0.0, "max": 3.141592653589793},
+            "orbit.gamma": {"min": 0.0, "max": 10.0},
+            "orbit.R_spec": {"min": 0.0, "max": 1.0e5},
+            "orbit.msis_date": {"kind": "str"},
+            "orbit.msis_f107": {"min": 0.0, "max": 1000.0},
+            "orbit.msis_ap": {"min": 0.0, "max": 1000.0},
+            "orbit.latitude": {"min": -90.0, "max": 90.0},
+            "orbit.longitude": {"min": -180.0, "max": 180.0},
+            "orbit.use_average": {"kind": "bool"},
+
+            "geometry.S_in": {"kind": "choice", "allowed": {"c", "s", "e", "r"}},
+            "geometry.S_body": {"kind": "choice", "allowed": {"c", "s", "e", "r"}},
+            "geometry.use_intake_area_ratio": {"kind": "bool"},
+            "geometry.fixed_body": {"kind": "bool"},
+            "geometry.intake_area_ratio": {"min": 0.0, "max": 100.0},
+            "geometry.AR_in": {"min": 0.0, "max": 100.0},
+            "geometry.AR_body": {"min": 0.0, "max": 100.0},
+            "geometry.AR_solar": {"min": 0.0, "max": 100.0},
+            "geometry.AR_rad": {"min": 0.0, "max": 100.0},
+            "geometry.epsilon_in": {"min": 0.0, "max": 1.0},
+            "geometry.epsilon_body": {"min": 0.0, "max": 1.0},
+            "geometry.epsilon_solar": {"min": 0.0, "max": 1.0},
+            "geometry.epsilon_rad": {"min": 0.0, "max": 1.0},
+            "geometry.epsilon_in_norm": {"min": 0.0, "max": 1.0},
+            "geometry.wake_in": {"min": 0.0, "max": 10.0},
+            "geometry.wake_body": {"min": 0.0, "max": 10.0},
+            "geometry.wake_solar": {"min": 0.0, "max": 10.0},
+            "geometry.wake_radiator": {"min": 0.0, "max": 10.0},
+            "geometry.A_in": {"min": 0.0, "max": 1.0e5},
+            "geometry.A_ref": {"min": 0.0, "max": 1.0e5},
+            "geometry.A_prop": {"min": 0.0, "max": 1.0e5},
+            "geometry.A_in_drag": {"min": 0.0, "max": 1.0e5},
+            "geometry.A_body": {"min": 0.0, "max": 1.0e5},
+            "geometry.A_solar": {"min": 0.0, "max": 1.0e5},
+            "geometry.A_rad": {"min": 0.0, "max": 1.0e5},
+            "geometry.t_solar": {"min": 0.0, "max": 100.0},
+            "geometry.t_rad": {"min": 0.0, "max": 100.0},
+            "geometry.L_in": {"min": 0.0, "max": 1.0e5},
+            "geometry.L_body": {"min": 0.0, "max": 1.0e5},
+            "geometry.X_solar": {"min": 0.0, "max": 1.0e5},
+            "geometry.X_rad": {"min": 0.0, "max": 1.0e5},
+
+            "rate.R_mass_volume_in": {"min": 0.0, "max": 1.0e6},
+            "rate.R_mass_volume_body": {"min": 0.0, "max": 1.0e6},
+            "rate.R_mass_surface_solar": {"min": 0.0, "max": 1.0e6},
+            "rate.R_mass_surface_rad": {"min": 0.0, "max": 1.0e6},
+
+            "mass.Mass_in": {"min": 0.0, "max": 1.0e9},
+            "mass.Mass_body": {"min": 0.0, "max": 1.0e9},
+            "mass.Mass_solar": {"min": 0.0, "max": 1.0e9},
+            "mass.Mass_rad": {"min": 0.0, "max": 1.0e9},
+            "mass.Mass_prop": {"min": 0.0, "max": 1.0e9},
+            "mass.Mass_ADCS": {"min": 0.0, "max": 1.0e9},
+            "mass.Mass_payload": {"min": 0.0, "max": 1.0e9},
+            "mass.Mass_refprop": {"min": 0.0, "max": 1.0e9},
+            "mass.Mass_total": {"min": 0.0, "max": 1.0e9},
+
+            "power.Power_in": {"min": 0.0, "max": 1.0e9},
+            "power.Power_body": {"min": 0.0, "max": 1.0e9},
+            "power.Power_solar": {"min": 0.0, "max": 1.0e9},
+            "power.Power_rad": {"min": 0.0, "max": 1.0e9},
+            "power.Power_prop": {"min": 0.0, "max": 1.0e9},
+            "power.Power_ADCS": {"min": 0.0, "max": 1.0e9},
+            "power.Power_payload": {"min": 0.0, "max": 1.0e9},
+            "power.Power_refprop": {"min": 0.0, "max": 1.0e9},
+            "power.Power_total": {"min": 0.0, "max": 1.0e9},
+
+            "thruster.thrust": {"min": 0.0, "max": 1.0e9},
+            "thruster.specific_impulse": {"min": 0.0, "max": 1.0e6},
+            "thruster.eff": {"min": 0.0, "max": 1.0},
+            "thruster.thermal_eff": {"min": 0.0, "max": 1.0},
+            "thruster.power": {"min": 0.0, "max": 1.0e9},
+            "thruster.propellant_mass": {"min": 0.0, "max": 1.0e6},
+            "thruster.m_flow": {"min": 0.0, "max": 1.0e6},
+            "thruster.propulsive_ram_load": {"min": 0.0, "max": 1.0e9},
+            "thruster.refueling_ram_load": {"min": 0.0, "max": 1.0e9},
+            "thruster.required_load": {"min": 0.0, "max": 1.0e9},
+            "thruster.force_residual": {"min": 0.0, "max": 1.0e9},
+
+            "refueling.coll_eff": {"min": 0.0, "max": 1.0},
+            "refueling.t_refuel": {"min": 0.0, "max": 1.0e10},
+            "refueling.eta_refuel": {"min": 0.0, "max": 1.0},
+            "refueling.m_flow": {"min": 0.0, "max": 1.0e6},
+            "refueling.p_tank": {"min": 0.0, "max": 1.0e10},
+            "refueling.V_prop": {"min": 0.0, "max": 1.0e6},
+
+            "solar.av_aligment": {"min": 0.0, "max": 180.0},
+            "solar.eta_solar": {"min": 0.0, "max": 1.0},
+            "solar.eta_power": {"min": 0.0, "max": 1.0},
+
+            "drag.cd_solar": {"min": 0.0, "max": 100.0},
+            "drag.cd_solar_front": {"min": 0.0, "max": 100.0},
+            "drag.cd_rad": {"min": 0.0, "max": 100.0},
+            "drag.cd_rad_front": {"min": 0.0, "max": 100.0},
+            "drag.cd_body_side": {"min": 0.0, "max": 100.0},
+            "drag.cd_inlet_side": {"min": 0.0, "max": 100.0},
+            "drag.cd_inlet_front": {"min": 0.0, "max": 100.0},
+            "drag.drag_total": {"min": 0.0, "max": 1.0e9},
+            "drag.drag_solar": {"min": 0.0, "max": 1.0e9},
+            "drag.drag_solar_front": {"min": 0.0, "max": 1.0e9},
+            "drag.drag_rad": {"min": 0.0, "max": 1.0e9},
+            "drag.drag_rad_front": {"min": 0.0, "max": 1.0e9},
+            "drag.drag_body_side": {"min": 0.0, "max": 1.0e9},
+            "drag.drag_inlet_side": {"min": 0.0, "max": 1.0e9},
+            "drag.drag_inlet_front": {"min": 0.0, "max": 1.0e9},
+
+            "thermal.T_des": {"min": 0.0, "max": 10000.0},
+            "thermal.alpha_body": {"min": 0.0, "max": 1.0},
+            "thermal.alpha_solar": {"min": 0.0, "max": 1.0},
+            "thermal.epsilon_therm_in": {"min": 0.0, "max": 1.0},
+            "thermal.epsilon_therm_body": {"min": 0.0, "max": 1.0},
+            "thermal.epsilon_therm_solar": {"min": 0.0, "max": 1.0},
+            "thermal.epsilon_therm_rad": {"min": 0.0, "max": 1.0},
+
+            "mission_profile.active_refueling": {"kind": "bool"},
+            "mission_profile.delta_v": {"min": 0.0, "max": 1.0e7},
+            "mission_profile.required_fuel": {"min": 0.0, "max": 1.0e9},
+        }
+
+        errors: list[str] = []
+
+        for path, spec in specs.items():
+            value = values[path]
+            kind = spec.get("kind", "number")
+
+            if kind == "bool":
+                if not isinstance(value, bool):
+                    errors.append(f"{path} must be a bool, got {type(value).__name__}")
+                continue
+
+            if kind == "str":
+                if not isinstance(value, str) or not value.strip():
+                    errors.append(f"{path} must be a non-empty string")
+                continue
+
+            if kind == "choice":
+                if value not in spec["allowed"]:
+                    errors.append(f"{path} must be one of {sorted(spec['allowed'])}, got {value!r}")
+                continue
+
+            if not isinstance(value, (int, float)) or isinstance(value, bool):
+                errors.append(f"{path} must be a number, got {type(value).__name__}")
+                continue
+
+            if not math.isfinite(float(value)):
+                errors.append(f"{path} must be finite, got {value!r}")
+                continue
+
+            min_value = spec["min"]
+            max_value = spec["max"]
+
+            if value < min_value or value > max_value:
+                errors.append(
+                    f"{path} must be between {min_value} and {max_value}, got {value}"
+                )
+
+        if errors:
+            raise ValueError("SpacecraftState bound check failed:\n - " + "\n - ".join(errors))
 
     @classmethod
     def from_toml(cls, filepath: str | PathLike[str]) -> "SpacecraftState":

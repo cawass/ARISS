@@ -1,0 +1,28 @@
+name = "Ext 03 Avg Atmos RR | Fixed Body Ratio | Refueling"
+
+[orbit]
+altitude = 210.0
+msis_date = "2015-11-17T06:00:00"
+msis_f107 = 130.0
+msis_ap = 22.0
+latitude = 55.0
+longitude = 60.0
+use_average = true
+
+[geometry]
+S_in = "r"
+S_body = "r"
+AR_in = 1.0
+AR_body = 1.0
+use_intake_area_ratio = true
+fixed_body = true
+intake_area_ratio = 1.6
+
+[refueling]
+coll_eff = 0.32
+t_refuel = 45000000.0
+
+[mission_profile]
+active_refueling = true
+delta_v = 1200.0
+

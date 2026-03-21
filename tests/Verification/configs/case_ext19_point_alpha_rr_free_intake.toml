@@ -1,0 +1,29 @@
+name = "Ext 19 Point Atmos RR | Free Intake | Small Alpha and Accommodation Mix"
+
+[orbit]
+altitude = 202.0
+msis_date = "2016-04-16T04:00:00"
+msis_f107 = 140.0
+msis_ap = 12.0
+latitude = 5.0
+longitude = -60.0
+alpha = 0.05
+use_average = false
+
+[geometry]
+S_in = "r"
+S_body = "r"
+AR_in = 1.0
+AR_body = 1.0
+use_intake_area_ratio = false
+fixed_body = false
+intake_area_ratio = 1.0
+epsilon_in = 0.12
+epsilon_body = 0.08
+epsilon_solar = 0.10
+epsilon_rad = 0.10
+epsilon_in_norm = 0.20
+
+[mission_profile]
+active_refueling = false
+

@@ -21,6 +21,9 @@ from scipy.special import erf
 from ariss.core.spacecraft import SpacecraftState
 from ariss.utils import constants as const
 
+# ============================================================================== #
+#  HELPERS
+# ============================================================================== #
 
 def _drag_coefficient(speed_ratio: float, epsilon: float, alpha: float, orb_temp: float, wall_temp: float, multiplier: float) -> float:
     # Inputs:
@@ -84,6 +87,9 @@ def _panel_front_area(total_area: float, aspect_ratio: float, thickness: float) 
     span = area_each / chord
     return 2.0 * span * thickness
 
+# ============================================================================== #
+#  CORE
+# ============================================================================== #
 
 def drag_model(sc: SpacecraftState) -> None:
     # Inputs:
@@ -113,11 +119,23 @@ def drag_model(sc: SpacecraftState) -> None:
     else:
         alpha_in = 0.0
 
-    # Apply wake factors directly from geometry settings to each drag channel.
-    sc.drag.cd_inlet_side = _drag_coefficient(speed_ratio, sc.geometry.epsilon_in, sc.orbit.alpha + alpha_in, sc.orbit.temperature, sc.thermal.T_des, 1.0) * sc.geometry.wake_in
-    sc.drag.cd_inlet_front = _drag_coefficient(speed_ratio, sc.geometry.epsilon_in_norm, sc.orbit.alpha + 0.5 * np.pi, sc.orbit.temperature, sc.thermal.T_des, 1.0) 
-    sc.drag.cd_solar = _drag_coefficient(speed_ratio, sc.geometry.epsilon_solar, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des, 2.0) * sc.geometry.wake_solar
-    sc.drag.cd_solar_front = _drag_coefficient(speed_ratio, sc.geometry.epsilon_solar, sc.orbit.alpha + 0.5 * np.pi, sc.orbit.temperature, sc.thermal.T_des, 1.0) * sc.geometry.wake_solar
-    sc.drag.cd_rad = _drag_coefficient(speed_ratio, sc.geometry.epsilon_rad, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des, 2.0) * sc.geometry.wake_radiator
-    sc.drag.cd_rad_front = _drag_coefficient(speed_ratio, sc.geometry.epsilon_rad, sc.orbit.alpha + 0.5 * np.pi, sc.orbit.temperature, sc.thermal.T_des, 1.0) * sc.geometry.wake_radiator
-    sc.drag.cd_body_side = _drag_coefficient(speed_ratio, sc.geometry.epsilon_body, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des, 1.0) * sc.geometry.wake_body
+    # Apply wake factors directly from geometry settings to each drag channel if applicable.
+
+    if sc.geometry.A_in > sc.geometry.A_body:
+        sc.drag.cd_inlet_side = _drag_coefficient(speed_ratio, sc.geometry.epsilon_in, sc.orbit.alpha + alpha_in, sc.orbit.temperature, sc.thermal.T_des, 1.0) * sc.geometry.wake_in
+        sc.drag.cd_inlet_front = _drag_coefficient(speed_ratio, sc.geometry.epsilon_in_norm, sc.orbit.alpha + 0.5 * np.pi, sc.orbit.temperature, sc.thermal.T_des, 1.0) 
+        sc.drag.cd_solar = _drag_coefficient(speed_ratio, sc.geometry.epsilon_solar, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des, 2.0) * sc.geometry.wake_solar
+        sc.drag.cd_solar_front = _drag_coefficient(speed_ratio, sc.geometry.epsilon_solar, sc.orbit.alpha + 0.5 * np.pi, sc.orbit.temperature, sc.thermal.T_des, 1.0) * sc.geometry.wake_solar
+        sc.drag.cd_rad = _drag_coefficient(speed_ratio, sc.geometry.epsilon_rad, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des, 2.0) * sc.geometry.wake_radiator
+        sc.drag.cd_rad_front = _drag_coefficient(speed_ratio, sc.geometry.epsilon_rad, sc.orbit.alpha + 0.5 * np.pi, sc.orbit.temperature, sc.thermal.T_des, 1.0) * sc.geometry.wake_radiator
+        sc.drag.cd_body_side = _drag_coefficient(speed_ratio, sc.geometry.epsilon_body, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des, 1.0) * sc.geometry.wake_body
+    else:
+        sc.drag.cd_inlet_side = _drag_coefficient(speed_ratio, sc.geometry.epsilon_in, sc.orbit.alpha + alpha_in, sc.orbit.temperature, sc.thermal.T_des, 1.0) 
+        sc.drag.cd_inlet_front = _drag_coefficient(speed_ratio, sc.geometry.epsilon_in_norm, sc.orbit.alpha + 0.5 * np.pi, sc.orbit.temperature, sc.thermal.T_des, 1.0) 
+        sc.drag.cd_solar = _drag_coefficient(speed_ratio, sc.geometry.epsilon_solar, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des, 2.0) 
+        sc.drag.cd_solar_front = _drag_coefficient(speed_ratio, sc.geometry.epsilon_solar, sc.orbit.alpha + 0.5 * np.pi, sc.orbit.temperature, sc.thermal.T_des, 1.0) 
+        sc.drag.cd_rad = _drag_coefficient(speed_ratio, sc.geometry.epsilon_rad, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des, 2.0) 
+        sc.drag.cd_rad_front = _drag_coefficient(speed_ratio, sc.geometry.epsilon_rad, sc.orbit.alpha + 0.5 * np.pi, sc.orbit.temperature, sc.thermal.T_des, 1.0) 
+        sc.drag.cd_body_side = _drag_coefficient(speed_ratio, sc.geometry.epsilon_body, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des, 1.0) 
+    
+

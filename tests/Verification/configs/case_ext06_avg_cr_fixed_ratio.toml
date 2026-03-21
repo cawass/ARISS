@@ -1,0 +1,23 @@
+name = "Ext 06 Avg Atmos CR | Fixed Body Ratio"
+
+[orbit]
+altitude = 200.0
+msis_date = "2019-07-04T09:30:00"
+msis_f107 = 190.0
+msis_ap = 25.0
+latitude = -35.0
+longitude = 30.0
+use_average = true
+
+[geometry]
+S_in = "c"
+S_body = "r"
+AR_in = 1.2
+AR_body = 0.9
+use_intake_area_ratio = true
+fixed_body = true
+intake_area_ratio = 1.8
+
+[mission_profile]
+active_refueling = false
+

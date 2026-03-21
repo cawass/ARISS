@@ -1,0 +1,23 @@
+name = "Ext 15 Point Atmos Dateline RR | Fixed Body Ratio | Low Ap"
+
+[orbit]
+altitude = 205.0
+msis_date = "2018-03-03T03:00:00"
+msis_f107 = 120.0
+msis_ap = 4.0
+latitude = 10.0
+longitude = 179.0
+use_average = false
+
+[geometry]
+S_in = "r"
+S_body = "r"
+AR_in = 2.0
+AR_body = 1.0
+use_intake_area_ratio = true
+fixed_body = true
+intake_area_ratio = 1.1
+
+[mission_profile]
+active_refueling = false
+

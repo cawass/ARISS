@@ -42,11 +42,21 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import tkinter as tk
 from tkinter import ttk
 
-from ariss.core.simulation import compute_drag_diagnostics, load_spacecraft_from_base_config, run_sizing_loop
+from ariss.core.simulation import load_spacecraft_from_base_config, run_sizing_loop
+from ariss.modules.Drag import drag_model   # <-- REQUIRED
 from ariss.core.spacecraft import GeometryState, SpacecraftState
 from ariss.modules.Thermal import ThermalDiagnostics, thermal_model
 from ariss.utils import constants as const
 from ariss.utils.atmosphere import atmosphere_properties_from_height, atmos
+
+def compute_drag_diagnostics(sc: SpacecraftState) -> SpacecraftState:
+    """
+    Runs drag model on a COPY of the spacecraft state for UI diagnostics.
+    This prevents mutation of history states.
+    """
+    state = deepcopy(sc)
+    drag_model(state)
+    return state
 
 
 # --------------------------------------------------------------------------------------

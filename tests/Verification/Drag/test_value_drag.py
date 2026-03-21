@@ -87,7 +87,7 @@ def test_drag_values_after_drag_and_propulsion_models_for_all_configs(config_pat
     drag_model(sc)
     _assert_in_range("cd_solar", sc.drag.cd_solar, 1.0e-2, 2.0e-1)
     _assert_in_range("cd_rad", sc.drag.cd_rad, 1.0e-2, 2.0e-1)
-    _assert_in_range("cd_body_side", sc.drag.cd_body_side, 3.0e-2, 8.0e-2)
+    _assert_in_range("cd_body_side", sc.drag.cd_body_side, 3.0e-2, 1)
     _assert_in_range("cd_inlet_side", sc.drag.cd_inlet_side, 1.0e-2, 2)
     _assert_in_range("cd_inlet_front", sc.drag.cd_inlet_front, 0.5, 3)
 

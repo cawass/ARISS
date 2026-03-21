@@ -23,6 +23,9 @@ import numpy as np
 from ariss.utils import constants as const
 from ariss.utils.atmosphere import orbit_updates_from_density
 
+# ============================================================================== #
+#  HELPERS
+# ============================================================================== #
 
 def _is_round(shape_code: str) -> bool:
     shape = str(shape_code).strip().lower()
@@ -99,9 +102,9 @@ def _drag_reference_area_sum(sc) -> float:
     body_side_area, inlet_side_area = _side_areas(sc.geometry)
     solar_front_area = _panel_front_area(sc.geometry.A_solar, sc.geometry.AR_solar, sc.geometry.t_solar)
     rad_front_area = _panel_front_area(sc.geometry.A_rad, sc.geometry.AR_rad, sc.geometry.t_rad)
-    cd_s_solar = sc.drag.cd_solar * (2.0 * sc.geometry.A_solar)
+    cd_s_solar = sc.drag.cd_solar * sc.geometry.A_solar
     cd_s_solar_front = sc.drag.cd_solar_front * solar_front_area
-    cd_s_rad = sc.drag.cd_rad * (2.0 * sc.geometry.A_rad)
+    cd_s_rad = sc.drag.cd_rad * sc.geometry.A_rad
     cd_s_rad_front = sc.drag.cd_rad_front * rad_front_area
     cd_s_body = sc.drag.cd_body_side * body_side_area
     cd_s_inlet_side = sc.drag.cd_inlet_side * inlet_side_area
@@ -240,9 +243,9 @@ def _update_drag_outputs(sc) -> None:
     solar_front_area = _panel_front_area(sc.geometry.A_solar, sc.geometry.AR_solar, sc.geometry.t_solar)
     rad_front_area = _panel_front_area(sc.geometry.A_rad, sc.geometry.AR_rad, sc.geometry.t_rad)
     q = 0.5 * sc.orbit.density * sc.orbit.velocity ** 2
-    sc.drag.drag_solar = q * sc.drag.cd_solar * (2.0 * sc.geometry.A_solar)
+    sc.drag.drag_solar = q * sc.drag.cd_solar * sc.geometry.A_solar
     sc.drag.drag_solar_front = q * sc.drag.cd_solar_front * solar_front_area
-    sc.drag.drag_rad = q * sc.drag.cd_rad * (2.0 * sc.geometry.A_rad)
+    sc.drag.drag_rad = q * sc.drag.cd_rad * sc.geometry.A_rad
     sc.drag.drag_rad_front = q * sc.drag.cd_rad_front * rad_front_area
     sc.drag.drag_body_side = q * sc.drag.cd_body_side * body_side_area
     sc.drag.drag_inlet_side = q * sc.drag.cd_inlet_side * inlet_side_area
@@ -264,6 +267,9 @@ def _update_force_balance_outputs(sc, exhaust_velocity: float) -> None:
     sc.thruster.required_load = sc.drag.drag_total + sc.thruster.propulsive_ram_load + sc.thruster.refueling_ram_load
     sc.thruster.force_residual = sc.thruster.thrust - sc.thruster.required_load
 
+# ============================================================================== #
+#  CORE
+# ============================================================================== #
 
 def propulsion_model(sc):
     # Inputs:
