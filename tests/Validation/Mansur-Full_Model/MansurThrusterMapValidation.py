@@ -6,8 +6,11 @@ from contextlib import redirect_stdout
 
 ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "src"
+VALIDATION_DIR = ROOT / "tests" / "Validation"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
+if str(VALIDATION_DIR) not in sys.path:
+    sys.path.insert(0, str(VALIDATION_DIR))
 
 HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
@@ -19,13 +22,12 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 from matplotlib.lines import Line2D
-from matplotlib.patches import Rectangle
 
 from ariss.core.spacecraft import SpacecraftState
 from ariss.core.simulation import run_sizing_loop, logger as simulation_logger
+from plot_style import PALETTE, apply_validation_style, style_axis, style_legend
 
 from MansurEnvelopeValidation import (
-    _apply_publication_style,
     smooth_by_y,
     crossing_tp_for_level,
     stitch_branches,
@@ -40,9 +42,9 @@ EFF_LEVELS = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
 MDOT_LEVELS = [0.25, 0.4, 0.6, 0.8, 1.0, 1.2, 1.5]
 AIN_LEVELS = [1.2, 0.5, 0.3, 0.16]
 
-EFF_COLOR = "#0025F5"
-MDOT_COLOR = "#00B5F5"
-AIN_COLOR = "#00F5A0"
+EFF_COLOR = PALETTE["l1_teal"]
+MDOT_COLOR = PALETTE["sernn_pink"]
+AIN_COLOR = PALETTE["choice_mid"]
 
 
 def run_sweep():
@@ -147,7 +149,7 @@ def _plot_family(axis, lines, levels, color, linestyle, linewidth, label_specs, 
 
 
 def plot():
-    _apply_publication_style()
+    apply_validation_style()
 
     isp_grid, tp_mn_per_kw, eff_grid, mdot_mg_per_s, ain_m2 = run_sweep()
 
@@ -218,31 +220,9 @@ def plot():
 
     axis.xaxis.set_minor_locator(AutoMinorLocator(2))
     axis.yaxis.set_minor_locator(AutoMinorLocator(2))
-    for spine in axis.spines.values():
-        spine.set_visible(True)
-        spine.set_color("black")
-        spine.set_linewidth(1.0)
-        spine.set_alpha(1.0)
-
-    axis.tick_params(axis="both", which="major", colors="black", width=0.9, length=5)
-    axis.tick_params(axis="both", which="minor", colors="black", width=0.7, length=3)
-    axis.xaxis.label.set_color("black")
-    axis.yaxis.label.set_color("black")
-
-    axis.add_patch(
-        Rectangle(
-            (0.0, 0.0),
-            1.0,
-            1.0,
-            transform=axis.transAxes,
-            fill=False,
-            edgecolor="black",
-            linewidth=1.0,
-            alpha=1.0,
-            zorder=3,
-            clip_on=False,
-        )
-    )
+    style_axis(axis)
+    axis.tick_params(axis="both", which="major", width=0.9, length=5)
+    axis.tick_params(axis="both", which="minor", width=0.7, length=3)
 
     axis.legend(
         handles=[
@@ -259,6 +239,7 @@ def plot():
         handletextpad=0.5,
         borderaxespad=0.0,
     )
+    style_legend(axis.get_legend())
 
     figure.tight_layout()
     figure.savefig(OUTPUT, dpi=1200, bbox_inches="tight")

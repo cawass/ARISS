@@ -31,14 +31,18 @@ from scipy.interpolate import PchipInterpolator
 
 ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "src"
+VALIDATION_DIR = ROOT / "tests" / "Validation"
 
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
+if str(VALIDATION_DIR) not in sys.path:
+    sys.path.insert(0, str(VALIDATION_DIR))
 
 from ariss.core.simulation import load_spacecraft_from_base_config
 from ariss.modules.Drag import drag_model
 from ariss.modules.Propulsion import _update_drag_outputs
 from ariss.utils.atmosphere import orbit_updates_from_height
+from plot_style import PALETTE, apply_validation_style, style_axis, style_legend
 
 CASE_3U_PATH = Path(__file__).with_name("CrandallWirz2022_3U.toml")
 CASE_6U_PATH = Path(__file__).with_name("CrandallWirz2022_6U.toml")
@@ -60,15 +64,15 @@ SOLAR_ACTIVITY_F107 = {
     "Solar Maximum": 200.0,
 }
 SOLAR_COLORS = {
-    "Solar Minimum": "#0b69c7",
-    "Mean Solar Activity": "#e25822",
-    "Solar Maximum": "#f2b01e",
+    "Solar Minimum": PALETTE["l1_teal"],
+    "Mean Solar Activity": PALETTE["sernn_pink"],
+    "Solar Maximum": PALETTE["choice_mid"],
 }
 MISSION_COLORS = {
-    "1 Year Mission": "#0b69c7",
-    "2 Year Mission": "#e25822",
-    "3 Year Mission": "#f2b01e",
-    "4 Year Mission": "#7b3294",
+    "1 Year Mission": PALETTE["l1_teal"],
+    "2 Year Mission": PALETTE["sernn_pink"],
+    "3 Year Mission": PALETTE["choice_mid"],
+    "4 Year Mission": PALETTE["cat_purple"],
 }
 
 # Digitized from the paper figure for a compact reference recreation.
@@ -184,7 +188,7 @@ def build_fig11_curves(spacecraft_template) -> dict[str, dict[str, np.ndarray]]:
 
 
 def plot_fig11(curves: dict[str, dict[str, np.ndarray]], save_path: Path = FIG11_OUTPUT_PATH, show: bool = True) -> Path:
-    plt.rcParams.update({"font.family": "serif", "font.size": 12})
+    apply_validation_style()
     figure, axis = plt.subplots(figsize=(7.4, 5.5), dpi=150)
 
     for label, payload in curves.items():
@@ -200,8 +204,9 @@ def plot_fig11(curves: dict[str, dict[str, np.ndarray]], save_path: Path = FIG11
     axis.set_ylim(150.0, 190.0)
     axis.set_xlabel("Thrust to Power [mN/kW]")
     axis.set_ylabel("Minimum Operating Altitude [km]")
-    axis.grid(True, color="#bdbdbd", linewidth=0.6, alpha=0.45)
-    axis.legend(loc="upper right", frameon=True, edgecolor="black", fancybox=False)
+    style_axis(axis)
+    legend = axis.legend(loc="upper right")
+    style_legend(legend)
 
     figure.tight_layout()
     figure.savefig(save_path, dpi=300, bbox_inches="tight")
@@ -255,7 +260,7 @@ def save_table1_png(rows: list[dict[str, str]], save_path: Path = TABLE1_PNG_PAT
     headers = ["Altitude [km]", "Total", "Inlet", "SA Skin", "Body Skin", "SA Frontal Area"]
     cell_text = [[row[header] for header in headers] for row in rows]
 
-    plt.rcParams.update({"font.family": "serif", "font.size": 11})
+    apply_validation_style()
     figure, axis = plt.subplots(figsize=(10.6, 4.8), dpi=150)
     axis.axis("off")
     axis.set_title(
@@ -274,7 +279,7 @@ def save_table1_png(rows: list[dict[str, str]], save_path: Path = TABLE1_PNG_PAT
         cell.set_edgecolor("black")
         if row_index == 0:
             cell.set_text_props(weight="bold")
-            cell.set_facecolor("#f2f2f2")
+            cell.set_facecolor(PALETTE["l1_teal_fill"])
 
     figure.tight_layout()
     figure.savefig(save_path, dpi=300, bbox_inches="tight")
@@ -312,18 +317,20 @@ def build_drag_profiles(spacecraft_template, altitude_grid_km: np.ndarray = DRAG
 
 def _plot_drag_panel(axis, profiles: dict[str, np.ndarray], title: str) -> None:
     altitude_km = profiles["altitude_km"]
-    axis.plot(profiles["total_drag_mn"], altitude_km, color="#0b69c7", linewidth=1.8, label="Total Drag")
-    axis.plot(profiles["frontal_drag_mn"], altitude_km, color="#e25822", linewidth=1.6, label="Frontal Area Drag")
-    axis.plot(profiles["solar_skin_drag_mn"], altitude_km, color="#f2b01e", linewidth=1.6, label="SA Skin Friction Drag")
-    axis.plot(profiles["body_skin_drag_mn"], altitude_km, color="#7b3294", linewidth=1.6, label="Body Skin Friction Drag")
-    axis.plot(profiles["solar_front_drag_mn"], altitude_km, color="#6dbb3c", linewidth=1.6, label="SA Frontal Area Drag")
+    axis.plot(profiles["total_drag_mn"], altitude_km, color=PALETTE["l1_teal"], linewidth=1.8, label="Total Drag")
+    axis.plot(profiles["frontal_drag_mn"], altitude_km, color=PALETTE["sernn_pink"], linewidth=1.6, label="Frontal Area Drag")
+    axis.plot(profiles["solar_skin_drag_mn"], altitude_km, color=PALETTE["choice_mid"], linewidth=1.6, label="SA Skin Friction Drag")
+    axis.plot(profiles["body_skin_drag_mn"], altitude_km, color=PALETTE["cat_purple"], linewidth=1.6, label="Body Skin Friction Drag")
+    axis.plot(profiles["solar_front_drag_mn"], altitude_km, color=PALETTE["cat_green"], linewidth=1.6, label="SA Frontal Area Drag")
     axis.set_xscale("log")
     axis.set_xlim(1.0e-3, 1.0e1)
     axis.set_ylim(float(np.min(altitude_km)), float(np.max(altitude_km)))
     axis.set_xlabel("Drag [mN]")
     axis.set_title(title)
-    axis.grid(True, which="both", color="#bdbdbd", linewidth=0.5, alpha=0.35)
-    axis.legend(loc="lower left", frameon=True, edgecolor="black", fancybox=False, fontsize=8.5)
+    style_axis(axis)
+    axis.grid(True, which="both", color=PALETTE["light_grid"], linewidth=0.5, alpha=0.5)
+    legend = axis.legend(loc="lower left", fontsize=8.5)
+    style_legend(legend)
 
 
 def plot_fig6_drag_comparison(
@@ -332,7 +339,7 @@ def plot_fig6_drag_comparison(
     save_path: Path = FIG6_OUTPUT_PATH,
     show: bool = True,
 ) -> Path:
-    plt.rcParams.update({"font.family": "serif", "font.size": 12})
+    apply_validation_style()
     figure, axes = plt.subplots(1, 2, figsize=(11.2, 4.8), dpi=150, sharey=True)
     _plot_drag_panel(axes[0], profiles_3u, "(a) 3U Drag")
     _plot_drag_panel(axes[1], profiles_6u, "(b) 6U Drag")
@@ -356,7 +363,7 @@ def _smooth_digitized_curve(payload: dict[str, np.ndarray], x_key: str) -> tuple
 
 
 def plot_fig19_payload_volume(save_path: Path = FIG19_OUTPUT_PATH, show: bool = True) -> Path:
-    plt.rcParams.update({"font.family": "serif", "font.size": 12})
+    apply_validation_style()
     figure, axis = plt.subplots(figsize=(6.1, 5.3), dpi=150)
 
     for label, payload in FIG19_REFERENCE.items():
@@ -367,8 +374,9 @@ def plot_fig19_payload_volume(save_path: Path = FIG19_OUTPUT_PATH, show: bool = 
     axis.set_ylim(180.0, 300.0)
     axis.set_xlabel("Payload Volume [U]")
     axis.set_ylabel("Altitude [km]")
-    axis.grid(True, color="#bdbdbd", linewidth=0.6, alpha=0.45)
-    axis.legend(loc="upper left", frameon=True, edgecolor="black", fancybox=False, fontsize=10)
+    style_axis(axis)
+    legend = axis.legend(loc="upper left", fontsize=10)
+    style_legend(legend)
 
     figure.tight_layout()
     figure.savefig(save_path, dpi=300, bbox_inches="tight")
@@ -380,7 +388,7 @@ def plot_fig19_payload_volume(save_path: Path = FIG19_OUTPUT_PATH, show: bool = 
 
 
 def plot_fig20_wet_mass(save_path: Path = FIG20_OUTPUT_PATH, show: bool = True) -> Path:
-    plt.rcParams.update({"font.family": "serif", "font.size": 12})
+    apply_validation_style()
     figure, axis = plt.subplots(figsize=(6.1, 5.3), dpi=150)
 
     for label, payload in FIG20_REFERENCE.items():
@@ -391,8 +399,9 @@ def plot_fig20_wet_mass(save_path: Path = FIG20_OUTPUT_PATH, show: bool = True) 
     axis.set_ylim(180.0, 300.0)
     axis.set_xlabel("Mass [kg]")
     axis.set_ylabel("Operating Altitude [km]")
-    axis.grid(True, color="#bdbdbd", linewidth=0.6, alpha=0.45)
-    axis.legend(loc="upper right", frameon=True, edgecolor="black", fancybox=False, fontsize=10)
+    style_axis(axis)
+    legend = axis.legend(loc="upper right", fontsize=10)
+    style_legend(legend)
 
     figure.tight_layout()
     figure.savefig(save_path, dpi=300, bbox_inches="tight")

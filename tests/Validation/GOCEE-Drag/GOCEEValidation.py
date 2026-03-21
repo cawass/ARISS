@@ -27,9 +27,12 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "src"
+VALIDATION_DIR = ROOT / "tests" / "Validation"
 
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
+if str(VALIDATION_DIR) not in sys.path:
+    sys.path.insert(0, str(VALIDATION_DIR))
 
 
 # ------------------------------------------------------------------------------ #
@@ -37,6 +40,7 @@ if str(SRC) not in sys.path:
 # ------------------------------------------------------------------------------ #
 
 from ariss.modules.Drag import _drag_coefficient
+from plot_style import PALETTE, apply_validation_style, style_axis, style_legend
 
 
 # ------------------------------------------------------------------------------ #
@@ -86,19 +90,21 @@ def plot_gocee_validation(save_path: Path = OUTPUT_PATH, show: bool = True) -> P
     # Outputs:
     #   Saved path of the validation figure.
 
+    apply_validation_style()
     speed_ratio = np.linspace(8.0, 13.0, 400, dtype=float)
     total_cd = gocee_total_cd(speed_ratio)
 
     fig, axis = plt.subplots(figsize=(6.4, 4.6), dpi=150)
-    axis.plot(speed_ratio, total_cd, color="#4c9ed9", linewidth=2.0, label=r"$C_D$ with $A_{par}/A_{front} = 28.2$")
-    axis.scatter(REFERENCE_SPEED_RATIO, REFERENCE_CD, color="#d97a3a", marker="x", s=42, linewidths=1.6, label="Koppenwallner GOCE $C_D$")
+    axis.plot(speed_ratio, total_cd, color=PALETTE["l1_teal"], linewidth=2.0, label=r"$C_D$ with $A_{par}/A_{front} = 28.2$")
+    axis.scatter(REFERENCE_SPEED_RATIO, REFERENCE_CD, color=PALETTE["choice_mid"], marker="x", s=42, linewidths=1.6, label="Koppenwallner GOCE $C_D$")
 
     axis.set_xlim(8.0, 13.0)
     axis.set_ylim(3.2, 4.2)
     axis.set_xlabel(r"Speed ratio $S_{\infty}$")
     axis.set_ylabel(r"Drag coefficient $C_D$")
-    axis.grid(True, color="#d9d9d9", linewidth=0.8, alpha=0.8)
-    axis.legend(loc="upper right", frameon=True)
+    style_axis(axis)
+    legend = axis.legend(loc="upper right")
+    style_legend(legend)
 
     fig.tight_layout()
     fig.savefig(save_path, dpi=300, bbox_inches="tight")

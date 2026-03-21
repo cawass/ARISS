@@ -36,10 +36,10 @@ use_average = false               # [bool] If true, use latitude/longitude-avera
 
 [geometry]
 S_in = "c"                        # [str] Intake shape code ("c/e" round, "s/r" rectangular).
-S_body = "c"                      # [str] Body shape code ("c/e" round, "s/r" rectangular).
+S_body = "r"                      # [str] Body shape code ("c/e" round, "s/r" rectangular).
 use_intake_area_ratio = true      # [bool] If true, enforce A_in/A_body = intake_area_ratio.
 fixed_body = false 
-intake_area_ratio = 1.0           # [-] Intake-to-body area ratio (1 equal, <1 smaller intake, >1 larger intake).
+intake_area_ratio = 2.0           # [-] Intake-to-body area ratio (1 equal, <1 smaller intake, >1 larger intake).
 AR_in = 1.0                       # [-] Intake width/height aspect ratio.
 AR_body = 1.0                     # [-] Body width/height aspect ratio.
 AR_solar = 0.5                    # [-] Solar panel planform aspect ratio.

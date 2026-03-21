@@ -30,9 +30,12 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "src"
+VALIDATION_DIR = ROOT / "tests" / "Validation"
 
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
+if str(VALIDATION_DIR) not in sys.path:
+    sys.path.insert(0, str(VALIDATION_DIR))
 
 
 # ------------------------------------------------------------------------------ #
@@ -40,6 +43,7 @@ if str(SRC) not in sys.path:
 # ------------------------------------------------------------------------------ #
 
 from ariss.core.simulation import load_spacecraft_from_base_config, logger as simulation_logger, run_sizing_loop
+from plot_style import PALETTE, apply_validation_style, style_axis, style_legend
 
 
 # ------------------------------------------------------------------------------ #
@@ -64,6 +68,7 @@ def run_efficiency_sweep(show: bool = True) -> Path:
     # Outputs:
     #   Saved path to the validation figure.
 
+    apply_validation_style()
     results: list[tuple[float, bool, float]] = []
 
     previous_level = simulation_logger.level
@@ -90,14 +95,14 @@ def run_efficiency_sweep(show: bool = True) -> Path:
     altitude = np.asarray([item[2] for item in results], dtype=float)
 
     fig, axis = plt.subplots(figsize=(7.2, 4.6), dpi=150)
-    axis.axvline(PAPER_MIN_EFFICIENCY, color="#c44e52", linestyle="--", linewidth=1.4, label="Paper threshold at eta_c = 0.50")
-    axis.axhline(PAPER_MEAN_ALTITUDE, color="#6c757d", linestyle=":", linewidth=1.3, label="Paper mean altitude = 255 km")
+    axis.axvline(PAPER_MIN_EFFICIENCY, color=PALETTE["sernn_pink"], linestyle="--", linewidth=1.4, label="Paper threshold at eta_c = 0.50")
+    axis.axhline(PAPER_MEAN_ALTITUDE, color=PALETTE["muted_text"], linestyle=":", linewidth=1.3, label="Paper mean altitude = 255 km")
 
     if np.any(converged_mask):
         axis.plot(
             efficiency[converged_mask],
             altitude[converged_mask],
-            color="#1f77b4",
+            color=PALETTE["l1_teal"],
             marker="o",
             linewidth=2.0,
             label="ARISS steady-state result",
@@ -108,7 +113,7 @@ def run_efficiency_sweep(show: bool = True) -> Path:
         axis.scatter(
             efficiency[~converged_mask],
             np.full(np.count_nonzero(~converged_mask), fail_altitude),
-            color="#d97a3a",
+            color=PALETTE["choice_mid"],
             marker="x",
             s=52,
             linewidths=1.6,
@@ -122,8 +127,9 @@ def run_efficiency_sweep(show: bool = True) -> Path:
     axis.set_xlabel("Collection efficiency eta_c [-]")
     axis.set_ylabel("Converged altitude [km]")
     axis.set_title("IEPC 2025 Paper | EULO Comparison Sweep")
-    axis.grid(True, color="#d9d9d9", linewidth=0.8, alpha=0.8)
-    axis.legend(loc="best", frameon=True)
+    style_axis(axis)
+    legend = axis.legend(loc="best")
+    style_legend(legend)
 
     fig.tight_layout()
     fig.savefig(OUTPUT_PATH, dpi=300, bbox_inches="tight")

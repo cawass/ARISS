@@ -25,7 +25,6 @@ from pathlib import Path
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
 from matplotlib.lines import Line2D
 from matplotlib.ticker import AutoMinorLocator
 from scipy.interpolate import PchipInterpolator
@@ -37,9 +36,12 @@ from scipy.interpolate import PchipInterpolator
 
 ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "src"
+VALIDATION_DIR = ROOT / "tests" / "Validation"
 
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
+if str(VALIDATION_DIR) not in sys.path:
+    sys.path.insert(0, str(VALIDATION_DIR))
 
 
 # ------------------------------------------------------------------------------ #
@@ -49,6 +51,7 @@ if str(SRC) not in sys.path:
 from ariss.core.simulation import load_spacecraft_from_base_config
 from ariss.core.simulation import logger as simulation_logger
 from ariss.core.simulation import run_sizing_loop
+from plot_style import PALETTE, apply_validation_style, style_axis, style_legend
 
 
 logging.getLogger("fontTools").setLevel(logging.ERROR)
@@ -67,7 +70,7 @@ VECTOR_OUTPUT_PATH = Path(__file__).with_name("mansur_efficiency_validation.svg"
 PDF_OUTPUT_PATH = Path(__file__).with_name("mansur_efficiency_validation.pdf")
 
 COLLECTION_EFFICIENCIES = (0.35, 0.40, 0.45)
-PLOT_COLORS = ["#0025F5", "#00B5F5", "#00F5A0", "#25F500", "#E0F400"]
+PLOT_COLORS = [PALETTE["l1_teal"], PALETTE["sernn_pink"], PALETTE["choice_mid"], PALETTE["cat_green"], PALETTE["cat_yellow"]]
 
 ISP = np.linspace(200, 10000, 40)  # [s]
 
@@ -242,29 +245,7 @@ def _apply_publication_style():
     #   BeautifulFigures principles: readable serif typography, minimal clutter,
     #   subtle grid lines, and consistent colours.
 
-    plt.rcParams.update(
-        {
-            "font.family": "serif",
-            "font.size": 11,
-            "axes.labelsize": 13,
-            "legend.fontsize": 10,
-            "xtick.labelsize": 11,
-            "ytick.labelsize": 11,
-            "axes.linewidth": 1.0,
-            "xtick.direction": "in",
-            "ytick.direction": "in",
-            "xtick.major.size": 5,
-            "ytick.major.size": 5,
-            "xtick.minor.size": 3,
-            "ytick.minor.size": 3,
-            "xtick.top": False,
-            "ytick.right": False,
-            "savefig.dpi": 1200,
-            "savefig.bbox": "tight",
-            "pdf.fonttype": 42,
-            "ps.fonttype": 42,
-        }
-    )
+    apply_validation_style()
 
 
 def _soft_curve_points(altitude_km: np.ndarray, isp_s: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -421,31 +402,9 @@ def plot_results(results, paper_results=None, save_path: Path = OUTPUT_PATH, sho
 
     axis.xaxis.set_minor_locator(AutoMinorLocator(2))
     axis.yaxis.set_minor_locator(AutoMinorLocator(2))
-    for spine in axis.spines.values():
-        spine.set_visible(True)
-        spine.set_color("black")
-        spine.set_linewidth(1.0)
-        spine.set_alpha(1.0)
-
-    axis.tick_params(axis="both", which="major", colors="black", width=0.9, length=5)
-    axis.tick_params(axis="both", which="minor", colors="black", width=0.7, length=3)
-    axis.xaxis.label.set_color("black")
-    axis.yaxis.label.set_color("black")
-
-    axis.add_patch(
-        Rectangle(
-            (0.0, 0.0),
-            1.0,
-            1.0,
-            transform=axis.transAxes,
-            fill=False,
-            edgecolor="black",
-            linewidth=1.0,
-            alpha=1.0,
-            zorder=3,
-            clip_on=False,
-        )
-    )
+    style_axis(axis)
+    axis.tick_params(axis="both", which="major", width=0.9, length=5)
+    axis.tick_params(axis="both", which="minor", width=0.7, length=3)
     if legend_handles:
         ariss_handles = legend_handles[0::2]
         ariss_labels = legend_labels[0::2]
@@ -476,12 +435,7 @@ def plot_results(results, paper_results=None, save_path: Path = OUTPUT_PATH, sho
             borderaxespad=0.0,
         )
         legend = axis.get_legend()
-        if legend is not None:
-            for text in legend.get_texts():
-                text.set_color("black")
-                text.set_alpha(1.0)
-            for handle in legend.legend_handles:
-                handle.set_alpha(1.0)
+        style_legend(legend)
 
     figure.tight_layout()
     figure.savefig(save_path, dpi=1200, bbox_inches="tight")

@@ -7,8 +7,11 @@ from contextlib import redirect_stdout
 
 ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "src"
+VALIDATION_DIR = ROOT / "tests" / "Validation"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
+if str(VALIDATION_DIR) not in sys.path:
+    sys.path.insert(0, str(VALIDATION_DIR))
 
 import numpy as np
 import matplotlib
@@ -17,7 +20,7 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import PchipInterpolator
 from matplotlib.ticker import AutoMinorLocator
 from matplotlib.lines import Line2D
-from matplotlib.patches import Rectangle
+from plot_style import PALETTE, apply_validation_style, style_axis, style_legend
 
 from ariss.core.spacecraft import SpacecraftState
 from ariss.core.simulation import run_sizing_loop, logger as simulation_logger
@@ -38,29 +41,7 @@ G0 = 9.80665
 # ------------------------------------------------------------------------------
 
 def _apply_publication_style():
-    plt.rcParams.update(
-        {
-            "font.family": "serif",
-            "font.size": 11,
-            "axes.labelsize": 13,
-            "legend.fontsize": 10,
-            "xtick.labelsize": 11,
-            "ytick.labelsize": 11,
-            "axes.linewidth": 1.0,
-            "xtick.direction": "in",
-            "ytick.direction": "in",
-            "xtick.major.size": 5,
-            "ytick.major.size": 5,
-            "xtick.minor.size": 3,
-            "ytick.minor.size": 3,
-            "xtick.top": False,
-            "ytick.right": False,
-            "savefig.dpi": 1200,
-            "savefig.bbox": "tight",
-            "pdf.fonttype": 42,
-            "ps.fonttype": 42,
-        }
-    )
+    apply_validation_style()
 
 def smooth_xy(x, y, n=200):
     x = np.asarray(x, dtype=float)
@@ -240,7 +221,7 @@ def plot_efficiency_lines(ax):
 
         x_plot = x_grid[mask]
         y_plot = y_grid[mask]
-        ax.plot(x_plot, y_plot, color="black", lw=0.9, zorder=1)
+        ax.plot(x_plot, y_plot, color=PALETTE["secondary_text"], lw=0.9, zorder=1)
 
         y_label = label_y_targets.get(float(eta), 3800.0)
         x_label = float(tp_from_efficiency(eta, y_label))
@@ -249,13 +230,13 @@ def plot_efficiency_lines(ax):
                 x_label + 0.4,
                 y_label,
                 f"{eta:.1f}",
-                color="black",
+                color=PALETTE["secondary_text"],
                 fontsize=10,
                 rotation=-63.0,
                 rotation_mode="anchor",
                 va="center",
                 ha="left",
-                bbox=dict(facecolor="white", edgecolor="none", pad=0.1),
+                bbox=dict(facecolor=PALETTE["panel_bg"], edgecolor="none", pad=0.1),
                 zorder=4,
             )
 
@@ -532,36 +513,14 @@ def plot():
 
     ax.xaxis.set_minor_locator(AutoMinorLocator(2))
     ax.yaxis.set_minor_locator(AutoMinorLocator(2))
-    for spine in ax.spines.values():
-        spine.set_visible(True)
-        spine.set_color("black")
-        spine.set_linewidth(1.0)
-        spine.set_alpha(1.0)
-
-    ax.tick_params(axis="both", which="major", colors="black", width=0.9, length=5)
-    ax.tick_params(axis="both", which="minor", colors="black", width=0.7, length=3)
-    ax.xaxis.label.set_color("black")
-    ax.yaxis.label.set_color("black")
-
-    ax.add_patch(
-        Rectangle(
-            (0.0, 0.0),
-            1.0,
-            1.0,
-            transform=ax.transAxes,
-            fill=False,
-            edgecolor="black",
-            linewidth=1.0,
-            alpha=1.0,
-            zorder=3,
-            clip_on=False,
-        )
-    )
+    style_axis(ax)
+    ax.tick_params(axis="both", which="major", width=0.9, length=5)
+    ax.tick_params(axis="both", which="minor", width=0.7, length=3)
 
     ax.legend(
         handles=[
-            Line2D([0], [0], color="black", label="ARISS feasible alt (km)"),
-            Line2D([0], [0], color="black", ls="--", label="Mansur feasible alt (km)"),
+            Line2D([0], [0], color=PALETTE["secondary_text"], label="ARISS feasible alt (km)"),
+            Line2D([0], [0], color=PALETTE["secondary_text"], ls="--", label="Mansur feasible alt (km)"),
         ],
         loc="lower center",
         bbox_to_anchor=(0.5, 1.04),
@@ -572,6 +531,7 @@ def plot():
         handletextpad=0.5,
         borderaxespad=0.0,
     )
+    style_legend(ax.get_legend())
 
     fig.tight_layout()
     fig.savefig(OUTPUT, dpi=1200, bbox_inches="tight")

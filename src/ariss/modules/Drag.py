@@ -41,9 +41,9 @@ def _drag_coefficient(speed_ratio: float, epsilon: float, alpha: float, orb_temp
     sin_a = np.sin(alpha)
     cos_2a = np.cos(2.0 * alpha)
     return (
-        (1.0 - epsilon * cos_2a) / (np.sqrt(np.pi) * speed_ratio) * np.exp(-(speed_ratio ** 2) * (sin_a ** 2))
-        + sin_a / (speed_ratio ** 2) * (1.0 + 2.0 * speed_ratio ** 2 + epsilon * (1.0 - 2.0 * speed_ratio ** 2 * cos_2a)) * erf(speed_ratio * sin_a) * multiplier
-        + (1.0 - epsilon) / speed_ratio * np.sqrt(np.pi) * (sin_a ** 2) * np.sqrt(wall_temp / orb_temp)
+        (1.0 - epsilon * cos_2a) / (np.sqrt(np.pi) * speed_ratio) * np.exp(-(speed_ratio ** 2) * (sin_a ** 2)) * multiplier
+        + sin_a / (speed_ratio ** 2) * (1.0 + 2.0 * speed_ratio ** 2 + epsilon * (1.0 - 2.0 * speed_ratio ** 2 * cos_2a)) * erf(speed_ratio * sin_a) 
+        + (1.0 - epsilon) / speed_ratio * np.sqrt(np.pi) * (sin_a ** 2) * np.sqrt(wall_temp / orb_temp) 
     )
 
 

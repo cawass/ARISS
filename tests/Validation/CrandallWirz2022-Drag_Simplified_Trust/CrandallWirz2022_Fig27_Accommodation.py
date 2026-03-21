@@ -19,10 +19,17 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
+import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
 
+ROOT = Path(__file__).resolve().parents[3]
+VALIDATION_DIR = ROOT / "tests" / "Validation"
+if str(VALIDATION_DIR) not in sys.path:
+    sys.path.insert(0, str(VALIDATION_DIR))
+
+from plot_style import apply_validation_style, style_axis, style_legend
 from CrandallWirz2022Validation import (
     CASE_6U_PATH,
     SOLAR_ACTIVITY_F107,
@@ -80,7 +87,7 @@ def build_fig27_curves() -> dict[str, dict[str, np.ndarray]]:
 
 
 def plot_fig27(curves: dict[str, dict[str, np.ndarray]], save_path: Path = OUTPUT_PATH, show: bool = True) -> Path:
-    plt.rcParams.update({"font.family": "serif", "font.size": 12})
+    apply_validation_style()
     figure, axis = plt.subplots(figsize=(7.2, 5.3), dpi=150)
 
     for label, payload in curves.items():
@@ -96,8 +103,9 @@ def plot_fig27(curves: dict[str, dict[str, np.ndarray]], save_path: Path = OUTPU
     axis.set_ylim(150.0, 190.0)
     axis.set_xlabel("Accommodation Coefficient")
     axis.set_ylabel("Minimum Operating Altitude [km]")
-    axis.grid(True, color="#bdbdbd", linewidth=0.6, alpha=0.45)
-    axis.legend(loc="upper left", frameon=True, edgecolor="black", fancybox=False)
+    style_axis(axis)
+    legend = axis.legend(loc="upper left")
+    style_legend(legend)
 
     figure.tight_layout()
     figure.savefig(save_path, dpi=300, bbox_inches="tight")
