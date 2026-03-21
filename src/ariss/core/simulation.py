@@ -142,15 +142,7 @@ def run_sizing_loop(
 
     # Initialize the orbit-dependent atmospheric properties from the starting
     # mission altitude before entering the iterative sizing loop.
-    orbit_updates = orbit_updates_from_height(
-        loop_sc.orbit.altitude,
-        msis_date=loop_sc.orbit.msis_date,
-        msis_f107=loop_sc.orbit.msis_f107,
-        msis_ap=loop_sc.orbit.msis_ap,
-        latitude=loop_sc.orbit.latitude,
-        longitude=loop_sc.orbit.longitude,
-        use_average=loop_sc.orbit.use_average,
-    )
+    orbit_updates = orbit_updates_from_height(loop_sc.orbit.altitude, msis_date=loop_sc.orbit.msis_date, msis_f107=loop_sc.orbit.msis_f107, msis_ap=loop_sc.orbit.msis_ap, latitude=loop_sc.orbit.latitude, longitude=loop_sc.orbit.longitude, use_average=loop_sc.orbit.use_average)
     loop_sc = replace(loop_sc, orbit=replace(loop_sc.orbit, **orbit_updates))
 
     # Prepare the iteration history and convergence trackers.
@@ -190,14 +182,7 @@ def run_sizing_loop(
             residual = abs(loop_sc.mass.Mass_total - previous_state.mass.Mass_total)
             density_residual = _normalized_residual(loop_sc.orbit.density, previous_state.orbit.density, 1.0e-20)
         force_residual = _normalized_residual(loop_sc.thruster.thrust, loop_sc.thruster.required_load, 1.0e-12)
-        logger.debug(
-            "Iter %d: Mass = %.6f kg | Mass residual = %.6e | Force residual = %.6e | Density residual = %.6e",
-            i,
-            loop_sc.mass.Mass_total,
-            residual,
-            force_residual,
-            density_residual,
-        )
+        logger.debug("Iter %d: Mass = %.6f kg | Mass residual = %.6e | Force residual = %.6e | Density residual = %.6e",i,loop_sc.mass.Mass_total,residual,force_residual,density_residual)
 
         # Require mass stability, force balance, density stability, and a
         # minimum number of iterations to avoid exiting on an early transient
@@ -214,9 +199,7 @@ def run_sizing_loop(
 
     # Warn when the loop exits without satisfying the convergence criterion.
     if not converged:
-        logger.warning(
-            "Sizing loop FAILED to converge after %d iterations. Final mass residual: %.6f kg | Final force residual: %.6e | Final density residual: %.6e",
-            max_iterations,
+        logger.warning("Sizing loop FAILED to converge after %d iterations. Final mass residual: %.6f kg | Final force residual: %.6e | Final density residual: %.6e", max_iterations,
             residual,
             force_residual,
             density_residual,
