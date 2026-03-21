@@ -96,7 +96,7 @@ def thermal_model(sc: SpacecraftState):
 
     # Specific geometry types calculation
     # Intake Surface caclulations
-    if sc.geometry.S_in == "s":
+    if sc.geometry.S_in == "s" or sc.geometry.S_in == "r":
         # From the side (assumed Earth direction) there is just body surface
         # Effective projected absorptivity area of side of intake
         Aa_in_earth = A_in_earth * sc.thermal.alpha_body 
@@ -158,7 +158,7 @@ def thermal_model(sc: SpacecraftState):
     
 
     # Body surface calculations
-    if sc.geometry.S_body == "s":
+    if sc.geometry.S_body == "s" or sc.geometry.S_body == "r":
         # From the side (assumed Earth direction) there is just body surface
         # Effective projected absorptivity area of side of body
         Aa_body_earth = A_body_earth * sc.thermal.alpha_body 
