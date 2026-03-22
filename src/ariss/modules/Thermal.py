@@ -12,7 +12,7 @@
 #
 #  Project:        ARISS
 #  Module:         Thermal.py
-#  Author:         Jan
+#  Author:         Jan Zuchowski
 # ============================================================================
 
 

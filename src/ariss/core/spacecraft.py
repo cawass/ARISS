@@ -12,7 +12,7 @@
 #
 #  Project:        ARISS
 #  Module:         spacecraft.py
-#  Author:         Lucas Calderon del Rio, Carlos Carrasco Requejo, Jan
+#  Author:         Lucas Calderon del Rio, Carlos Carrasco Requejo, Jan Zuchowski
 # ============================================================================
 
 import tomllib
