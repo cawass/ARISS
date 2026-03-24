@@ -229,7 +229,7 @@ def thermal_model(sc: SpacecraftState):
     sc.geometry.A_rad = max(((Q_in_total - Q_radiated)/ (const.STEFAN_BOLTZMANN * sc.thermal.T_des**4 * sc.thermal.epsilon_therm_rad) - sc.geometry.A_solar)/2, 0.0)
 
     if sc.geometry.A_rad == 0.0:
-        T_max = (Q_in_total/(const.STEFAN_BOLTZMANN * Ae_total))**(1/4)
+        T_max = (Q_in_total/(const.STEFAN_BOLTZMANN * Ae_total + sc.geometry.A_solar * sc.thermal.epsilon_therm_rad))**(1/4)
     else:
         T_max = sc.thermal.T_des
     
