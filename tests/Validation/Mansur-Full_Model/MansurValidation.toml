@@ -67,7 +67,7 @@ fixed_body = false
 thrust = 0.0575                   # [N] Thruster force.
 specific_impulse = 5455.0         # [s] Thruster specific impulse.
 eff = 0.5                         # [-] Electrical-to-jet thruster efficiency.
-power = 1000.0                    # [W] Electrical power supplied to thruster.
+power = 3000.0                    # [W] Electrical power supplied to thruster.
 propellant_mass = 0.0             # [kg/s] Legacy propellant flow field.
 m_flow = 1e-3                     # [kg/s] Thruster mass flow rate.
 

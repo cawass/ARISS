@@ -55,10 +55,17 @@ def run_simulation(
     return run_sizing_loop(spacecraft, **kwargs)
 
 
+def run_sensitivity(*args: Any, **kwargs: Any):
+    from ariss.core.sensitivity import run_sensitivity as _run_sensitivity
+
+    return _run_sensitivity(*args, **kwargs)
+
+
 __all__ = [
     "SpacecraftState",
     "launch_history_ui",
     "load_spacecraft",
     "plot_simulation_history",
+    "run_sensitivity",
     "run_simulation",
 ]

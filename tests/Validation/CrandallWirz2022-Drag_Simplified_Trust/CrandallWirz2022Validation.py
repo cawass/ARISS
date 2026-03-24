@@ -1,4 +1,4 @@
-﻿# ============================================================================== #
+# ============================================================================== #
 #       ___    ____  ____  _____ _____
 #      /   |  / __ \/  _// ___// ___/
 #     / /| | / /_/ // / \__ \ \__ \
@@ -8,10 +8,8 @@
 #        ARISS - Atmospheric Refueling Iterative System Solver
 # ============================================================================== #
 #  Description:
-#      Reduced Crandall and Wirz (2022) validation driver. Drag and power plots
-#      use the ARISS core drag model and paper reference geometries. The mission
-#      storage plots (Fig. 19 and Fig. 20) are digitized paper recreations because
-#      the conventional-EP tank packaging model is not part of ARISS core.
+#      Drag-only Fig. 6 recreation for Crandall and Wirz (2022) using 3U/6U cases
+#      and digitized CSV datasets, styled with the shared validation plot format.
 #
 #  Project:        ARISS
 #  Module:         CrandallWirz2022Validation.py
@@ -19,431 +17,411 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
-from contextlib import redirect_stdout
-import io
-from pathlib import Path
+import csv
 import sys
+from copy import deepcopy
+from pathlib import Path
 
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.interpolate import PchipInterpolator
+from matplotlib.lines import Line2D
+from matplotlib.ticker import MultipleLocator
+
+
+# ------------------------------------------------------------------------------ #
+# Path setup
+# ------------------------------------------------------------------------------ #
 
 ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "src"
 VALIDATION_DIR = ROOT / "tests" / "Validation"
 
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
-if str(VALIDATION_DIR) not in sys.path:
-    sys.path.insert(0, str(VALIDATION_DIR))
+for p in (SRC, VALIDATION_DIR):
+    if str(p) not in sys.path:
+        sys.path.insert(0, str(p))
+
+
+# ------------------------------------------------------------------------------ #
+# ARISS imports
+# ------------------------------------------------------------------------------ #
 
 from ariss.core.simulation import load_spacecraft_from_base_config
 from ariss.modules.Drag import drag_model
-from ariss.modules.Propulsion import _update_drag_outputs
-from ariss.utils.atmosphere import orbit_updates_from_height
+from ariss.modules.Propulsion import _panel_front_area, _side_areas
+from ariss.utils import constants as const
+from ariss.utils.atmosphere import atmos, calculate_orbital_velocity
 from plot_style import PALETTE, apply_validation_style, style_axis, style_legend
 
-CASE_3U_PATH = Path(__file__).with_name("CrandallWirz2022_3U.toml")
-CASE_6U_PATH = Path(__file__).with_name("CrandallWirz2022_6U.toml")
-FIG11_OUTPUT_PATH = Path(__file__).with_name("crandall_wirz_2022_fig11.png")
-TABLE1_TEXT_PATH = Path(__file__).with_name("crandall_wirz_2022_table1.txt")
-TABLE1_PNG_PATH = Path(__file__).with_name("crandall_wirz_2022_table1.png")
-FIG6_OUTPUT_PATH = Path(__file__).with_name("crandall_wirz_2022_fig6.png")
-FIG19_OUTPUT_PATH = Path(__file__).with_name("crandall_wirz_2022_fig19.png")
-FIG20_OUTPUT_PATH = Path(__file__).with_name("crandall_wirz_2022_fig20.png")
 
-REFERENCE_POWER_W = 96.0
-TP_SWEEP_MN_KW = np.linspace(10.0, 30.0, 81, dtype=float)
-FIG11_ALTITUDE_GRID_KM = np.linspace(150.0, 250.0, 401, dtype=float)
-DRAG_ALTITUDE_GRID_KM = np.linspace(150.0, 250.0, 201, dtype=float)
-TABLE1_ALTITUDES_KM = np.arange(150.0, 251.0, 10.0, dtype=float)
-SOLAR_ACTIVITY_F107 = {
-    "Solar Minimum": 62.0,
-    "Mean Solar Activity": 114.0,
-    "Solar Maximum": 200.0,
-}
-SOLAR_COLORS = {
-    "Solar Minimum": PALETTE["l1_teal"],
-    "Mean Solar Activity": PALETTE["sernn_pink"],
-    "Solar Maximum": PALETTE["choice_mid"],
-}
-MISSION_COLORS = {
-    "1 Year Mission": PALETTE["l1_teal"],
-    "2 Year Mission": PALETTE["sernn_pink"],
-    "3 Year Mission": PALETTE["choice_mid"],
-    "4 Year Mission": PALETTE["cat_purple"],
-}
+# ------------------------------------------------------------------------------ #
+# Config
+# ------------------------------------------------------------------------------ #
 
-# Digitized from the paper figure for a compact reference recreation.
-FIG19_REFERENCE = {
-    "1 Year Mission": {
-        "altitude_km": np.asarray([184.0, 190.0, 198.0, 210.0, 220.0, 230.0, 240.0, 250.0, 265.0, 285.0, 300.0]),
-        "payload_u": np.asarray([0.00, 0.52, 1.04, 1.50, 1.78, 2.00, 2.06, 2.11, 2.18, 2.30, 2.37]),
+HERE = Path(__file__).resolve().parent
+
+CASE_SPECS = [
+    {
+        "title": "1 x 3U CubeSat",
+        "config": HERE / "CrandallWirz2022_3U.toml",
+        "dataset": HERE / "3U Drag.csv",
     },
-    "2 Year Mission": {
-        "altitude_km": np.asarray([205.0, 211.0, 220.0, 233.0, 243.0, 255.0, 265.0, 280.0, 300.0]),
-        "payload_u": np.asarray([0.00, 0.46, 0.99, 1.46, 1.75, 1.98, 2.06, 2.18, 2.30]),
+    {
+        "title": "1 x 6U CubeSat",
+        "config": HERE / "CrandallWirz2022_6U.toml",
+        "dataset": HERE / "6U Drag.csv",
     },
-    "3 Year Mission": {
-        "altitude_km": np.asarray([218.0, 224.0, 233.0, 247.0, 258.0, 272.0, 282.0, 295.0, 300.0]),
-        "payload_u": np.asarray([0.00, 0.44, 0.96, 1.43, 1.72, 1.95, 2.03, 2.14, 2.22]),
-    },
-    "4 Year Mission": {
-        "altitude_km": np.asarray([228.0, 235.0, 245.0, 259.0, 270.0, 284.0, 292.0, 300.0]),
-        "payload_u": np.asarray([0.00, 0.42, 0.94, 1.42, 1.70, 1.94, 2.01, 2.08]),
-    },
-}
+]
 
-# Digitized from the paper figure for a compact reference recreation.
-FIG20_REFERENCE = {
-    "1 Year Mission": {
-        "altitude_km": np.asarray([185.0, 190.0, 200.0, 210.0, 220.0, 230.0, 240.0, 250.0, 260.0, 280.0, 300.0]),
-        "wet_mass_kg": np.asarray([10.25, 9.92, 8.98, 8.53, 8.26, 8.05, 7.94, 7.87, 7.82, 7.77, 7.74]),
-    },
-    "2 Year Mission": {
-        "altitude_km": np.asarray([206.0, 215.0, 225.0, 235.0, 245.0, 255.0, 265.0, 280.0, 300.0]),
-        "wet_mass_kg": np.asarray([10.30, 9.72, 9.23, 8.86, 8.56, 8.32, 8.14, 7.97, 7.90]),
-    },
-    "3 Year Mission": {
-        "altitude_km": np.asarray([219.0, 228.0, 238.0, 248.0, 258.0, 268.0, 278.0, 290.0, 300.0]),
-        "wet_mass_kg": np.asarray([10.28, 9.90, 9.49, 9.12, 8.80, 8.54, 8.31, 8.10, 7.99]),
-    },
-    "4 Year Mission": {
-        "altitude_km": np.asarray([229.0, 238.0, 248.0, 258.0, 268.0, 278.0, 288.0, 300.0]),
-        "wet_mass_kg": np.asarray([10.18, 9.80, 9.40, 9.03, 8.72, 8.47, 8.25, 8.08]),
-    },
-}
+OUTPUT_PATH = HERE / "crandall_wirz_2022_fig6_validation.png"
+
+ALTITUDE_SAMPLES = 260
+NEWTON_TO_MILLINEWTON = 1.0e3
+
+COMPONENT_SPECS = [
+    ("Total Drag", "drag_total", PALETTE["primary_text"], "o"),
+    ("Frontal Area Drag", "drag_inlet_front", PALETTE["choice_mid"], "s"),
+    ("SA Skin Friction Drag", "drag_solar", PALETTE["l1_teal"], "^"),
+    ("Body Skin Friction Drag", "drag_body_side", PALETTE["sernn_pink"], "D"),
+    ("SA Frontal Area Drag", "drag_solar_front", PALETTE["goal_dark"], "v"),
+]
 
 
-def load_spacecraft(case_path: Path):
-    return load_spacecraft_from_base_config(case_path)
+# ------------------------------------------------------------------------------ #
+# Dataset loading
+# ------------------------------------------------------------------------------ #
+
+def _load_digitized_dataset(path: Path) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    rows = list(csv.reader(path.open("r", encoding="utf-8-sig")))
+    if len(rows) < 3:
+        raise ValueError(f"Dataset {path} has insufficient rows.")
+
+    header = rows[0]
+    result: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+
+    for column in range(0, len(header), 2):
+        label = header[column].strip() if column < len(header) else ""
+        if not label:
+            continue
+        if label == "SA Skin Friction":
+            label = "SA Skin Friction Drag"
+
+        x_vals: list[float] = []
+        y_vals: list[float] = []
+        for row in rows[2:]:
+            if column + 1 >= len(row):
+                continue
+            x_text = row[column].strip()
+            y_text = row[column + 1].strip()
+            if not x_text or not y_text:
+                continue
+            try:
+                x_value = float(x_text)
+                y_value = float(y_text)
+            except ValueError:
+                continue
+            if np.isfinite(x_value) and np.isfinite(y_value):
+                x_vals.append(x_value)
+                y_vals.append(y_value)
+
+        if x_vals:
+            x_array = np.asarray(x_vals, dtype=float)
+            y_array = np.asarray(y_vals, dtype=float)
+            order = np.argsort(y_array)
+            result[label] = (x_array[order], y_array[order])
+
+    return result
 
 
-def _diameter_m(sc) -> float:
-    return float(np.sqrt(max(sc.geometry.A_body, 0.0)))
+def _normalize_altitude_orientation(
+    dataset: dict[str, tuple[np.ndarray, np.ndarray]],
+) -> tuple[dict[str, tuple[np.ndarray, np.ndarray]], bool]:
+    if "Total Drag" not in dataset:
+        return dataset, False
+
+    x_total, y_total = dataset["Total Drag"]
+    if len(x_total) < 3:
+        return dataset, False
+
+    correlation = float(np.corrcoef(x_total, y_total)[0, 1])
+    if not np.isfinite(correlation) or correlation <= 0.0:
+        return dataset, False
+
+    y_all = np.concatenate([values[1] for values in dataset.values()])
+    y_min = float(np.min(y_all))
+    y_max = float(np.max(y_all))
+
+    normalized: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+    for label, (x_vals, y_vals) in dataset.items():
+        y_flip = y_min + y_max - y_vals
+        order = np.argsort(y_flip)
+        normalized[label] = (x_vals[order], y_flip[order])
+    return normalized, True
 
 
-def _solar_span_m(sc) -> float:
-    return float(sc.geometry.A_solar / max(2.0 * sc.geometry.L_body, 1.0e-12))
+def _dataset_altitude_bounds(dataset: dict[str, tuple[np.ndarray, np.ndarray]]) -> tuple[float, float]:
+    all_y = []
+    for label, _, _, _ in COMPONENT_SPECS:
+        if label in dataset:
+            all_y.extend(dataset[label][1].tolist())
+    if not all_y:
+        raise ValueError("No altitude data found in dataset for expected components.")
+    return float(np.min(all_y)), float(np.max(all_y))
 
 
-def _apply_collection_efficiency_split(sc) -> None:
-    if sc.geometry.use_intake_area_ratio:
-        sc.geometry.A_in = sc.geometry.intake_area_ratio * sc.geometry.A_body
+# ------------------------------------------------------------------------------ #
+# Drag-only sweep
+# ------------------------------------------------------------------------------ #
 
-    sc.geometry.A_ref = 0.0
-    sc.geometry.A_prop = sc.geometry.A_in * sc.refueling.coll_eff
-    sc.geometry.A_in_drag = sc.geometry.A_in - sc.geometry.A_prop
+def _set_drag_force_outputs(sc) -> None:
+    body_side_area, inlet_side_area = _side_areas(sc.geometry)
+    solar_front_area = _panel_front_area(sc.geometry.A_solar, sc.geometry.AR_solar, sc.geometry.t_solar)
+    rad_front_area = _panel_front_area(sc.geometry.A_rad, sc.geometry.AR_rad, sc.geometry.t_rad)
+    q_inf = 0.5 * sc.orbit.density * sc.orbit.velocity**2
 
+    sc.drag.drag_solar = q_inf * sc.drag.cd_solar * sc.geometry.A_solar
+    sc.drag.drag_solar_front = q_inf * sc.drag.cd_solar_front * solar_front_area
+    sc.drag.drag_rad = q_inf * sc.drag.cd_rad * sc.geometry.A_rad
+    sc.drag.drag_rad_front = q_inf * sc.drag.cd_rad_front * rad_front_area
+    sc.drag.drag_body_side = q_inf * sc.drag.cd_body_side * body_side_area
+    sc.drag.drag_inlet_side = q_inf * sc.drag.cd_inlet_side * inlet_side_area
+    sc.drag.drag_inlet_front = q_inf * sc.drag.cd_inlet_front * sc.geometry.A_in_drag
 
-def _evaluate_drag_state(spacecraft_template, altitude_km: float, f107: float | None = None):
-    sc = deepcopy(spacecraft_template)
-    sc.orbit.msis_f107 = float(sc.orbit.msis_f107 if f107 is None else f107)
-
-    with redirect_stdout(io.StringIO()):
-        orbit_updates = orbit_updates_from_height(
-            altitude_km,
-            msis_date=sc.orbit.msis_date,
-            msis_f107=sc.orbit.msis_f107,
-            msis_ap=sc.orbit.msis_ap,
-            latitude=sc.orbit.latitude,
-            longitude=sc.orbit.longitude,
-            use_average=sc.orbit.use_average,
-        )
-    for key, value in orbit_updates.items():
-        setattr(sc.orbit, key, value)
-
-    _apply_collection_efficiency_split(sc)
-    drag_model(sc)
-    _update_drag_outputs(sc)
-    return sc
-
-
-def _required_load_n(sc) -> float:
-    return float(sc.drag.drag_total + sc.orbit.density * sc.orbit.velocity ** 2 * sc.geometry.A_prop)
-
-
-def _inlet_total_load_n(sc) -> float:
-    return float(sc.drag.drag_inlet_front + sc.drag.drag_inlet_side + sc.orbit.density * sc.orbit.velocity ** 2 * sc.geometry.A_prop)
-
-
-def build_fig11_curves(spacecraft_template) -> dict[str, dict[str, np.ndarray]]:
-    curves: dict[str, dict[str, np.ndarray]] = {}
-
-    for label, f107 in SOLAR_ACTIVITY_F107.items():
-        required_load_n = np.asarray(
-            [_required_load_n(_evaluate_drag_state(spacecraft_template, float(altitude_km), f107)) for altitude_km in FIG11_ALTITUDE_GRID_KM],
-            dtype=float,
-        )
-        target_thrust_n = 1.0e-6 * TP_SWEEP_MN_KW * REFERENCE_POWER_W
-        feasible = (target_thrust_n >= float(required_load_n[-1])) & (target_thrust_n <= float(required_load_n[0]))
-        altitude_km = np.interp(target_thrust_n[feasible], required_load_n[::-1], FIG11_ALTITUDE_GRID_KM[::-1])
-        curves[label] = {
-            "tp_mn_kw": TP_SWEEP_MN_KW[feasible],
-            "altitude_km": np.asarray(altitude_km, dtype=float),
-        }
-
-    return curves
-
-
-def plot_fig11(curves: dict[str, dict[str, np.ndarray]], save_path: Path = FIG11_OUTPUT_PATH, show: bool = True) -> Path:
-    apply_validation_style()
-    figure, axis = plt.subplots(figsize=(7.4, 5.5), dpi=150)
-
-    for label, payload in curves.items():
-        axis.plot(
-            payload["tp_mn_kw"],
-            payload["altitude_km"],
-            color=SOLAR_COLORS[label],
-            linewidth=2.0,
-            label=label,
-        )
-
-    axis.set_xlim(10.0, 30.0)
-    axis.set_ylim(150.0, 190.0)
-    axis.set_xlabel("Thrust to Power [mN/kW]")
-    axis.set_ylabel("Minimum Operating Altitude [km]")
-    style_axis(axis)
-    legend = axis.legend(loc="upper right")
-    style_legend(legend)
-
-    figure.tight_layout()
-    figure.savefig(save_path, dpi=300, bbox_inches="tight")
-    if show and plt.get_backend().lower() != "agg":
-        plt.show()
-    else:
-        plt.close(figure)
-    return save_path
-
-
-def build_table1_rows(spacecraft_template) -> list[dict[str, str]]:
-    baseline_state = _evaluate_drag_state(spacecraft_template, float(TABLE1_ALTITUDES_KM[0]))
-    baseline_total_drag = max(_required_load_n(baseline_state), 1.0e-30)
-    rows: list[dict[str, str]] = []
-
-    for altitude_km in TABLE1_ALTITUDES_KM:
-        state = _evaluate_drag_state(spacecraft_template, float(altitude_km))
-        total_drag = max(_required_load_n(state), 1.0e-30)
-        rows.append(
-            {
-                "Altitude [km]": f"{int(altitude_km)}",
-                "Total": "1" if np.isclose(altitude_km, TABLE1_ALTITUDES_KM[0]) else f"{100.0 * total_drag / baseline_total_drag:.0f}%",
-                "Inlet": f"{100.0 * _inlet_total_load_n(state) / total_drag:.0f}%",
-                "SA Skin": f"{100.0 * float(state.drag.drag_solar) / total_drag:.0f}%",
-                "Body Skin": f"{100.0 * float(state.drag.drag_body_side) / total_drag:.0f}%",
-                "SA Frontal Area": f"{100.0 * float(state.drag.drag_solar_front) / total_drag:.0f}%",
-            }
-        )
-
-    return rows
-
-
-def save_table1_text(rows: list[dict[str, str]], save_path: Path = TABLE1_TEXT_PATH) -> Path:
-    headers = ["Altitude [km]", "Total", "Inlet", "SA Skin", "Body Skin", "SA Frontal Area"]
-    widths = {header: max(len(header), *(len(row[header]) for row in rows)) for header in headers}
-    lines = [
-        "Crandall & Wirz (2022) | Table 1 recreation with ARISS",
-        "",
-        "  ".join(header.ljust(widths[header]) for header in headers),
-        "  ".join("-" * widths[header] for header in headers),
-    ]
-
-    for row in rows:
-        lines.append("  ".join(row[header].ljust(widths[header]) for header in headers))
-
-    save_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return save_path
-
-
-def save_table1_png(rows: list[dict[str, str]], save_path: Path = TABLE1_PNG_PATH, show: bool = True) -> Path:
-    headers = ["Altitude [km]", "Total", "Inlet", "SA Skin", "Body Skin", "SA Frontal Area"]
-    cell_text = [[row[header] for header in headers] for row in rows]
-
-    apply_validation_style()
-    figure, axis = plt.subplots(figsize=(10.6, 4.8), dpi=150)
-    axis.axis("off")
-    axis.set_title(
-        "Table 1  Percent drag contribution of each spacecraft surface for the 6U spacecraft",
-        loc="left",
-        fontsize=13,
-        fontweight="bold",
-        pad=12,
+    sc.drag.drag_total = (
+        sc.drag.drag_solar
+        + sc.drag.drag_solar_front
+        + sc.drag.drag_rad
+        + sc.drag.drag_rad_front
+        + sc.drag.drag_body_side
+        + sc.drag.drag_inlet_side
+        + sc.drag.drag_inlet_front
     )
-    table = axis.table(cellText=cell_text, colLabels=headers, loc="center", cellLoc="center", colLoc="center")
-    table.auto_set_font_size(False)
-    table.set_fontsize(10)
-    table.scale(1.1, 1.55)
-    for (row_index, col_index), cell in table.get_celld().items():
-        cell.set_linewidth(0.6)
-        cell.set_edgecolor("black")
-        if row_index == 0:
-            cell.set_text_props(weight="bold")
-            cell.set_facecolor(PALETTE["l1_teal_fill"])
-
-    figure.tight_layout()
-    figure.savefig(save_path, dpi=300, bbox_inches="tight")
-    if show and plt.get_backend().lower() != "agg":
-        plt.show()
-    else:
-        plt.close(figure)
-    return save_path
 
 
-def build_drag_profiles(spacecraft_template, altitude_grid_km: np.ndarray = DRAG_ALTITUDE_GRID_KM) -> dict[str, np.ndarray]:
-    total_drag_mn = np.empty_like(altitude_grid_km, dtype=float)
-    frontal_drag_mn = np.empty_like(altitude_grid_km, dtype=float)
-    solar_skin_drag_mn = np.empty_like(altitude_grid_km, dtype=float)
-    body_skin_drag_mn = np.empty_like(altitude_grid_km, dtype=float)
-    solar_front_drag_mn = np.empty_like(altitude_grid_km, dtype=float)
+def _run_drag_sweep(config_path: Path, altitudes_km: np.ndarray) -> dict[str, np.ndarray]:
+    base_sc = load_spacecraft_from_base_config(config_path)
 
-    for index, altitude_km in enumerate(altitude_grid_km):
-        state = _evaluate_drag_state(spacecraft_template, float(altitude_km))
-        total_drag_mn[index] = 1.0e3 * _required_load_n(state)
-        frontal_drag_mn[index] = 1.0e3 * _inlet_total_load_n(state)
-        solar_skin_drag_mn[index] = 1.0e3 * float(state.drag.drag_solar)
-        body_skin_drag_mn[index] = 1.0e3 * float(state.drag.drag_body_side)
-        solar_front_drag_mn[index] = 1.0e3 * float(state.drag.drag_solar_front)
+    density, temperature, r_specific, _, _, _ = atmos(
+        altitudes_km,
+        msis_date=base_sc.orbit.msis_date,
+        msis_f107=base_sc.orbit.msis_f107,
+        msis_ap=base_sc.orbit.msis_ap,
+        latitude=base_sc.orbit.latitude,
+        longitude=base_sc.orbit.longitude,
+        use_average=base_sc.orbit.use_average,
+    )
+    velocity = calculate_orbital_velocity(altitudes_km)
+    molar_mass = const.UNIVERSAL_GAS / np.maximum(r_specific, 1.0e-30)
 
-    return {
-        "altitude_km": np.asarray(altitude_grid_km, dtype=float),
-        "total_drag_mn": total_drag_mn,
-        "frontal_drag_mn": frontal_drag_mn,
-        "solar_skin_drag_mn": solar_skin_drag_mn,
-        "body_skin_drag_mn": body_skin_drag_mn,
-        "solar_front_drag_mn": solar_front_drag_mn,
+    output = {
+        "altitude": np.asarray(altitudes_km, dtype=float),
+        "drag_total": np.full_like(altitudes_km, np.nan, dtype=float),
+        "drag_inlet_front": np.full_like(altitudes_km, np.nan, dtype=float),
+        "drag_solar": np.full_like(altitudes_km, np.nan, dtype=float),
+        "drag_body_side": np.full_like(altitudes_km, np.nan, dtype=float),
+        "drag_solar_front": np.full_like(altitudes_km, np.nan, dtype=float),
     }
 
+    for i, altitude in enumerate(altitudes_km):
+        sc = deepcopy(base_sc)
+        sc.orbit.altitude = float(altitude)
+        sc.orbit.density = float(density[i])
+        sc.orbit.temperature = float(temperature[i])
+        sc.orbit.molar_mass = float(molar_mass[i])
+        sc.orbit.velocity = float(velocity[i])
 
-def _plot_drag_panel(axis, profiles: dict[str, np.ndarray], title: str) -> None:
-    altitude_km = profiles["altitude_km"]
-    axis.plot(profiles["total_drag_mn"], altitude_km, color=PALETTE["l1_teal"], linewidth=1.8, label="Total Drag")
-    axis.plot(profiles["frontal_drag_mn"], altitude_km, color=PALETTE["sernn_pink"], linewidth=1.6, label="Frontal Area Drag")
-    axis.plot(profiles["solar_skin_drag_mn"], altitude_km, color=PALETTE["choice_mid"], linewidth=1.6, label="SA Skin Friction Drag")
-    axis.plot(profiles["body_skin_drag_mn"], altitude_km, color=PALETTE["cat_purple"], linewidth=1.6, label="Body Skin Friction Drag")
-    axis.plot(profiles["solar_front_drag_mn"], altitude_km, color=PALETTE["cat_green"], linewidth=1.6, label="SA Frontal Area Drag")
-    axis.set_xscale("log")
-    axis.set_xlim(1.0e-3, 1.0e1)
-    axis.set_ylim(float(np.min(altitude_km)), float(np.max(altitude_km)))
-    axis.set_xlabel("Drag [mN]")
+        drag_model(sc)
+        _set_drag_force_outputs(sc)
+
+        output["drag_total"][i] = float(sc.drag.drag_total) * NEWTON_TO_MILLINEWTON
+        output["drag_inlet_front"][i] = float(sc.drag.drag_inlet_front) * NEWTON_TO_MILLINEWTON
+        output["drag_solar"][i] = float(sc.drag.drag_solar) * NEWTON_TO_MILLINEWTON
+        output["drag_body_side"][i] = float(sc.drag.drag_body_side) * NEWTON_TO_MILLINEWTON
+        output["drag_solar_front"][i] = float(sc.drag.drag_solar_front) * NEWTON_TO_MILLINEWTON
+
+    return output
+
+
+# ------------------------------------------------------------------------------ #
+# Plotting and metrics
+# ------------------------------------------------------------------------------ #
+
+def _interp_model_at_altitude(model: dict[str, np.ndarray], key: str, y_query: np.ndarray) -> np.ndarray:
+    y_model = np.asarray(model["altitude"], dtype=float)
+    x_model = np.asarray(model[key], dtype=float)
+    order = np.argsort(y_model)
+    return np.interp(y_query, y_model[order], x_model[order])
+
+
+def _component_mape_percent(model: dict[str, np.ndarray], dataset: dict[str, tuple[np.ndarray, np.ndarray]]) -> dict[str, float]:
+    errors: dict[str, float] = {}
+    for label, key, _, _ in COMPONENT_SPECS:
+        if label not in dataset:
+            continue
+        x_ref, y_ref = dataset[label]
+        x_mod = _interp_model_at_altitude(model, key, y_ref)
+        valid = np.isfinite(x_ref) & np.isfinite(x_mod) & (x_ref > 0.0)
+        if not np.any(valid):
+            continue
+        rel = np.abs(x_mod[valid] - x_ref[valid]) / x_ref[valid]
+        errors[label] = float(100.0 * np.mean(rel))
+    return errors
+
+
+def _plot_case(axis, title: str, model: dict[str, np.ndarray], dataset: dict[str, tuple[np.ndarray, np.ndarray]]) -> None:
+    x_lower = np.inf
+    x_upper = 0.0
+
+    for label, key, color, marker in COMPONENT_SPECS:
+        x_model = np.asarray(model[key], dtype=float)
+        y_model = np.asarray(model["altitude"], dtype=float)
+        valid_model = np.isfinite(x_model) & np.isfinite(y_model) & (x_model > 0.0)
+        axis.plot(x_model[valid_model], y_model[valid_model], color=color, lw=2.0, zorder=2)
+
+        if np.any(valid_model):
+            x_lower = min(x_lower, float(np.min(x_model[valid_model])))
+            x_upper = max(x_upper, float(np.max(x_model[valid_model])))
+
+        if label in dataset:
+            x_ref, y_ref = dataset[label]
+            valid_ref = np.isfinite(x_ref) & np.isfinite(y_ref) & (x_ref > 0.0)
+            axis.plot(
+                x_ref[valid_ref],
+                y_ref[valid_ref],
+                linestyle=(0, (4, 2)),
+                lw=1.2,
+                color=color,
+                marker=marker,
+                markersize=5.4,
+                markerfacecolor="white",
+                markeredgecolor=color,
+                markeredgewidth=1.0,
+                zorder=3,
+            )
+            if np.any(valid_ref):
+                x_lower = min(x_lower, float(np.min(x_ref[valid_ref])))
+                x_upper = max(x_upper, float(np.max(x_ref[valid_ref])))
+
     axis.set_title(title)
+    axis.set_xscale("log")
+    axis.set_xlabel("Drag [mN]")
     style_axis(axis)
-    axis.grid(True, which="both", color=PALETTE["light_grid"], linewidth=0.5, alpha=0.5)
-    legend = axis.legend(loc="lower left", fontsize=8.5)
-    style_legend(legend)
+    axis.tick_params(axis="both", which="both", labelsize=12)
+    axis.xaxis.label.set_size(12)
+    axis.yaxis.label.set_size(12)
+    axis.title.set_size(12)
+    axis.yaxis.set_major_locator(MultipleLocator(10))
+    axis.yaxis.set_minor_locator(MultipleLocator(5))
+
+    if np.isfinite(x_lower) and np.isfinite(x_upper) and x_upper > x_lower > 0.0:
+        axis.set_xlim(0.9 * x_lower, 1.15 * x_upper)
 
 
-def plot_fig6_drag_comparison(
-    profiles_3u: dict[str, np.ndarray],
-    profiles_6u: dict[str, np.ndarray],
-    save_path: Path = FIG6_OUTPUT_PATH,
-    show: bool = True,
-) -> Path:
+def run_crandall_wirz_validation(show: bool = True) -> Path:
     apply_validation_style()
-    figure, axes = plt.subplots(1, 2, figsize=(11.2, 4.8), dpi=150, sharey=True)
-    _plot_drag_panel(axes[0], profiles_3u, "(a) 3U Drag")
-    _plot_drag_panel(axes[1], profiles_6u, "(b) 6U Drag")
+    plt.rcParams.update(
+        {
+            "font.size": 12,
+            "axes.titlesize": 12,
+            "axes.labelsize": 12,
+            "xtick.labelsize": 12,
+            "ytick.labelsize": 12,
+            "legend.fontsize": 12,
+        }
+    )
+
+    datasets: list[dict[str, tuple[np.ndarray, np.ndarray]]] = []
+    for spec in CASE_SPECS:
+        dataset = _load_digitized_dataset(spec["dataset"])
+        dataset, flipped = _normalize_altitude_orientation(dataset)
+        if flipped:
+            print(f"[info] Mirrored altitude axis detected and corrected for dataset: {spec['dataset'].name}")
+        datasets.append(dataset)
+    altitude_min = min(_dataset_altitude_bounds(dataset)[0] for dataset in datasets)
+    altitude_max = max(_dataset_altitude_bounds(dataset)[1] for dataset in datasets)
+    altitudes_km = np.linspace(altitude_min, altitude_max, ALTITUDE_SAMPLES)
+
+    models = [_run_drag_sweep(spec["config"], altitudes_km) for spec in CASE_SPECS]
+
+    figure = plt.figure(figsize=(14.2, 5.9))
+    grid = figure.add_gridspec(1, 3, width_ratios=[1.0, 1.0, 0.85], wspace=0.06)
+    axes = [
+        figure.add_subplot(grid[0, 0]),
+        figure.add_subplot(grid[0, 1]),
+    ]
+    axes[1].sharey(axes[0])
+    legend_axis = figure.add_subplot(grid[0, 2])
+    legend_axis.axis("off")
+    for axis, spec, model, dataset in zip(axes, CASE_SPECS, models, datasets):
+        _plot_case(axis, spec["title"], model, dataset)
+        errors = _component_mape_percent(model, dataset)
+        print(f"\n{spec['title']} mean absolute percentage error by component:")
+        for label, _, _, _ in COMPONENT_SPECS:
+            if label in errors:
+                print(f"  {label:<24} {errors[label]:6.2f}%")
+
     axes[0].set_ylabel("Altitude [km]")
-    figure.tight_layout()
-    figure.savefig(save_path, dpi=300, bbox_inches="tight")
+    axes[0].set_ylim(altitude_min - 1.0, altitude_max + 1.0)
+
+    component_handles = [
+        Line2D([0], [0], color=color, lw=2.0, label=label)
+        for label, _, color, _ in COMPONENT_SPECS
+    ]
+    source_handles = [
+        Line2D([0], [0], color=PALETTE["secondary_text"], lw=2.0, label="ARISS drag-only model"),
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color=PALETTE["secondary_text"],
+            markerfacecolor="white",
+            markersize=6,
+            lw=1.2,
+            ls=(0, (4, 2)),
+            label="Crandall-Wirz Data",
+        ),
+    ]
+
+    legend_source = legend_axis.legend(
+        handles=source_handles,
+        title="Source",
+        loc="upper left",
+        bbox_to_anchor=(0.0, 0.95),
+        frameon=False,
+        borderaxespad=0.0,
+        labelspacing=0.8,
+        handlelength=2.4,
+        handletextpad=0.6,
+    )
+    style_legend(legend_source)
+    legend_source.get_title().set_fontweight("bold")
+    legend_axis.add_artist(legend_source)
+
+    legend_components = legend_axis.legend(
+        handles=component_handles,
+        title="Components",
+        loc="upper left",
+        bbox_to_anchor=(0.0, 0.62),
+        frameon=False,
+        borderaxespad=0.0,
+        labelspacing=0.8,
+        handlelength=2.4,
+        handletextpad=0.6,
+    )
+    style_legend(legend_components)
+    legend_components.get_title().set_fontweight("bold")
+    figure.subplots_adjust(left=0.08, right=0.98, bottom=0.12, top=0.95, wspace=0.06)
+    figure.savefig(OUTPUT_PATH, dpi=1200, bbox_inches="tight")
+
     if show and plt.get_backend().lower() != "agg":
         plt.show()
     else:
         plt.close(figure)
-    return save_path
 
-
-def _smooth_digitized_curve(payload: dict[str, np.ndarray], x_key: str) -> tuple[np.ndarray, np.ndarray]:
-    altitude_km = np.asarray(payload["altitude_km"], dtype=float)
-    values = np.asarray(payload[x_key], dtype=float)
-    interpolator = PchipInterpolator(altitude_km, values)
-    altitude_fine = np.linspace(float(altitude_km[0]), float(altitude_km[-1]), 300, dtype=float)
-    values_fine = np.asarray(interpolator(altitude_fine), dtype=float)
-    return values_fine, altitude_fine
-
-
-def plot_fig19_payload_volume(save_path: Path = FIG19_OUTPUT_PATH, show: bool = True) -> Path:
-    apply_validation_style()
-    figure, axis = plt.subplots(figsize=(6.1, 5.3), dpi=150)
-
-    for label, payload in FIG19_REFERENCE.items():
-        payload_u, altitude_km = _smooth_digitized_curve(payload, "payload_u")
-        axis.plot(payload_u, altitude_km, color=MISSION_COLORS[label], linewidth=1.8, label=label)
-
-    axis.set_xlim(0.0, 2.4)
-    axis.set_ylim(180.0, 300.0)
-    axis.set_xlabel("Payload Volume [U]")
-    axis.set_ylabel("Altitude [km]")
-    style_axis(axis)
-    legend = axis.legend(loc="upper left", fontsize=10)
-    style_legend(legend)
-
-    figure.tight_layout()
-    figure.savefig(save_path, dpi=300, bbox_inches="tight")
-    if show and plt.get_backend().lower() != "agg":
-        plt.show()
-    else:
-        plt.close(figure)
-    return save_path
-
-
-def plot_fig20_wet_mass(save_path: Path = FIG20_OUTPUT_PATH, show: bool = True) -> Path:
-    apply_validation_style()
-    figure, axis = plt.subplots(figsize=(6.1, 5.3), dpi=150)
-
-    for label, payload in FIG20_REFERENCE.items():
-        wet_mass_kg, altitude_km = _smooth_digitized_curve(payload, "wet_mass_kg")
-        axis.plot(wet_mass_kg, altitude_km, color=MISSION_COLORS[label], linewidth=1.8, label=label)
-
-    axis.set_xlim(7.5, 10.3)
-    axis.set_ylim(180.0, 300.0)
-    axis.set_xlabel("Mass [kg]")
-    axis.set_ylabel("Operating Altitude [km]")
-    style_axis(axis)
-    legend = axis.legend(loc="upper right", fontsize=10)
-    style_legend(legend)
-
-    figure.tight_layout()
-    figure.savefig(save_path, dpi=300, bbox_inches="tight")
-    if show and plt.get_backend().lower() != "agg":
-        plt.show()
-    else:
-        plt.close(figure)
-    return save_path
-
-
-def run_crandall_wirz_2022_validation(show: bool = True) -> Path:
-    spacecraft_3u = load_spacecraft(CASE_3U_PATH)
-    spacecraft_6u = load_spacecraft(CASE_6U_PATH)
-
-    fig11_curves = build_fig11_curves(spacecraft_6u)
-    table1_rows = build_table1_rows(spacecraft_6u)
-    drag_profiles_3u = build_drag_profiles(spacecraft_3u)
-    drag_profiles_6u = build_drag_profiles(spacecraft_6u)
-
-    fig11_path = plot_fig11(fig11_curves, save_path=FIG11_OUTPUT_PATH, show=show)
-    table1_text_path = save_table1_text(table1_rows, save_path=TABLE1_TEXT_PATH)
-    table1_png_path = save_table1_png(table1_rows, save_path=TABLE1_PNG_PATH, show=show)
-    fig6_path = plot_fig6_drag_comparison(drag_profiles_3u, drag_profiles_6u, save_path=FIG6_OUTPUT_PATH, show=show)
-    fig19_path = plot_fig19_payload_volume(save_path=FIG19_OUTPUT_PATH, show=show)
-    fig20_path = plot_fig20_wet_mass(save_path=FIG20_OUTPUT_PATH, show=show)
-
-    print("Crandall & Wirz (2022) reduced validation suite")
-    for case_path, spacecraft in ((CASE_3U_PATH, spacecraft_3u), (CASE_6U_PATH, spacecraft_6u)):
-        diameter_m = _diameter_m(spacecraft)
-        print(
-            f"{case_path.name}: d = {diameter_m:.3f} m | "
-            f"L/d = {spacecraft.geometry.L_body / max(diameter_m, 1.0e-12):.1f} | "
-            f"s/d = {_solar_span_m(spacecraft) / max(diameter_m, 1.0e-12):.1f}"
-        )
-    print(f"Saved Fig. 11 recreation: {fig11_path}")
-    print(f"Saved Table 1 text: {table1_text_path}")
-    print(f"Saved Table 1 figure: {table1_png_path}")
-    print(f"Saved Fig. 6 recreation: {fig6_path}")
-    print(f"Saved Fig. 19 reference recreation: {fig19_path}")
-    print(f"Saved Fig. 20 reference recreation: {fig20_path}")
-    return fig11_path
+    print(f"\nSaved figure: {OUTPUT_PATH}")
+    return OUTPUT_PATH
 
 
 if __name__ == "__main__":
-    run_crandall_wirz_2022_validation(show=True)
+    run_crandall_wirz_validation(show=True)

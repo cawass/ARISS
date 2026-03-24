@@ -1,0 +1,17 @@
+name = "CORE_07 CR AR=0.5 fixed_point_00 passive free_inlet_fixed_body"
+
+[orbit]
+use_average = false
+latitude = 0
+longitude = 0
+
+[geometry]
+S_in = "c"
+S_body = "r"
+AR_in = 0.5
+AR_body = 0.5
+use_intake_area_ratio = false
+fixed_body = true
+
+[mission_profile]
+active_refueling = false

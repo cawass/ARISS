@@ -242,6 +242,7 @@ def run_sweep():
             for j, eff in enumerate(eta):
                 sc = deepcopy(base)
                 sc.geometry.use_intake_area_ratio = False
+                sc.geometry.fixed_body = True
                 sc.thruster.specific_impulse = isp
                 sc.thruster.eff = eff
 
@@ -330,6 +331,16 @@ def extract_lines(ISP, alt, tp):
 
 def plot():
     _apply_style()
+    plt.rcParams.update(
+        {
+            "font.size": 12,
+            "axes.titlesize": 12,
+            "axes.labelsize": 12,
+            "xtick.labelsize": 12,
+            "ytick.labelsize": 12,
+            "legend.fontsize": 12,
+        }
+    )
 
     ISP, alt, tp = run_sweep()
     paper, _ = load_dataset(DATASET_PATH)
@@ -344,8 +355,11 @@ def plot():
     marker_cycle = ["o", "s", "^", "D", "v", "P", "X", "<", ">"]
     markers = {h: m for h, m in zip(ALT_LEVELS, marker_cycle)}
 
-    fig, ax = plt.subplots(figsize=(10.8, 5.8))
-    fig.subplots_adjust(right=0.80, top=0.86)
+    fig = plt.figure(figsize=(13.2, 6.0))
+    grid = fig.add_gridspec(1, 2, width_ratios=[1.0, 0.55], wspace=0.06)
+    ax = fig.add_subplot(grid[0, 0])
+    legend_axis = fig.add_subplot(grid[0, 1])
+    legend_axis.axis("off")
 
     # Draw Mansur first, lighter, same marker per altitude
     for h in ALT_LEVELS:
@@ -413,24 +427,27 @@ def plot():
 
     for s in ax.spines.values():
         s.set_color("black")
-    ax.tick_params(colors="black")
+    ax.tick_params(colors="black", axis="both", which="both", labelsize=12)
 
     # Source legend
     source_handles = [
         Line2D([0], [0], color="black", lw=2.2, ls="-", label="ARISS"),
         Line2D([0], [0], color="black", lw=1.2, ls=(0, (4, 2)), label="Mansur"),
     ]
-    leg_source = ax.legend(
+    leg_source = legend_axis.legend(
         handles=source_handles,
-        loc="lower center",
-        bbox_to_anchor=(0.5, 1.02),
+        title="Source",
+        loc="upper left",
+        bbox_to_anchor=(0.0, 0.95),
         frameon=False,
-        ncol=2,
-        columnspacing=1.8,
-        handletextpad=0.8,
+        borderaxespad=0.0,
+        labelspacing=0.8,
+        handlelength=2.5,
+        handletextpad=0.6,
     )
     style_legend(leg_source)
-    ax.add_artist(leg_source)
+    leg_source.get_title().set_fontweight("bold")
+    legend_axis.add_artist(leg_source)
 
     # Altitude legend: marker + color
     alt_handles = [
@@ -447,19 +464,21 @@ def plot():
         for h in ALT_LEVELS
     ]
 
-    leg_alt = ax.legend(
+    leg_alt = legend_axis.legend(
         handles=alt_handles,
         title="Altitude",
         loc="upper left",
-        bbox_to_anchor=(1.01, 1.00),
+        bbox_to_anchor=(0.0, 0.72),
         borderaxespad=0.0,
         frameon=False,
-        labelspacing=0.6,
+        labelspacing=0.7,
+        handlelength=2.5,
         handletextpad=0.6,
     )
     style_legend(leg_alt)
     leg_alt.get_title().set_fontweight("bold")
 
+    fig.subplots_adjust(left=0.09, right=0.98, bottom=0.13, top=0.95, wspace=0.06)
     fig.savefig(OUTPUT, dpi=1200, bbox_inches="tight")
     plt.close(fig)
 

@@ -15,7 +15,7 @@ S_body = "r"
 AR_in = 1.0
 AR_body = 1.0
 use_intake_area_ratio = false
-fixed_body = false
+fixed_body = true
 intake_area_ratio = 1.0
 
 [mission_profile]

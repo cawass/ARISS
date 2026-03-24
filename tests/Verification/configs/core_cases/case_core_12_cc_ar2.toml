@@ -1,0 +1,17 @@
+name = "CORE_12 CC AR=2 fixed_point_00 active fixed_inlet_free_body"
+
+[orbit]
+use_average = false
+latitude = 0
+longitude = 0
+
+[geometry]
+S_in = "c"
+S_body = "c"
+AR_in = 2
+AR_body = 2
+use_intake_area_ratio = true
+fixed_body = false
+
+[mission_profile]
+active_refueling = true

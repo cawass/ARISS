@@ -603,6 +603,12 @@ class SpacecraftState:
                     f"{path} must be between {min_value} and {max_value}, got {value}"
                 )
 
+        if (not self.geometry.use_intake_area_ratio) and (not self.geometry.fixed_body):
+            errors.append(
+                "Invalid geometry mode: geometry.use_intake_area_ratio and "
+                "geometry.fixed_body cannot both be false."
+            )
+
         if errors:
             raise ValueError("SpacecraftState bound check failed:\n - " + "\n - ".join(errors))
 

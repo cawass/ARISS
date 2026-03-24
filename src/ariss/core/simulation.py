@@ -171,16 +171,18 @@ def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_to
 
         # Require mass stability, force balance, density stability, and a
         # minimum number of iterations to avoid exiting on an early transient
-        # match.
-        if (residual <= mass_tolerance and force_residual <= force_tolerance and density_residual <= density_tolerance and i > 10):
+        # match.        
+        if loop_sc.orbit.altitude > 345:
+            converged = False
+            break
+
+        if (residual <= mass_tolerance and force_residual <= force_tolerance and density_residual <= density_tolerance and i > 10) and loop_sc.orbit.altitude < 345:
             logger.info("Convergence reached at iteration %d. Final Mass: %.2f kg", i, loop_sc.mass.Mass_total)
             converged = True
             history.append(deepcopy(loop_sc))
             break
 
         # Abort if the solved altitude drifts outside the modeled mission range.
-        if loop_sc.orbit.altitude > 900:
-            break
 
     return loop_sc, converged, history
 

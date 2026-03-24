@@ -135,7 +135,7 @@ drag_inlet_side = 0.2             # [N] Inlet-side drag force contribution.
 drag_inlet_front = 0.2            # [N] Inlet-front drag force contribution.
 
 [refueling]
-coll_eff = 0.35                   # [-] Intake collection efficiency.
+coll_eff = 0.45                   # [-] Intake collection efficiency.
 t_refuel = 51000000.0               # [s] Nominal refueling duration.
 eta_refuel = 0.1                  # [-] Refueling compression-process efficiency.
 m_flow = 1e-3                     # [kg/s] Captured mass flow into tanks.

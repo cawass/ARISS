@@ -521,8 +521,16 @@ def _plot_mansur_family(axis, dataset, levels, color, linewidth, markers, marker
 
 def plot():
     apply_validation_style()
-    
-    
+    plt.rcParams.update(
+        {
+            "font.size": 12,
+            "axes.titlesize": 12,
+            "axes.labelsize": 12,
+            "xtick.labelsize": 12,
+            "ytick.labelsize": 12,
+            "legend.fontsize": 12,
+        }
+    )
 
     isp_grid, tp_mn_per_kw, eff_grid, mdot_mg_per_s, ain_m2 = run_sweep()
 
@@ -548,7 +556,7 @@ def plot():
     legend_axis = figure.add_subplot(grid[0, 1])
     legend_axis.axis("off")
 
-    figure.subplots_adjust(left=0.08, right=0.97, bottom=0.11, top=0.90)
+    figure.subplots_adjust(left=0.08, right=0.97, bottom=0.11, top=0.94)
 
     # Mansur first
     _plot_mansur_family(
@@ -630,7 +638,7 @@ def plot():
     axis.tick_params(axis="both", which="minor", width=0.7, length=3)
 
     # ------------------------------------------------------------------ #
-    # Source legend at top center
+    # Source legend
     # ------------------------------------------------------------------ #
     source_handles = [
         Line2D(
@@ -659,18 +667,20 @@ def plot():
         ),
     ]
 
-    leg_source = figure.legend(
+    leg_source = legend_axis.legend(
         handles=source_handles,
-        loc="upper center",
-        bbox_to_anchor=(0.5, 0.995),
+        title="Source",
+        loc="upper left",
+        bbox_to_anchor=(0.00, 0.96),
         frameon=False,
-        ncol=2,
-        columnspacing=2.0,
+        borderaxespad=0.0,
+        labelspacing=0.8,
         handlelength=2.5,
         handletextpad=0.6,
-        borderaxespad=0.0,
     )
     style_legend(leg_source)
+    leg_source.get_title().set_fontweight("bold")
+    legend_axis.add_artist(leg_source)
 
     # ------------------------------------------------------------------ #
     # Families legend
@@ -685,7 +695,7 @@ def plot():
         handles=family_handles,
         title="Families",
         loc="upper left",
-        bbox_to_anchor=(0.00, 0.90),
+        bbox_to_anchor=(0.00, 0.76),
         frameon=False,
         borderaxespad=0.0,
         labelspacing=0.7,
@@ -717,7 +727,7 @@ def plot():
         handles=eta_handles,
         title=r"$\eta_T$",
         loc="upper left",
-        bbox_to_anchor=(0.00, 0.60),
+        bbox_to_anchor=(0.00, 0.52),
         frameon=False,
         borderaxespad=0.0,
         ncol=4,
@@ -750,7 +760,7 @@ def plot():
         handles=mdot_handles,
         title=r"$\dot{m}$ (mg/s)",
         loc="upper left",
-        bbox_to_anchor=(0.00, 0.38),
+        bbox_to_anchor=(0.00, 0.30),
         frameon=False,
         borderaxespad=0.0,
         ncol=4,
@@ -783,7 +793,7 @@ def plot():
         handles=ain_handles,
         title=r"$A_i$ (m$^2$)",
         loc="upper left",
-        bbox_to_anchor=(0.00, 0.12),
+        bbox_to_anchor=(0.00, 0.08),
         frameon=False,
         borderaxespad=0.0,
         ncol=3,

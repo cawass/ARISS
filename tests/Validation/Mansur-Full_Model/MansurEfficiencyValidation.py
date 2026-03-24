@@ -237,8 +237,22 @@ def load_mansur_paper_dataset():
 def plot_results(results, paper=None, save_path=OUTPUT_PATH, show=True):
 
     apply_validation_style()
+    plt.rcParams.update(
+        {
+            "font.size": 12,
+            "axes.titlesize": 12,
+            "axes.labelsize": 12,
+            "xtick.labelsize": 12,
+            "ytick.labelsize": 12,
+            "legend.fontsize": 12,
+        }
+    )
 
-    fig, ax = plt.subplots(figsize=(9.6, 5.4))
+    fig = plt.figure(figsize=(11.6, 5.8))
+    grid = fig.add_gridspec(1, 2, width_ratios=[1.0, 0.62], wspace=0.05)
+    ax = fig.add_subplot(grid[0, 0])
+    legend_axis = fig.add_subplot(grid[0, 1])
+    legend_axis.axis("off")
 
     handles, labels = [], []
 
@@ -274,6 +288,9 @@ def plot_results(results, paper=None, save_path=OUTPUT_PATH, show=True):
     ax.yaxis.set_minor_locator(AutoMinorLocator(2))
 
     style_axis(ax)
+    ax.tick_params(axis="both", which="both", labelsize=12)
+    ax.grid(which="major", color="0.88", linewidth=0.7)
+    ax.grid(which="minor", color="0.94", linewidth=0.5)
 
     # Force black axis
     for spine in ax.spines.values():
@@ -281,10 +298,22 @@ def plot_results(results, paper=None, save_path=OUTPUT_PATH, show=True):
     ax.tick_params(colors="black")
 
     if handles:
-        ax.legend(handles, labels, loc="lower center", bbox_to_anchor=(0.5, 1.04), ncol=3, frameon=False)
-        style_legend(ax.get_legend())
+        legend = legend_axis.legend(
+            handles,
+            labels,
+            title="Curves",
+            loc="upper left",
+            bbox_to_anchor=(0.0, 0.96),
+            frameon=False,
+            borderaxespad=0.0,
+            labelspacing=0.8,
+            handlelength=2.5,
+            handletextpad=0.6,
+        )
+        style_legend(legend)
+        legend.get_title().set_fontweight("bold")
 
-    fig.tight_layout()
+    fig.subplots_adjust(left=0.09, right=0.98, bottom=0.13, top=0.95, wspace=0.05)
     fig.savefig(save_path, dpi=1200, bbox_inches="tight")
     fig.savefig(VECTOR_OUTPUT_PATH, bbox_inches="tight")
     fig.savefig(PDF_OUTPUT_PATH, bbox_inches="tight")

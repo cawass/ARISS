@@ -1,0 +1,17 @@
+name = "CORE_06 RR AR=1 av_atmos active fixed_inlet_free_body"
+
+[orbit]
+use_average = true
+latitude = 0
+longitude = 0
+
+[geometry]
+S_in = "r"
+S_body = "r"
+AR_in = 1
+AR_body = 1
+use_intake_area_ratio = true
+fixed_body = false
+
+[mission_profile]
+active_refueling = true
