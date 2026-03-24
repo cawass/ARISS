@@ -28,9 +28,12 @@ def refueling_model(sc: SpacecraftState) -> float:
     if sc.mission_profile.active_refueling:
         # Captured atmospheric mass flow routed to the refueling tanks.
 
-        # Total compressed stream. The thruster line is added because the
-        # architecture currently treats the intake as a single non-bypass flow.
-        m_dot_b = sc.refueling.m_flow + sc.thruster.m_flow
+        if sc.mission_profile.active_and_bypass:
+            m_dot_b = sc.refueling.m_flow + sc.thruster.m_flow
+        else:
+            m_dot_b = sc.refueling.m_flow
+
+        # Power required to compress the refueling mass flow to tank pressure.
         sc.power.Power_refprop = 1 / sc.refueling.eta_refuel * 1 / (sc.orbit.gamma - 1) * m_dot_b * sc.orbit.R_spec * sc.thermal.T_des * ((sc.refueling.p_tank / sc.orbit.p_orb) ** ((sc.orbit.gamma - 1) / sc.orbit.gamma) - 1)
 
         # Ideal-gas storage volume at design temperature and tank pressure.

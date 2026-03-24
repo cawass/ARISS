@@ -144,5 +144,6 @@ V_prop = 0.7                      # [m^3] Stored propellant tank volume.
 
 [mission_profile]
 active_refueling = false          # [bool] Enables/disables mission refueling branch.
+active_and_bypass = false         # [bool] Enables/disables mission refueling branch with bypass to the thruster.
 delta_v = 1157.8                  # [m/s] Mission delta-v requirement.
 required_fuel = 0.0               # [kg] Required fuel from rocket equation.
