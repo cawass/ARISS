@@ -77,6 +77,7 @@ class MissionProfileState:
     """Mission-level targets and refueling activation flags."""
 
     active_refueling: bool = False  # [bool] Enables the mission branch that collects atmospheric propellant.
+    active_and_bypass: bool = False  # [bool] Active refuelling with bypass to the thruster.
     delta_v: float = 1157.8  # [m/s] Mission delta-v requirement used in the rocket equation.
     required_fuel: float = 0  # [kg] Derived: fuel mass required to satisfy the mission delta-v target.
 
