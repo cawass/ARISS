@@ -98,12 +98,12 @@ MPL_RC = {
     "axes.edgecolor": "#444444",
     "axes.linewidth": 0.8,
     "axes.labelcolor": "#111111",
-    "axes.titlesize": 16,
-    "axes.labelsize": 16,
+    "axes.titlesize": 12,
+    "axes.labelsize": 12,
     "xtick.color": "#4A4A4A",
     "ytick.color": "#4A4A4A",
-    "xtick.labelsize": 13,
-    "ytick.labelsize": 13,
+    "xtick.labelsize": 12,
+    "ytick.labelsize": 12,
     "text.color": "#111111",
     "font.family": "sans-serif",
     "font.sans-serif": ["DejaVu Sans", "Arial", "Helvetica"],
@@ -118,6 +118,9 @@ MPL_RC = {
 plt.rcParams.update(MPL_RC)
 
 FONT_FAMILY = "DejaVu Sans"
+UI_FONT_SIZE = 12
+UI_FONT = (FONT_FAMILY, UI_FONT_SIZE)
+UI_FONT_BOLD = (FONT_FAMILY, UI_FONT_SIZE, "bold")
 NASA_BG = PALETTE["background"]
 NASA_PANEL = PALETTE["panel_bg"]
 NASA_GRID = PALETTE["light_grid"]
@@ -336,7 +339,7 @@ def _shape_at_x(x_geom: float, body_length: float, intake_length: float, body_sh
 def _style_2d_axis(axis) -> None:
     axis.set_facecolor(NASA_PANEL)
     axis.grid(True, color=NASA_GRID, alpha=0.6, linestyle="-", linewidth=0.6)
-    axis.tick_params(colors=NASA_TEXT_SECONDARY, labelsize=13, width=0.8)
+    axis.tick_params(colors=NASA_TEXT_SECONDARY, labelsize=UI_FONT_SIZE, width=0.8)
     axis.spines["top"].set_visible(False)
     axis.spines["right"].set_visible(False)
     for side in ("left", "bottom"):
@@ -439,11 +442,11 @@ def _style_3d_axis(axis, title: str) -> None:
     axis.set_facecolor(NASA_BG)
     if hasattr(axis, "computed_zorder"):
         axis.computed_zorder = False
-    axis.set_title(title, color=NASA_TEXT, fontsize=13)
-    axis.set_xlabel("X [m]", color=NASA_TEXT, fontsize=14)
-    axis.set_ylabel("Y [m]", color=NASA_TEXT, fontsize=14)
-    axis.set_zlabel("Z [m]", color=NASA_TEXT, fontsize=14)
-    axis.tick_params(colors=NASA_TEXT_SECONDARY, labelsize=12)
+    axis.set_title(title, color=NASA_TEXT, fontsize=UI_FONT_SIZE)
+    axis.set_xlabel("X [m]", color=NASA_TEXT, fontsize=UI_FONT_SIZE)
+    axis.set_ylabel("Y [m]", color=NASA_TEXT, fontsize=UI_FONT_SIZE)
+    axis.set_zlabel("Z [m]", color=NASA_TEXT, fontsize=UI_FONT_SIZE)
+    axis.tick_params(colors=NASA_TEXT_SECONDARY, labelsize=UI_FONT_SIZE)
     axis.view_init(elev=24, azim=-58)
     grid_color = colors.to_rgba(NASA_GRID_MID, 0.35)
     for pane in (axis.xaxis.pane, axis.yaxis.pane, axis.zaxis.pane):
@@ -648,12 +651,12 @@ def draw_spacecraft_drag_geometry(figure, state: SpacecraftState, iteration: int
         _extend_bounds(bounds, [0.0, 1.0], [-0.5, 0.5], [-0.5, 0.5])
     _style_3d_axis(axis, f"3D Drag Exposure | Iteration {iteration if iteration is not None else 0}")
     _set_equal_limits(axis, bounds)
-    axis.text2D(0.02, 0.02, "Surface color = local wake factor | red = y=c cuts | green = z=c cuts", transform=axis.transAxes, color=NASA_TEXT, fontsize=10, fontfamily="DejaVu Sans")
+    axis.text2D(0.02, 0.02, "Surface color = local wake factor | red = y=c cuts | green = z=c cuts", transform=axis.transAxes, color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
     scalar_map = cm.ScalarMappable(norm=WAKE_NORM, cmap=WAKE_CMAP)
     scalar_map.set_array([])
     colorbar = figure.colorbar(scalar_map, ax=axis, fraction=0.045, pad=0.08)
-    colorbar.set_label("Wake factor [-]", color=NASA_TEXT, fontsize=10)
-    colorbar.ax.tick_params(colors=NASA_TEXT, labelsize=9)
+    colorbar.set_label("Wake factor [-]", color=NASA_TEXT, fontsize=UI_FONT_SIZE)
+    colorbar.ax.tick_params(colors=NASA_TEXT, labelsize=UI_FONT_SIZE)
     colorbar.outline.set_edgecolor(NASA_TEXT)
     figure.patch.set_facecolor(NASA_BG)
     figure.tight_layout()
@@ -707,8 +710,8 @@ def draw_drag_distribution(figure, state: SpacecraftState, iteration: int | None
     _style_2d_axis(cd_axis)
     cd_labels, cd_values = list(drag_coefficients.keys()), list(drag_coefficients.values())
     cd_axis.bar(cd_labels, cd_values, color=[NASA_LINE[i % len(NASA_LINE)] for i in range(len(cd_labels))], edgecolor=NASA_TEXT, linewidth=0.8)
-    cd_axis.set_title("EFFECTIVE DRAG COEFFICIENTS", color=NASA_TEXT, fontsize=12, fontfamily="DejaVu Sans")
-    cd_axis.set_ylabel("Cd [-]", color=NASA_TEXT, fontsize=13)
+    cd_axis.set_title("EFFECTIVE DRAG COEFFICIENTS", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
+    cd_axis.set_ylabel("Cd [-]", color=NASA_TEXT, fontsize=UI_FONT_SIZE)
 
     force_axis = axes[0][1]
     _style_2d_axis(force_axis)
@@ -718,17 +721,17 @@ def draw_drag_distribution(figure, state: SpacecraftState, iteration: int | None
     force_axis.axhline(total_drag, color=NASA_TEXT_MUTED, linestyle="--", linewidth=1.1, label=f"State total = {total_drag:.3e} N")
     if not np.isclose(shown_drag_sum, total_drag, rtol=1.0e-6, atol=1.0e-12):
         force_axis.axhline(shown_drag_sum, color=PALETTE["l1_teal"], linestyle="-.", linewidth=1.1, label=f"Shown sum = {shown_drag_sum:.3e} N")
-    force_axis.set_title("DRAG FORCE BY SURFACE", color=NASA_TEXT, fontsize=12, fontfamily="DejaVu Sans")
-    force_axis.set_ylabel("Force [N]", color=NASA_TEXT, fontsize=13)
-    force_axis.legend(loc="best", frameon=False, fontsize=10)
+    force_axis.set_title("DRAG FORCE BY SURFACE", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
+    force_axis.set_ylabel("Force [N]", color=NASA_TEXT, fontsize=UI_FONT_SIZE)
+    force_axis.legend(loc="best", frameon=False, fontsize=UI_FONT_SIZE)
 
     wake_axis = axes[1][0]
     _style_2d_axis(wake_axis)
     wake_labels, wake_values = list(wake_factors.keys()), list(wake_factors.values())
     wake_axis.bar(wake_labels, wake_values, color=[PALETTE["sernn_pink"], PALETTE["l1_teal"], PALETTE["goal_mid"], PALETTE["cat_purple"]], edgecolor=NASA_TEXT, linewidth=0.8)
     wake_axis.set_ylim(-0.05, 1.05)
-    wake_axis.set_title("WAKE FACTORS", color=NASA_TEXT, fontsize=12, fontfamily="DejaVu Sans")
-    wake_axis.set_ylabel("Wake factor [-]", color=NASA_TEXT, fontsize=13)
+    wake_axis.set_title("WAKE FACTORS", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
+    wake_axis.set_ylabel("Wake factor [-]", color=NASA_TEXT, fontsize=UI_FONT_SIZE)
 
     terms_axis = axes[1][1]
     _style_2d_axis(terms_axis)
@@ -736,12 +739,12 @@ def draw_drag_distribution(figure, state: SpacecraftState, iteration: int | None
     term_labels = ["Aero Drag", "Refuel Ram", "Prop Ram", "Required Load", "Thrust"]
     term_values = [exchange_terms["total_drag"], exchange_terms["refueling_exchange"], exchange_terms["propulsive_exchange"], exchange_terms["total_load"], thrust_available]
     terms_axis.bar(term_labels, term_values, color=[NASA_TEXT_MUTED, PALETTE["choice_mid"], PALETTE["cat_green"], PALETTE["sernn_pink"], PALETTE["l1_teal"]], edgecolor=NASA_TEXT, linewidth=0.8)
-    terms_axis.set_title("FORCE BALANCE (AERO + RAM)", color=NASA_TEXT, fontsize=12, fontfamily="DejaVu Sans")
-    terms_axis.set_ylabel("Force [N]", color=NASA_TEXT, fontsize=13)
-    terms_axis.text(0.02, 0.98, f"rho = {orbit_density:.3e} kg/m^3\nV = {orbit_velocity:.2f} m/s\nq = {dynamic_pressure:.3e} Pa\nResidual (T-Load) = {balance_residual:.3e} N", transform=terms_axis.transAxes, ha="left", va="top", color=NASA_TEXT, fontsize=10, fontfamily="DejaVu Sans")
+    terms_axis.set_title("FORCE BALANCE (AERO + RAM)", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
+    terms_axis.set_ylabel("Force [N]", color=NASA_TEXT, fontsize=UI_FONT_SIZE)
+    terms_axis.text(0.02, 0.98, f"rho = {orbit_density:.3e} kg/m^3\nV = {orbit_velocity:.2f} m/s\nq = {dynamic_pressure:.3e} Pa\nResidual (T-Load) = {balance_residual:.3e} N", transform=terms_axis.transAxes, ha="left", va="top", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
 
     figure.patch.set_facecolor(NASA_BG)
-    figure.suptitle(f"DRAG DIAGNOSTICS | Iteration {iteration if iteration is not None else 0}", color=NASA_TEXT, fontsize=16, fontfamily="DejaVu Sans", fontweight="bold")
+    figure.suptitle(f"DRAG DIAGNOSTICS | Iteration {iteration if iteration is not None else 0}", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY, fontweight="bold")
     figure.tight_layout(rect=[0, 0, 1, 0.96])
 
 
@@ -757,31 +760,31 @@ def draw_thermal_distribution(figure, state: SpacecraftState, diagnostics: Therm
     input_axis = axes[0][0]
     _style_2d_axis(input_axis)
     input_axis.bar(input_labels, input_values, color=[NASA_LINE[i % len(NASA_LINE)] for i in range(len(input_labels))], edgecolor=NASA_TEXT, linewidth=0.8)
-    input_axis.set_title("HEATING INPUTS", color=NASA_TEXT, fontsize=12, fontfamily="DejaVu Sans")
-    input_axis.set_ylabel("Heat rate [W]", color=NASA_TEXT, fontsize=13)
+    input_axis.set_title("HEATING INPUTS", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
+    input_axis.set_ylabel("Heat rate [W]", color=NASA_TEXT, fontsize=UI_FONT_SIZE)
 
     signed_axis = axes[0][1]
     _style_2d_axis(signed_axis)
     signed_labels, signed_values = input_labels + [_thermal_component_label("Q_radiated")], np.concatenate([input_values, np.array([-q_radiated], dtype=float)])
     signed_axis.bar(signed_labels, signed_values, color=[NASA_LINE[i % len(NASA_LINE)] for i in range(len(input_labels))] + [NASA_TEXT_MUTED], edgecolor=NASA_TEXT, linewidth=0.8)
     signed_axis.axhline(0.0, color=NASA_TEXT, linewidth=0.9)
-    signed_axis.set_title("SIGNED CONTRIBUTIONS", color=NASA_TEXT, fontsize=12, fontfamily="DejaVu Sans")
-    signed_axis.set_ylabel("Heat rate [W]", color=NASA_TEXT, fontsize=13)
+    signed_axis.set_title("SIGNED CONTRIBUTIONS", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
+    signed_axis.set_ylabel("Heat rate [W]", color=NASA_TEXT, fontsize=UI_FONT_SIZE)
 
     balance_axis = axes[1][0]
     _style_2d_axis(balance_axis)
     balance_axis.bar(["Total in", "Radiated", "Net load"], np.asarray([total_input, q_radiated, net_load], dtype=float), color=[PALETTE["choice_mid"], NASA_TEXT_MUTED, PALETTE["l1_teal"]], edgecolor=NASA_TEXT, linewidth=0.8)
-    balance_axis.set_title("THERMAL BALANCE", color=NASA_TEXT, fontsize=12, fontfamily="DejaVu Sans")
-    balance_axis.set_ylabel("Heat rate [W]", color=NASA_TEXT, fontsize=13)
+    balance_axis.set_title("THERMAL BALANCE", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
+    balance_axis.set_ylabel("Heat rate [W]", color=NASA_TEXT, fontsize=UI_FONT_SIZE)
 
     summary_axis = axes[1][1]
     summary_axis.set_facecolor(NASA_BG)
     summary_axis.axis("off")
-    summary_axis.text(0.02, 0.98, f"A_rad = {_safe_float(state.geometry.A_rad):.3f} m^2\nT_des = {_safe_float(state.thermal.T_des):.2f} K\nalpha_body = {_safe_float(state.thermal.alpha_body):.3f}\nalpha_solar = {_safe_float(state.thermal.alpha_solar):.3f}\neps_body = {_safe_float(state.thermal.epsilon_therm_body):.3f}\neps_solar = {_safe_float(state.thermal.epsilon_therm_solar):.3f}\neps_rad = {_safe_float(state.thermal.epsilon_therm_rad):.3f}", transform=summary_axis.transAxes, ha="left", va="top", color=NASA_TEXT, fontsize=11, fontfamily="DejaVu Sans")
-    summary_axis.set_title("THERMAL STATE", color=NASA_TEXT, fontsize=12, fontfamily="DejaVu Sans")
+    summary_axis.text(0.02, 0.98, f"A_rad = {_safe_float(state.geometry.A_rad):.3f} m^2\nT_des = {_safe_float(state.thermal.T_des):.2f} K\nalpha_body = {_safe_float(state.thermal.alpha_body):.3f}\nalpha_solar = {_safe_float(state.thermal.alpha_solar):.3f}\neps_body = {_safe_float(state.thermal.epsilon_therm_body):.3f}\neps_solar = {_safe_float(state.thermal.epsilon_therm_solar):.3f}\neps_rad = {_safe_float(state.thermal.epsilon_therm_rad):.3f}", transform=summary_axis.transAxes, ha="left", va="top", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
+    summary_axis.set_title("THERMAL STATE", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
 
     figure.patch.set_facecolor(NASA_BG)
-    figure.suptitle(f"THERMAL CONTRIBUTIONS | Iteration {iteration if iteration is not None else 0}", color=NASA_TEXT, fontsize=16, fontfamily="DejaVu Sans", fontweight="bold")
+    figure.suptitle(f"THERMAL CONTRIBUTIONS | Iteration {iteration if iteration is not None else 0}", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY, fontweight="bold")
     figure.tight_layout(rect=[0, 0, 1, 0.96])
 
 
@@ -808,16 +811,16 @@ def draw_propulsion_overview(figure, state: SpacecraftState, iteration: int | No
     silhouette_axis.fill_between([x1, x2], [0.22 * chamber_radius, 0.22 * chamber_radius], [-0.22 * chamber_radius, -0.22 * chamber_radius], color=PALETTE["sernn_pink"], alpha=0.85)
     silhouette_axis.arrow(x0 - 0.55, 0.0, 0.35, 0.0, width=0.03, head_width=0.16, head_length=0.12, color=PALETTE["l1_teal"], length_includes_head=True)
     silhouette_axis.arrow(x3 + 0.08, 0.0, 0.55, 0.0, width=0.035, head_width=0.18, head_length=0.14, color=PALETTE["sernn_pink"], length_includes_head=True)
-    silhouette_axis.text(x0 + 0.05, intake_radius + 0.12, "INTAKE", color=NASA_TEXT, fontsize=10, fontfamily="DejaVu Sans")
-    silhouette_axis.text(x1 + 0.08, chamber_radius + 0.12, "THRUSTER", color=NASA_TEXT, fontsize=10, fontfamily="DejaVu Sans")
-    silhouette_axis.text(x2 + 0.10, exit_radius + 0.12, "NOZZLE", color=NASA_TEXT, fontsize=10, fontfamily="DejaVu Sans")
-    silhouette_axis.text(x0 - 0.60, -0.30, "FLOW", color=PALETTE["l1_teal"], fontsize=9, fontfamily="DejaVu Sans")
-    silhouette_axis.text(x3 + 0.22, -0.30, "THRUST", color=PALETTE["sernn_pink"], fontsize=9, fontfamily="DejaVu Sans")
+    silhouette_axis.text(x0 + 0.05, intake_radius + 0.12, "INTAKE", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
+    silhouette_axis.text(x1 + 0.08, chamber_radius + 0.12, "THRUSTER", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
+    silhouette_axis.text(x2 + 0.10, exit_radius + 0.12, "NOZZLE", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
+    silhouette_axis.text(x0 - 0.60, -0.30, "FLOW", color=PALETTE["l1_teal"], fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
+    silhouette_axis.text(x3 + 0.22, -0.30, "THRUST", color=PALETTE["sernn_pink"], fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
     silhouette_axis.set_xlim(x0 - 0.75, x3 + 0.85)
     silhouette_axis.set_ylim(-1.25 * max(exit_radius, chamber_radius, intake_radius), 1.25 * max(exit_radius, chamber_radius, intake_radius))
     silhouette_axis.set_aspect("equal", adjustable="box")
     silhouette_axis.axis("off")
-    silhouette_axis.set_title("THRUSTER SILHOUETTE", color=NASA_TEXT, fontsize=13, fontfamily="DejaVu Sans")
+    silhouette_axis.set_title("THRUSTER SILHOUETTE", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
 
     telemetry_axis.set_facecolor(NASA_PANEL)
     telemetry_axis.axis("off")
@@ -838,10 +841,10 @@ def draw_propulsion_overview(figure, state: SpacecraftState, iteration: int | No
         f"Orbit Velocity [m/s]         : {orbit_velocity:.3f}",
         f"Mission Altitude [km]        : {_safe_float(state.orbit.altitude):.3f}",
     ]
-    telemetry_axis.text(0.03, 0.97, "\n".join(lines), va="top", ha="left", color=NASA_TEXT, fontsize=11, fontfamily="DejaVu Sans", transform=telemetry_axis.transAxes)
+    telemetry_axis.text(0.03, 0.97, "\n".join(lines), va="top", ha="left", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY, transform=telemetry_axis.transAxes)
 
     figure.patch.set_facecolor(NASA_BG)
-    figure.suptitle(f"PROPULSION CONSOLE | Iteration {iteration if iteration is not None else 0}", color=NASA_TEXT, fontsize=16, fontfamily="DejaVu Sans", fontweight="bold")
+    figure.suptitle(f"PROPULSION CONSOLE | Iteration {iteration if iteration is not None else 0}", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY, fontweight="bold")
     figure.tight_layout(rect=[0, 0, 1, 0.95])
 
 
@@ -864,6 +867,7 @@ class _HistoryPlotterUI:
         self.root.title(window_title)
         self.root.geometry("1520x920")
         self.root.configure(bg=NASA_BG)
+        self.root.option_add("*Font", f"{{{FONT_FAMILY}}} {UI_FONT_SIZE}")
 
         self.view_iteration = tk.IntVar(value=max(len(history) - 1, 0))
         self.status_vars = {key: tk.StringVar() for key in self.AUX_TAB_TITLES}
@@ -895,10 +899,10 @@ class _HistoryPlotterUI:
             self.add_plot_row(*spec)
 
     def _build_controls(self, parent) -> None:
-        tk.Label(parent, text="ARISS FLIGHT DATA BOARD", bg=NASA_BG, fg=NASA_TEXT, font=("DejaVu Sans", 13, "bold"), justify="left").pack(anchor="w", pady=(0, 8))
+        tk.Label(parent, text="ARISS FLIGHT DATA BOARD", bg=NASA_BG, fg=NASA_TEXT, font=UI_FONT_BOLD, justify="left").pack(anchor="w", pady=(0, 8))
         if self.case_name:
-            tk.Label(parent, text=f"CASE: {self.case_name}", bg=NASA_BG, fg=NASA_TEXT, font=("DejaVu Sans", 11, "bold"), justify="left").pack(anchor="w", pady=(0, 8))
-        tk.Label(parent, text="SELECT ANY STATE CHANNEL\nMULTI-SERIES PER PLOT\nPLOTS + 3D + DRAG/PROP + THERMAL + ATMOSPHERE", bg=NASA_BG, fg=NASA_TEXT, font=("DejaVu Sans", 10), justify="left").pack(anchor="w", pady=(0, 12))
+            tk.Label(parent, text=f"CASE: {self.case_name}", bg=NASA_BG, fg=NASA_TEXT, font=UI_FONT_BOLD, justify="left").pack(anchor="w", pady=(0, 8))
+        tk.Label(parent, text="SELECT ANY STATE CHANNEL\nMULTI-SERIES PER PLOT\nPLOTS + 3D + DRAG/PROP + THERMAL + ATMOSPHERE", bg=NASA_BG, fg=NASA_TEXT, font=UI_FONT, justify="left").pack(anchor="w", pady=(0, 12))
         button_row = tk.Frame(parent, bg=NASA_BG)
         button_row.pack(fill="x", pady=(0, 10))
         tk.Button(button_row, text="Add Plot", command=self.add_plot_row, bg=NASA_PANEL, fg=NASA_TEXT, activebackground=PALETTE["l1_teal_fill"], activeforeground=NASA_TEXT, relief="flat", bd=1, highlightthickness=1, highlightbackground=NASA_GRID).pack(side="left", padx=(0, 6))
@@ -911,7 +915,7 @@ class _HistoryPlotterUI:
         except Exception:
             pass
         style.configure("ARISS.TNotebook", background=NASA_BG, borderwidth=0, tabmargins=(2, 2, 2, 0))
-        style.configure("ARISS.TNotebook.Tab", background=NASA_PANEL, foreground=NASA_TEXT_SECONDARY, padding=(10, 6), borderwidth=1, lightcolor=NASA_GRID, darkcolor=NASA_GRID)
+        style.configure("ARISS.TNotebook.Tab", background=NASA_PANEL, foreground=NASA_TEXT_SECONDARY, padding=(10, 6), borderwidth=1, lightcolor=NASA_GRID, darkcolor=NASA_GRID, font=UI_FONT)
         style.map(
             "ARISS.TNotebook.Tab",
             background=[("selected", PALETTE["l1_teal_fill"])],
@@ -923,9 +927,9 @@ class _HistoryPlotterUI:
     def _create_iteration_controls(self, parent, status_var) -> None:
         controls = tk.Frame(parent, bg=NASA_BG, padx=10, pady=10)
         controls.pack(fill="x")
-        tk.Label(controls, text="History Iteration", bg=NASA_BG, fg=NASA_TEXT, font=("DejaVu Sans", 11, "bold")).pack(anchor="w")
+        tk.Label(controls, text="History Iteration", bg=NASA_BG, fg=NASA_TEXT, font=UI_FONT_BOLD).pack(anchor="w")
         tk.Scale(controls, from_=0, to=max(len(self.history) - 1, 0), orient="horizontal", variable=self.view_iteration, command=self._on_iteration_change, bg=NASA_BG, fg=NASA_TEXT, troughcolor="#F3F6F7", activebackground=PALETTE["l1_teal"], highlightthickness=0).pack(fill="x", pady=(4, 2))
-        tk.Label(controls, textvariable=status_var, bg=NASA_BG, fg=NASA_TEXT, font=("DejaVu Sans", 10), justify="left").pack(anchor="w")
+        tk.Label(controls, textvariable=status_var, bg=NASA_BG, fg=NASA_TEXT, font=UI_FONT, justify="left").pack(anchor="w")
 
     def _attach_figure_canvas(self, parent, figure):
         canvas = FigureCanvasTkAgg(figure, master=parent)
@@ -994,15 +998,15 @@ class _HistoryPlotterUI:
         figure.clear()
         axis = figure.add_subplot(111)
         axis.set_facecolor(NASA_BG)
-        axis.text(0.5, 0.5, message, ha="center", va="center", color=NASA_TEXT, fontsize=12, fontfamily="DejaVu Sans", transform=axis.transAxes)
+        axis.text(0.5, 0.5, message, ha="center", va="center", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY, transform=axis.transAxes)
         axis.set_xticks([])
         axis.set_yticks([])
         for spine in axis.spines.values():
             spine.set_color(NASA_TEXT)
 
     def _draw_empty_history_axis(self, axis, title: str) -> None:
-        axis.set_title(title or "No series selected", color=NASA_TEXT, fontsize=12, fontfamily="DejaVu Sans")
-        axis.text(0.5, 0.5, "Select one or more series", transform=axis.transAxes, ha="center", va="center", color=NASA_TEXT, fontsize=10, fontfamily="DejaVu Sans")
+        axis.set_title(title or "No series selected", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
+        axis.text(0.5, 0.5, "Select one or more series", transform=axis.transAxes, ha="center", va="center", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
         axis.set_xticks([])
         axis.set_yticks([])
 
@@ -1013,12 +1017,12 @@ class _HistoryPlotterUI:
             if not y_values or any(value <= 0.0 for value in y_values):
                 all_positive = False
             axis.plot(x_values, y_values, color=_history_plot_color(line_idx), linewidth=1.9, label=path)
-        axis.set_title(row["title"].get() or _default_title(selected_paths), color=NASA_TEXT, fontsize=12, fontfamily="DejaVu Sans")
-        axis.set_xlabel("Iteration", color=NASA_TEXT, fontsize=13)
-        axis.set_ylabel(selected_paths[0] if len(selected_paths) == 1 else "Selected values", color=NASA_TEXT, fontsize=13)
+        axis.set_title(row["title"].get() or _default_title(selected_paths), color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
+        axis.set_xlabel("Iteration", color=NASA_TEXT, fontsize=UI_FONT_SIZE)
+        axis.set_ylabel(selected_paths[0] if len(selected_paths) == 1 else "Selected values", color=NASA_TEXT, fontsize=UI_FONT_SIZE)
         if row["log"].get():
             axis.set_yscale("log" if all_positive else "symlog", linthresh=1.0e-9)
-        legend = axis.legend(loc="best", frameon=False, fontsize=10)
+        legend = axis.legend(loc="best", frameon=False, fontsize=UI_FONT_SIZE)
         _style_legend_text(legend)
 
     def add_plot_row(self, path: str | Sequence[str] | None = None, title: str | None = None, log_scale: bool = False) -> None:
@@ -1081,7 +1085,7 @@ class _HistoryPlotterUI:
 
         title = "ARISS FLIGHT DATA WALL" if not self.case_name else f"ARISS FLIGHT DATA WALL | {self.case_name}"
         self.figure.patch.set_facecolor(NASA_BG)
-        self.figure.suptitle(title, color=NASA_TEXT, fontsize=16, fontfamily="DejaVu Sans", fontweight="bold")
+        self.figure.suptitle(title, color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY, fontweight="bold")
         self.figure.tight_layout(rect=[0, 0, 1, 0.97])
         self.canvas.draw_idle()
         self._refresh_aux_tabs()
@@ -1149,24 +1153,24 @@ class _HistoryPlotterUI:
             composition_axis.scatter([altitude_km], [max(_safe_float(properties["n2_density"]), 1.0e-30)], color=PALETTE["cat_green"], s=30, zorder=5)
             composition_axis.scatter([altitude_km], [max(_safe_float(properties["o_density"]), 1.0e-30)], color=PALETTE["sernn_pink"], s=30, zorder=5)
             composition_axis.set_yscale("log")
-            composition_axis.set_ylabel("Density [kg/m^3]", color=NASA_TEXT, fontsize=13)
-            composition_axis.set_title("COMPOSITION DENSITY VS ALTITUDE", color=NASA_TEXT, fontsize=12, fontfamily="DejaVu Sans")
-            composition_axis.legend(loc="best", frameon=False, fontsize=10)
+            composition_axis.set_ylabel("Density [kg/m^3]", color=NASA_TEXT, fontsize=UI_FONT_SIZE)
+            composition_axis.set_title("COMPOSITION DENSITY VS ALTITUDE", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
+            composition_axis.legend(loc="best", frameon=False, fontsize=UI_FONT_SIZE)
 
             model_r, state_r = _safe_float(properties["specific_gas_constant"]), _safe_float(getattr(state.orbit, "R_spec", _safe_float(properties["specific_gas_constant"])), default=_safe_float(properties["specific_gas_constant"]))
             r_axis.plot(altitude_profile, r_profile, color=PALETTE["choice_mid"], linewidth=2.0, label="Model R_specific")
             r_axis.axvline(altitude_km, color=NASA_TEXT, linestyle="--", linewidth=1.1)
             r_axis.scatter([altitude_km], [model_r], color=PALETTE["choice_mid"], s=34, zorder=5, label=f"Model @ altitude = {model_r:.2f}")
             r_axis.scatter([altitude_km], [state_r], color=PALETTE["goal_dark"], s=34, marker="D", zorder=5, label=f"State R_spec = {state_r:.2f}")
-            r_axis.set_xlabel("Altitude [km]", color=NASA_TEXT, fontsize=13)
-            r_axis.set_ylabel("R_specific [J/kg/K]", color=NASA_TEXT, fontsize=13)
-            r_axis.set_title("R VALUES VS ALTITUDE", color=NASA_TEXT, fontsize=12, fontfamily="DejaVu Sans")
-            r_axis.legend(loc="best", frameon=False, fontsize=10)
+            r_axis.set_xlabel("Altitude [km]", color=NASA_TEXT, fontsize=UI_FONT_SIZE)
+            r_axis.set_ylabel("R_specific [J/kg/K]", color=NASA_TEXT, fontsize=UI_FONT_SIZE)
+            r_axis.set_title("R VALUES VS ALTITUDE", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY)
+            r_axis.legend(loc="best", frameon=False, fontsize=UI_FONT_SIZE)
             composition_axis.set_xlim(min(float(np.min(altitude_profile)), altitude_km), max(float(np.max(altitude_profile)), altitude_km))
 
             self.status_vars["atmosphere"].set(f"Iteration {index} / {len(self.history) - 1} | Altitude {altitude_km:.2f} km | R_model {model_r:.2f} J/kg/K | R_state {state_r:.2f} J/kg/K")
             figure.patch.set_facecolor(NASA_BG)
-            figure.suptitle(f"ATMOSPHERE DIAGNOSTICS | Iteration {index}", color=NASA_TEXT, fontsize=16, fontfamily="DejaVu Sans", fontweight="bold")
+            figure.suptitle(f"ATMOSPHERE DIAGNOSTICS | Iteration {index}", color=NASA_TEXT, fontsize=UI_FONT_SIZE, fontfamily=FONT_FAMILY, fontweight="bold")
             figure.tight_layout(rect=[0, 0, 1, 0.96])
         except Exception as exc:
             self._draw_error_figure(figure, f"Atmosphere diagnostics unavailable\n{exc}")

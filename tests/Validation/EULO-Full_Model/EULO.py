@@ -50,7 +50,7 @@ SHOW_UI = True
 
 
 # ------------------------------------------------------------------------------ #
-# Run the Mansur validation case
+# Run the EULO validation case
 # ------------------------------------------------------------------------------ #
 
 def run_EULO_verification():

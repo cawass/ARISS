@@ -1,510 +1,402 @@
-from pathlib import Path
-import csv
 import sys
-from copy import deepcopy
 import io
+import csv
+from copy import deepcopy
+from pathlib import Path
 from contextlib import redirect_stdout
-
-ROOT = Path(__file__).resolve().parents[3]
-SRC = ROOT / "src"
-VALIDATION_DIR = ROOT / "tests" / "Validation"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
-if str(VALIDATION_DIR) not in sys.path:
-    sys.path.insert(0, str(VALIDATION_DIR))
 
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+import matplotlib.patheffects as pe
 from scipy.interpolate import PchipInterpolator
 from matplotlib.ticker import AutoMinorLocator
 from matplotlib.lines import Line2D
-from plot_style import PALETTE, apply_validation_style, style_axis, style_legend
 
-from ariss.core.spacecraft import SpacecraftState
+
+# ------------------------------------------------------------------------------ #
+# Paths
+# ------------------------------------------------------------------------------ #
+
+ROOT = Path(__file__).resolve().parents[3]
+SRC = ROOT / "src"
+VALIDATION_DIR = ROOT / "tests" / "Validation"
+
+for p in (SRC, VALIDATION_DIR):
+    if str(p) not in sys.path:
+        sys.path.insert(0, str(p))
+
 from ariss.core.simulation import run_sizing_loop, logger as simulation_logger
+from ariss.core.spacecraft import SpacecraftState
+from plot_style import apply_validation_style, style_axis, style_legend
+
+
+# ------------------------------------------------------------------------------ #
+# Config
+# ------------------------------------------------------------------------------ #
 
 HERE = Path(__file__).resolve().parent
-BASE_CONFIG_PATH = ROOT / "src" / "ariss" / "core" / "base_config.toml"
+BASE_CONFIG_PATH = ROOT / "src/ariss/core/base_config.toml"
 CONFIG_PATH = HERE / "MansurValidation.toml"
 DATASET_PATH = HERE / "TP Dataset.csv"
 OUTPUT = HERE / "mansur_envelope_validation.png"
 
 ALT_LEVELS = [150, 155, 160, 165, 170, 180, 190, 200, 220]
-EFF_LEVELS = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
 G0 = 9.80665
 
 
-# ------------------------------------------------------------------------------
-# Utilities
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------ #
+# Style
+# ------------------------------------------------------------------------------ #
 
-def _apply_publication_style():
+mpl.rcParams.update({
+    "font.family": "sans-serif",
+    "font.size": 12,
+    "axes.labelcolor": "black",
+    "xtick.color": "black",
+    "ytick.color": "black",
+})
+
+
+def _apply_style():
     apply_validation_style()
 
-def smooth_xy(x, y, n=200):
-    x = np.asarray(x, dtype=float)
-    y = np.asarray(y, dtype=float)
 
-    mask = np.isfinite(x) & np.isfinite(y)
-    x = x[mask]
-    y = y[mask]
+# ------------------------------------------------------------------------------ #
+# Utilities
+# ------------------------------------------------------------------------------ #
 
-    if len(x) == 0:
-        return x, y
+def _clean_xy(x, y):
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
+    m = np.isfinite(x) & np.isfinite(y)
+    return x[m], y[m]
 
-    x, u = np.unique(x, return_index=True)
-    y = y[u]
 
+def smooth_xy(x, y, n=300):
+    x, y = _clean_xy(x, y)
     if len(x) < 3:
         return x, y
+
+    x, idx = np.unique(x, return_index=True)
+    y = y[idx]
 
     f = PchipInterpolator(x, y)
     xs = np.linspace(x.min(), x.max(), n)
     return xs, f(xs)
 
 
-def smooth_by_y(x, y, n=200):
-    """
-    Smooth a curve where y is the natural marching coordinate.
-    Returns x_smooth, y_smooth.
-    """
-    x = np.asarray(x, dtype=float)
-    y = np.asarray(y, dtype=float)
-
-    mask = np.isfinite(x) & np.isfinite(y)
-    x = x[mask]
-    y = y[mask]
-
-    if len(x) == 0:
+def smooth_by_y(x, y, n=300):
+    x, y = _clean_xy(x, y)
+    if len(x) < 3:
         return x, y
 
     order = np.argsort(y)
-    y = y[order]
-    x = x[order]
+    y, x = y[order], x[order]
 
-    y, u = np.unique(y, return_index=True)
-    x = x[u]
-
-    if len(y) < 3:
-        return x, y
+    y, idx = np.unique(y, return_index=True)
+    x = x[idx]
 
     f = PchipInterpolator(y, x)
     ys = np.linspace(y.min(), y.max(), n)
     return f(ys), ys
 
 
-def label_line(ax, x, y, text, color, position="start", x_offset=0.5, y_offset=0.0):
-    if len(x) == 0 or len(y) == 0:
-        return
+def spaced_marker_indices(x, y, n_markers=2, pad_fraction=0.14):
+    """
+    Return indices corresponding to equally spaced positions in arc length.
+    This is better than equal index spacing because the curves are not
+    uniformly parameterized in x or y.
+    """
+    x, y = _clean_xy(x, y)
 
-    if position == "end":
-        idx = -1
-        ha = "right"
-    elif position == "middle":
-        idx = len(x) // 2
-        ha = "center"
+    if len(x) < 2:
+        return []
+
+    ds = np.hypot(np.diff(x), np.diff(y))
+    s = np.concatenate([[0.0], np.cumsum(ds)])
+    total = s[-1]
+
+    if not np.isfinite(total) or total <= 0:
+        return [len(x) // 2]
+
+    if n_markers <= 1:
+        targets = np.array([0.5 * total])
     else:
-        idx = 0
-        ha = "left"
+        lo = pad_fraction * total
+        hi = (1.0 - pad_fraction) * total
+        if hi <= lo:
+            targets = np.array([0.5 * total])
+        else:
+            targets = np.linspace(lo, hi, n_markers)
 
-    ax.text(
-        float(x[idx]) + x_offset,
-        float(y[idx]) + y_offset,
-        text,
-        color=color,
-        fontsize=9,
-        va="center",
-        ha=ha,
-        bbox=dict(facecolor="white", edgecolor="none", pad=0.1),
-        zorder=5,
-    )
+    idx = []
+    for t in targets:
+        i = int(np.argmin(np.abs(s - t)))
+        if i not in idx:
+            idx.append(i)
+
+    return idx
 
 
-def label_line_at_tp(
+def plot_curve_with_markers(
     ax,
     x,
     y,
-    tp_target,
-    text,
+    *,
     color,
-    x_offset=0.5,
-    y_offset=0.0,
-    rotate=False,
-    bbox_edgecolor="none",
-    bbox_linestyle="-",
-    bbox_linewidth=0.8,
+    marker,
+    lw,
+    ls,
+    alpha,
+    zorder,
+    filled,
+    halo=False,
+    n_markers=2,
 ):
-    x = np.asarray(x, dtype=float)
-    y = np.asarray(y, dtype=float)
-
-    mask = np.isfinite(x) & np.isfinite(y)
-    x = x[mask]
-    y = y[mask]
-
+    x, y = _clean_xy(x, y)
     if len(x) < 2:
         return
 
-    order = np.argsort(x)
-    x = x[order]
-    y = y[order]
+    mark_idx = spaced_marker_indices(x, y, n_markers=n_markers, pad_fraction=0.14)
 
-    x, u = np.unique(x, return_index=True)
-    y = y[u]
-
-    if len(x) < 2:
-        return
-
-    if not (x.min() <= tp_target <= x.max()):
-        return
-
-    y_target = np.interp(tp_target, x, y)
-
-    rotation = 0.0
-    if rotate:
-        idx = np.searchsorted(x, tp_target)
-        idx0 = max(0, min(len(x) - 2, idx - 1))
-        idx1 = idx0 + 1
-        dx = x[idx1] - x[idx0]
-        dy = y[idx1] - y[idx0]
-        if abs(dx) > 1e-12:
-            rotation = np.degrees(np.arctan2(dy, dx))
-            if rotation > 90.0:
-                rotation -= 180.0
-            elif rotation < -90.0:
-                rotation += 180.0
-
-    ax.text(
-        float(tp_target) + x_offset,
-        float(y_target) + y_offset,
-        text,
+    line, = ax.plot(
+        x,
+        y,
         color=color,
-        fontsize=9,
-        va="center",
-        ha="left",
-        rotation=rotation,
-        rotation_mode="anchor",
-        bbox=dict(
-            facecolor="white",
-            edgecolor=bbox_edgecolor,
-            linestyle=bbox_linestyle,
-            linewidth=bbox_linewidth,
-            pad=0.15,
-        ),
-        zorder=5,
+        lw=lw,
+        ls=ls,
+        alpha=alpha,
+        zorder=zorder,
+        solid_capstyle="round",
+        dash_capstyle="round",
+        marker=marker,
+        markevery=mark_idx if mark_idx else None,
+        ms=6.8 if filled else 6.2,
+        mec="white" if filled else color,
+        mew=0.9 if filled else 1.15,
+        mfc=color if filled else "white",
     )
 
+    if halo:
+        line.set_path_effects([
+            pe.Stroke(linewidth=lw + 1.6, foreground="white"),
+            pe.Normal(),
+        ])
 
-def tp_from_efficiency(eta, isp_s):
-    isp_s = np.asarray(isp_s, dtype=float)
-    return 1e6 * (2.0 * float(eta) / (G0 * isp_s))
 
-
-def plot_efficiency_lines(ax):
-    y_min, y_max = 2500.0, 6000.0
-    y_grid = np.linspace(y_min, y_max, 300)
-    label_y_targets = {
-        0.2: 3500.0,
-        0.3: 3600.0,
-        0.4: 3750.0,
-        0.5: 3900.0,
-        0.6: 4050.0,
-        0.7: 4200.0,
-    }
-
-    for eta in EFF_LEVELS:
-        x_grid = tp_from_efficiency(eta, y_grid)
-        mask = (x_grid >= 5.0) & (x_grid <= 60.0)
-        if np.count_nonzero(mask) < 2:
-            continue
-
-        x_plot = x_grid[mask]
-        y_plot = y_grid[mask]
-        ax.plot(x_plot, y_plot, color=PALETTE["secondary_text"], lw=0.9, zorder=1)
-
-        y_label = label_y_targets.get(float(eta), 3800.0)
-        x_label = float(tp_from_efficiency(eta, y_label))
-        if 5.0 <= x_label <= 60.0:
-            ax.text(
-                x_label + 0.4,
-                y_label,
-                f"{eta:.1f}",
-                color=PALETTE["secondary_text"],
-                fontsize=10,
-                rotation=-63.0,
-                rotation_mode="anchor",
-                va="center",
-                ha="left",
-                bbox=dict(facecolor=PALETTE["panel_bg"], edgecolor="none", pad=0.1),
-                zorder=4,
-            )
-
+# ------------------------------------------------------------------------------ #
+# Dataset
+# ------------------------------------------------------------------------------ #
 
 def load_dataset(path):
-    with open(path, encoding="utf-8-sig", newline="") as f:
-        rows = list(csv.reader(f))
-
+    rows = list(csv.reader(open(path, encoding="utf-8-sig")))
     header = rows[0]
 
-    contours = {}
-    sol = (np.array([]), np.array([]))
+    contours, solution = {}, (np.array([]), np.array([]))
 
     for i in range(0, len(header), 2):
-        label = header[i].lower().strip()
-        xs, ys = [], []
+        label = header[i].lower()
+        x, y = [], []
 
         for r in rows[2:]:
             if i + 1 < len(r) and r[i] and r[i + 1]:
-                xs.append(float(r[i]))
-                ys.append(float(r[i + 1]))
+                x.append(float(r[i]))
+                y.append(float(r[i + 1]))
 
-        if not xs:
+        if not x:
             continue
 
-        xs = np.array(xs, dtype=float)
-        ys = np.array(ys, dtype=float)
-        o = np.argsort(xs)
+        x, y = np.array(x), np.array(y)
+        o = np.argsort(x)
 
         if label.startswith("h"):
-            contours[float(label.split()[1])] = (xs[o], ys[o])
+            contours[float(label.split()[1])] = (x[o], y[o])
         elif "solution" in label:
-            sol = (xs[o], ys[o])
+            solution = (x[o], y[o])
 
-    return contours, sol
+    return contours, solution
 
 
-# ------------------------------------------------------------------------------
-# Simulation sweep
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------ #
+# Simulation
+# ------------------------------------------------------------------------------ #
 
 def run_sweep():
     base = SpacecraftState.from_toml(BASE_CONFIG_PATH)
     base.update_from_toml(CONFIG_PATH)
 
     eta = np.geomspace(0.05, 1, 60)
-    ISP = np.linspace(1000, 6000, 60)
+    isp_vals = np.linspace(2500, 6000, 60)
 
-    alt = np.full((len(ISP), len(eta)), np.nan, dtype=float)
+    alt = np.full((len(isp_vals), len(eta)), np.nan)
     tp = np.full_like(alt, np.nan)
 
     old = simulation_logger.level
     simulation_logger.setLevel(50)
 
     try:
-        for i, isp in enumerate(ISP):
-            for j, p in enumerate(eta):
+        for i, isp in enumerate(isp_vals):
+            for j, eff in enumerate(eta):
                 sc = deepcopy(base)
                 sc.geometry.use_intake_area_ratio = False
                 sc.thruster.specific_impulse = isp
-                sc.thruster.eff = p
+                sc.thruster.eff = eff
 
                 with redirect_stdout(io.StringIO()):
-                    sc, conv, _ = run_sizing_loop(sc)
+                    sc, ok, _ = run_sizing_loop(sc)
 
-                if not conv:
-                    continue
-
-                alt[i, j] = sc.orbit.altitude
-                tp[i, j] = 1e6 * sc.thruster.thrust / sc.thruster.power
-
+                if ok:
+                    alt[i, j] = sc.orbit.altitude
+                    tp[i, j] = 1e6 * sc.thruster.thrust / sc.thruster.power
     finally:
         simulation_logger.setLevel(old)
 
-    return ISP, alt, tp
+    return isp_vals, alt, tp
 
 
-# ------------------------------------------------------------------------------
-# Altitude contour extraction
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------ #
+# Contours
+# ------------------------------------------------------------------------------ #
 
-def crossing_tp_for_level(a, t, level, eps=1e-9):
-    """
-    Find all TP values where the altitude trace a crosses 'level',
-    preserving the original sweep order. This is the key fix.
-
-    a : altitude samples along increasing power for a single ISP
-    t : TP samples along the same power sweep
-    """
-    a = np.asarray(a, dtype=float)
-    t = np.asarray(t, dtype=float)
-
+def crossing_tp(a, t, level):
     hits = []
-
-    for k in range(len(a) - 1):
-        a0, a1 = a[k], a[k + 1]
-        t0, t1 = t[k], t[k + 1]
-
-        if not (np.isfinite(a0) and np.isfinite(a1) and np.isfinite(t0) and np.isfinite(t1)):
+    for i in range(len(a) - 1):
+        if not np.isfinite(a[i:i + 2]).all() or not np.isfinite(t[i:i + 2]).all():
             continue
 
-        d0 = level - a0
-        d1 = level - a1
+        if (a[i] - level) * (a[i + 1] - level) <= 0:
+            if a[i + 1] != a[i]:
+                f = (level - a[i]) / (a[i + 1] - a[i])
+                hits.append(t[i] + f * (t[i + 1] - t[i]))
 
-        # Entire segment lies exactly on the contour level.
-        if abs(d0) < eps and abs(d1) < eps:
-            hits.extend([t0, t1])
-            continue
-
-        # First endpoint exactly on level.
-        if abs(d0) < eps:
-            hits.append(t0)
-            continue
-
-        # Crossing inside segment, or second endpoint exactly on level.
-        if d0 * d1 < 0.0 or abs(d1) < eps:
-            if abs(a1 - a0) < eps:
-                continue
-            frac = (level - a0) / (a1 - a0)
-            hits.append(t0 + frac * (t1 - t0))
-
-    if not hits:
-        return np.array([], dtype=float)
-
-    hits = np.array(sorted(hits), dtype=float)
-
-    # Deduplicate numerically identical crossings.
-    dedup = [hits[0]]
-    for v in hits[1:]:
-        if abs(v - dedup[-1]) > 1e-8:
-            dedup.append(v)
-
-    return np.array(dedup, dtype=float)
+    return np.unique(np.array(hits))
 
 
-def stitch_branches(rows):
-    """
-    rows: list of (isp, tp_hits_array)
-
-    Each ISP row can have 0, 1, or multiple TP crossings.
-    Stitch them into continuous branches by nearest-neighbor continuity in TP.
-    """
-    branches = []
-    active = []
+def stitch(rows):
+    branches, active = [], []
 
     for isp, hits in rows:
-        hits = list(np.sort(np.asarray(hits, dtype=float)))
+        hits = list(np.sort(hits))
 
-        # No crossings on this ISP: terminate active branches.
-        if len(hits) == 0:
+        if not hits:
             active = []
             continue
 
-        # Start new branches if none are active yet.
         if not active:
-            active = []
-            for x in hits:
-                branch = [(x, float(isp))]
-                branches.append(branch)
-                active.append(branch)
+            active = [[(x, isp)] for x in hits]
+            branches += active
             continue
 
-        remaining = hits[:]
-        next_active = []
-
-        # Match each active branch to the nearest crossing on the current ISP row.
-        for branch in sorted(active, key=lambda b: b[-1][0]):
-            if not remaining:
+        new_active = []
+        for b in active:
+            if not hits:
                 continue
+            prev = b[-1][0]
+            idx = np.argmin(np.abs(np.array(hits) - prev))
+            x = hits.pop(idx)
+            b.append((x, isp))
+            new_active.append(b)
 
-            prev_x = branch[-1][0]
-            idx = int(np.argmin(np.abs(np.asarray(remaining) - prev_x)))
-            x = remaining.pop(idx)
+        for x in hits:
+            nb = [(x, isp)]
+            branches.append(nb)
+            new_active.append(nb)
 
-            branch.append((x, float(isp)))
-            next_active.append(branch)
+        active = new_active
 
-        # Any unmatched crossings start new branches.
-        for x in remaining:
-            branch = [(x, float(isp))]
-            branches.append(branch)
-            next_active.append(branch)
-
-        active = next_active
-
-    out = []
-    for branch in branches:
-        if len(branch) < 2:
-            continue
-        x = np.array([p[0] for p in branch], dtype=float)
-        y = np.array([p[1] for p in branch], dtype=float)
-        out.append((x, y))
-
-    return out
-
+    return [
+        (np.array([p[0] for p in b]), np.array([p[1] for p in b]))
+        for b in branches
+        if len(b) > 1
+    ]
 
 
 def extract_lines(ISP, alt, tp):
-    lines = {}
-
-    for level in ALT_LEVELS:
-        rows = []
-
-        for i, isp in enumerate(ISP):
-            hits = crossing_tp_for_level(alt[i], tp[i], level)
-            rows.append((float(isp), hits))
-
-        branches = stitch_branches(rows)
-
+    out = {}
+    for lvl in ALT_LEVELS:
+        rows = [(isp, crossing_tp(alt[i], tp[i], lvl)) for i, isp in enumerate(ISP)]
+        branches = stitch(rows)
         if branches:
-            lines[level] = branches
+            out[lvl] = branches
+    return out
 
-    return lines
 
-
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------ #
 # Plot
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------ #
 
 def plot():
-    _apply_publication_style()
+    _apply_style()
 
     ISP, alt, tp = run_sweep()
     paper, _ = load_dataset(DATASET_PATH)
     ariss = extract_lines(ISP, alt, tp)
 
-    colors = plt.cm.viridis(np.linspace(0, 1, len(ALT_LEVELS)))
+    colors = {
+        h: plt.cm.viridis(v)
+        for h, v in zip(ALT_LEVELS, np.linspace(0.08, 0.95, len(ALT_LEVELS)))
+    }
 
-    fig, ax = plt.subplots(figsize=(9.6, 5.4))
+    # One marker shape per altitude pair
+    marker_cycle = ["o", "s", "^", "D", "v", "P", "X", "<", ">"]
+    markers = {h: m for h, m in zip(ALT_LEVELS, marker_cycle)}
 
-    for c, h in zip(colors, ALT_LEVELS):
-        if h in paper:
-            x, y = smooth_xy(*paper[h])
-            ax.plot(x, y, color=c, ls="--", lw=1.0, alpha=0.65, zorder=2)
-            label_line_at_tp(
+    fig, ax = plt.subplots(figsize=(10.8, 5.8))
+    fig.subplots_adjust(right=0.80, top=0.86)
+
+    # Draw Mansur first, lighter, same marker per altitude
+    for h in ALT_LEVELS:
+        if h not in paper:
+            continue
+
+        c = colors[h]
+        mk = markers[h]
+        x, y = smooth_xy(*paper[h], n=320)
+
+        plot_curve_with_markers(
+            ax,
+            x,
+            y,
+            color=c,
+            marker=mk,
+            lw=1.2,
+            ls=(0, (4, 2)),
+            alpha=0.38,
+            zorder=1,
+            filled=False,
+            halo=False,
+            n_markers=2,
+        )
+
+    # Draw ARISS on top, same marker per altitude, filled markers + halo
+    for h in ALT_LEVELS:
+        if h not in ariss:
+            continue
+
+        c = colors[h]
+        mk = markers[h]
+
+        branches = sorted(ariss[h], key=lambda b: len(b[0]), reverse=True)
+        for x, y in branches:
+            xs, ys = smooth_by_y(x, y, n=320)
+
+            plot_curve_with_markers(
                 ax,
-                x,
-                y,
-                30.0,
-                f"{h}",
-                c,
-                x_offset=0.4,
-                rotate=False,
-                bbox_edgecolor=c,
-                bbox_linestyle="--",
+                xs,
+                ys,
+                color=c,
+                marker=mk,
+                lw=2.2,
+                ls="-",
+                alpha=0.98,
+                zorder=3,
+                filled=True,
+                halo=True,
+                n_markers=2,
             )
-
-        if h in ariss:
-            # Plot every extracted branch for this altitude level.
-            branches = sorted(ariss[h], key=lambda seg: len(seg[0]), reverse=True)
-
-            for k, (x, y) in enumerate(branches):
-                xs, ys = smooth_by_y(x, y)
-                ax.plot(xs, ys, color=c, lw=1.8, zorder=3)
-
-                # Label only the longest branch once.
-                if k == 0:
-                    label_line_at_tp(
-                        ax,
-                        xs,
-                        ys,
-                        50.0,
-                        f"{h}",
-                        c,
-                        x_offset=0.6,
-                        bbox_edgecolor=c,
-                        bbox_linestyle="-",
-                    )
 
     ax.set_xlabel("T/P (mN/kW)")
     ax.set_ylabel("Isp (s)")
@@ -513,31 +405,67 @@ def plot():
 
     ax.xaxis.set_minor_locator(AutoMinorLocator(2))
     ax.yaxis.set_minor_locator(AutoMinorLocator(2))
-    style_axis(ax)
-    ax.tick_params(axis="both", which="major", width=0.9, length=5)
-    ax.tick_params(axis="both", which="minor", width=0.7, length=3)
 
-    ax.legend(
-        handles=[
-            Line2D([0], [0], color=PALETTE["secondary_text"], label="ARISS feasible alt (km)"),
-            Line2D([0], [0], color=PALETTE["secondary_text"], ls="--", label="Mansur feasible alt (km)"),
-        ],
+    style_axis(ax)
+
+    ax.grid(which="major", color="0.88", linewidth=0.7)
+    ax.grid(which="minor", color="0.94", linewidth=0.5)
+
+    for s in ax.spines.values():
+        s.set_color("black")
+    ax.tick_params(colors="black")
+
+    # Source legend
+    source_handles = [
+        Line2D([0], [0], color="black", lw=2.2, ls="-", label="ARISS"),
+        Line2D([0], [0], color="black", lw=1.2, ls=(0, (4, 2)), label="Mansur"),
+    ]
+    leg_source = ax.legend(
+        handles=source_handles,
         loc="lower center",
-        bbox_to_anchor=(0.5, 1.04),
+        bbox_to_anchor=(0.5, 1.02),
         frameon=False,
         ncol=2,
-        columnspacing=1.2,
-        handlelength=2.8,
-        handletextpad=0.5,
-        borderaxespad=0.0,
+        columnspacing=1.8,
+        handletextpad=0.8,
     )
-    style_legend(ax.get_legend())
+    style_legend(leg_source)
+    ax.add_artist(leg_source)
 
-    fig.tight_layout()
+    # Altitude legend: marker + color
+    alt_handles = [
+        Line2D(
+            [0], [0],
+            linestyle="None",
+            marker=markers[h],
+            markersize=7.0,
+            markerfacecolor=colors[h],
+            markeredgecolor="black",
+            markeredgewidth=0.6,
+            label=f"{h} km",
+        )
+        for h in ALT_LEVELS
+    ]
+
+    leg_alt = ax.legend(
+        handles=alt_handles,
+        title="Altitude",
+        loc="upper left",
+        bbox_to_anchor=(1.01, 1.00),
+        borderaxespad=0.0,
+        frameon=False,
+        labelspacing=0.6,
+        handletextpad=0.6,
+    )
+    style_legend(leg_alt)
+    leg_alt.get_title().set_fontweight("bold")
+
     fig.savefig(OUTPUT, dpi=1200, bbox_inches="tight")
     plt.close(fig)
 
 
+# ------------------------------------------------------------------------------ #
+
 if __name__ == "__main__":
     plot()
-    print(f"Saved figure to: {OUTPUT}")
+    print(f"Saved: {OUTPUT}")

@@ -13,7 +13,6 @@
 #  Project:        ARISS
 #  Module:         MansurEfficiencyVerification.py
 # ============================================================================== #
-
 import sys
 import io
 import csv
@@ -25,27 +24,27 @@ from pathlib import Path
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from matplotlib.lines import Line2D
 from matplotlib.ticker import AutoMinorLocator
 from scipy.interpolate import PchipInterpolator
 
 
 # ------------------------------------------------------------------------------ #
-# Path setup so the ARISS source can be imported
+# Paths
 # ------------------------------------------------------------------------------ #
 
 ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "src"
 VALIDATION_DIR = ROOT / "tests" / "Validation"
 
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
-if str(VALIDATION_DIR) not in sys.path:
-    sys.path.insert(0, str(VALIDATION_DIR))
+for path in (SRC, VALIDATION_DIR):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
 
 
 # ------------------------------------------------------------------------------ #
-# ARISS simulation imports
+# Imports
 # ------------------------------------------------------------------------------ #
 
 from ariss.core.simulation import load_spacecraft_from_base_config
@@ -54,410 +53,256 @@ from ariss.core.simulation import run_sizing_loop
 from plot_style import PALETTE, apply_validation_style, style_axis, style_legend
 
 
-logging.getLogger("fontTools").setLevel(logging.ERROR)
-logging.getLogger("fontTools.subset").setLevel(logging.ERROR)
-warnings.filterwarnings("ignore", message="invalid value encountered in sqrt", category=RuntimeWarning)
-
-
 # ------------------------------------------------------------------------------ #
-# Configuration
+# Config
 # ------------------------------------------------------------------------------ #
 
 CONFIG_PATH = Path(__file__).with_name("MansurValidation.toml")
 DATASET_PATH = Path(__file__).with_name("Isp Altitude Dataset.csv")
+
 OUTPUT_PATH = Path(__file__).with_name("mansur_efficiency_validation.png")
 VECTOR_OUTPUT_PATH = Path(__file__).with_name("mansur_efficiency_validation.svg")
 PDF_OUTPUT_PATH = Path(__file__).with_name("mansur_efficiency_validation.pdf")
 
 COLLECTION_EFFICIENCIES = (0.35, 0.40, 0.45)
-PLOT_COLORS = [PALETTE["l1_teal"], PALETTE["sernn_pink"], PALETTE["choice_mid"], PALETTE["cat_green"], PALETTE["cat_yellow"]]
+ISP = np.linspace(2000, 6000, 40)
 
-ISP = np.linspace(200, 10000, 40)  # [s]
+PLOT_COLORS = [
+    PALETTE["l1_teal"],
+    PALETTE["sernn_pink"],
+    PALETTE["choice_mid"],
+]
+
+# ------------------------------------------------------------------------------ #
+# Global style
+# ------------------------------------------------------------------------------ #
+
+mpl.rcParams.update({
+    "font.family": "sans-serif",
+    "font.size": 12,
+    "axes.labelsize": 12,
+    "xtick.labelsize": 12,
+    "ytick.labelsize": 12,
+    "legend.fontsize": 12,
+    "text.color": "black",
+    "axes.labelcolor": "black",
+    "axes.edgecolor": "black",
+    "xtick.color": "black",
+    "ytick.color": "black",
+})
+
+logging.getLogger("fontTools").setLevel(logging.ERROR)
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
 # ------------------------------------------------------------------------------ #
-# Sweep the efficiencies and store converged results
+# Utilities
 # ------------------------------------------------------------------------------ #
 
-def sweep_mansur_efficiencies():
-
-    base_spacecraft = load_spacecraft_from_base_config(CONFIG_PATH)
-
-    results = {}
-    previous_level = simulation_logger.level
-    simulation_logger.setLevel(logging.CRITICAL)
-
-    try:
-        for efficiency in COLLECTION_EFFICIENCIES:
-
-            converged_altitudes = []
-            converged_isp = []
-
-            for isp in ISP:
-                spacecraft = deepcopy(base_spacecraft)
-
-                spacecraft.refueling.coll_eff = efficiency
-                spacecraft.thruster.specific_impulse = float(isp)
-
-                with redirect_stdout(io.StringIO()):
-                    final_sc, converged, _ = run_sizing_loop(spacecraft)
-
-                if converged:
-                    converged_altitudes.append(final_sc.orbit.altitude)
-                    converged_isp.append(final_sc.thruster.specific_impulse)
-
-            results[efficiency] = (np.array(converged_altitudes), np.array(converged_isp))
-    finally:
-        simulation_logger.setLevel(previous_level)
-
-    return results
+def _sanitize_color(color: str) -> str:
+    if str(color).lower() in {"grey", "gray", "#808080", "#7f7f7f"}:
+        return "black"
+    return color
 
 
-def load_mansur_paper_dataset():
+def _soft_curve_points(x: np.ndarray, y: np.ndarray):
+    if x.size < 3:
+        return x, y
 
-    dataset = {}
+    seg = np.hypot(np.diff(x), np.diff(y))
+    s = np.concatenate(([0.0], np.cumsum(seg)))
 
-    with DATASET_PATH.open("r", newline="", encoding="utf-8-sig") as handle:
-        rows = list(csv.reader(handle))
+    if s[-1] == 0:
+        return x, y
 
-    if len(rows) < 2:
-        return dataset
+    t = s / s[-1]
+    t, idx = np.unique(t, return_index=True)
 
-    header = rows[0]
+    if t.size < 3:
+        return x[idx], y[idx]
 
-    for column_index in range(0, len(header), 2):
-        label = header[column_index].strip()
+    fx = PchipInterpolator(t, x[idx])
+    fy = PchipInterpolator(t, y[idx])
 
-        if not label:
-            continue
-
-        try:
-            efficiency = float(label.split("=")[1].replace(",", "").strip())
-        except (IndexError, ValueError):
-            continue
-
-        altitude_km = []
-        isp_s = []
-
-        for row in rows[2:]:
-            x_value = row[column_index].strip() if column_index < len(row) else ""
-            y_value = row[column_index + 1].strip() if column_index + 1 < len(row) else ""
-
-            if not x_value or not y_value:
-                continue
-
-            altitude_km.append(float(x_value))
-            isp_s.append(float(y_value))
-
-        altitude_km = np.array(altitude_km)
-        isp_s = np.array(isp_s)
-        order = np.argsort(isp_s)[::-1]
-
-        dataset[efficiency] = (altitude_km[order], isp_s[order])
-
-    return dataset
+    tt = np.linspace(0, 1, max(140, 24 * (t.size - 1)))
+    return fx(tt), fy(tt)
 
 
-# ------------------------------------------------------------------------------ #
-# Plot the Mansur verification curves
-# ------------------------------------------------------------------------------ #
+def _plot_curve(ax, x, y, color, marker, linestyle):
+    color = _sanitize_color(color)
+    sx, sy = _soft_curve_points(x, y)
 
-def _plot_sweep_curve(axis, altitude_km: np.ndarray, isp_s: np.ndarray, color: str) -> None:
-
-    # Inputs:
-    #   axis: matplotlib axis used for plotting.
-    #   altitude_km: converged altitudes in the same order as the Isp sweep.
-    #   isp_s: converged specific impulse values in sweep order.
-    #   color: curve color.
-    #   efficiency: collection efficiency used for the sweep.
-    #
-    # Outputs:
-    #   Plots the sweep curve without folding the descending and ascending
-    #   altitude branches onto each other.
-
-    turning_index = int(np.argmin(altitude_km))
-    first_branch = slice(0, turning_index + 1)
-    second_branch = slice(turning_index, altitude_km.size)
-
-    _plot_soft_curve_with_markers(
-        axis,
-        altitude_km[first_branch],
-        isp_s[first_branch],
-        color=color,
-        marker="o",
-        line_style="-",
-        linewidth=1.1,
-    )
-
-    if second_branch.stop - second_branch.start > 1:
-        _plot_soft_curve_with_markers(
-            axis,
-            altitude_km[second_branch],
-            isp_s[second_branch],
-            color=color,
-            marker="o",
-            line_style="-",
-            linewidth=1.1,
-        )
-
-
-def _rebuild_reference_curve(altitude_km: np.ndarray, isp_s: np.ndarray):
-
-    # Inputs:
-    #   altitude_km: reference altitudes from the CSV.
-    #   isp_s: reference specific impulse values from the CSV.
-    #
-    # Outputs:
-    #   A single continuous reference curve ordered by specific impulse. The
-    #   Mansur CSV points are not stored in plotting order, so the reference
-    #   trace is rebuilt from highest to lowest Isp.
-
-    if altitude_km.size == 0 or isp_s.size == 0:
-        return altitude_km, isp_s
-
-    order = np.argsort(isp_s)[::-1]
-    return altitude_km[order], isp_s[order]
-
-
-def _plot_reference_curve(axis, altitude_km: np.ndarray, isp_s: np.ndarray, color: str) -> None:
-
-    rebuilt_altitude, rebuilt_isp = _rebuild_reference_curve(altitude_km, isp_s)
-
-    _plot_soft_curve_with_markers(
-        axis,
-        rebuilt_altitude,
-        rebuilt_isp,
-        color=color,
-        marker="s",
-        line_style="--",
-        linewidth=1.1,
-        alpha=1.0,
-    )
-
-
-def _apply_publication_style():
-
-    # Inputs:
-    #   None.
-    #
-    # Outputs:
-    #   Applies a compact publication-style Matplotlib theme inspired by the
-    #   BeautifulFigures principles: readable serif typography, minimal clutter,
-    #   subtle grid lines, and consistent colours.
-
-    apply_validation_style()
-
-
-def _soft_curve_points(altitude_km: np.ndarray, isp_s: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-
-    # Inputs:
-    #   altitude_km: x-coordinates of the plotted curve.
-    #   isp_s: y-coordinates of the plotted curve.
-    #
-    # Outputs:
-    #   Shape-preserving interpolated coordinates for a smoother visual line.
-
-    if altitude_km.size < 3 or isp_s.size < 3:
-        return altitude_km, isp_s
-
-    segment_lengths = np.hypot(np.diff(altitude_km), np.diff(isp_s))
-    cumulative_length = np.concatenate(([0.0], np.cumsum(segment_lengths)))
-
-    if cumulative_length[-1] <= 0.0:
-        return altitude_km, isp_s
-
-    parameter = cumulative_length / cumulative_length[-1]
-    unique_parameter, unique_indices = np.unique(parameter, return_index=True)
-
-    if unique_parameter.size < 3:
-        return altitude_km[unique_indices], isp_s[unique_indices]
-
-    altitude_interpolator = PchipInterpolator(unique_parameter, altitude_km[unique_indices])
-    isp_interpolator = PchipInterpolator(unique_parameter, isp_s[unique_indices])
-
-    sample_count = max(140, 24 * (unique_parameter.size - 1))
-    smooth_parameter = np.linspace(0.0, 1.0, sample_count)
-
-    return altitude_interpolator(smooth_parameter), isp_interpolator(smooth_parameter)
-
-
-def _plot_soft_curve_with_markers(
-    axis,
-    altitude_km: np.ndarray,
-    isp_s: np.ndarray,
-    color: str,
-    marker: str,
-    line_style: str,
-    linewidth: float,
-    label: str | None = None,
-    alpha: float = 1.0,
-) -> None:
-
-    # Inputs:
-    #   axis: matplotlib axis used for plotting.
-    #   altitude_km: x-coordinates of the raw points.
-    #   isp_s: y-coordinates of the raw points.
-    #   color: base curve colour.
-    #   marker: outer marker symbol.
-    #   line_style: line style for the smoothed trace.
-    #   linewidth: trace width.
-    #   label: optional legend label.
-    #   alpha: line opacity.
-    #
-    # Outputs:
-    #   Draws a smoothed line plus nested markers at the original points.
-
-    smooth_altitude, smooth_isp = _soft_curve_points(altitude_km, isp_s)
-
-    axis.plot(
-        smooth_altitude,
-        smooth_isp,
-        color=color,
-        linestyle=line_style,
-        linewidth=linewidth,
-        alpha=alpha,
-        label=label,
-    )
-    axis.plot(
-        altitude_km,
-        isp_s,
+    ax.plot(sx, sy, color=color, linestyle=linestyle, linewidth=1.1)
+    ax.plot(
+        x, y,
         linestyle="None",
         marker=marker,
         markersize=4.2,
         markerfacecolor="white",
         markeredgecolor=color,
         markeredgewidth=1.1,
-        alpha=alpha,
     )
 
 
-def plot_results(results, paper_results=None, save_path: Path = OUTPUT_PATH, show: bool = True) -> Path:
+def _plot_sweep(ax, x, y, color):
+    if x.size == 0:
+        return
 
-    if paper_results is None:
-        paper_results = {}
+    idx = np.argmin(x)
 
-    _apply_publication_style()
+    _plot_curve(ax, x[:idx+1], y[:idx+1], color, "o", "-")
 
-    figure, axis = plt.subplots(figsize=(9.6, 5.4))
+    if idx < len(x) - 1:
+        _plot_curve(ax, x[idx:], y[idx:], color, "o", "-")
 
-    legend_handles = []
-    legend_labels = []
 
-    colors = PLOT_COLORS[: len(COLLECTION_EFFICIENCIES)]
+def _plot_reference(ax, x, y, color):
+    if x.size == 0:
+        return
 
-    for color, efficiency in zip(colors, COLLECTION_EFFICIENCIES):
+    order = np.argsort(y)[::-1]
+    _plot_curve(ax, x[order], y[order], color, "s", "--")
 
-        altitude_km, isp_s = results.get(efficiency, (np.array([]), np.array([])))
-        paper_altitude_km, paper_isp_s = paper_results.get(efficiency, (np.array([]), np.array([])))
 
-        if altitude_km.size == 0:
+# ------------------------------------------------------------------------------ #
+# Data
+# ------------------------------------------------------------------------------ #
+
+def sweep_mansur_efficiencies():
+    base = load_spacecraft_from_base_config(CONFIG_PATH)
+    results = {}
+
+    prev_level = simulation_logger.level
+    simulation_logger.setLevel(logging.CRITICAL)
+
+    try:
+        for eff in COLLECTION_EFFICIENCIES:
+            alt, isp_vals = [], []
+
+            for isp in ISP:
+                sc = deepcopy(base)
+                sc.refueling.coll_eff = eff
+                sc.thruster.specific_impulse = float(isp)
+
+                with redirect_stdout(io.StringIO()):
+                    final, ok, _ = run_sizing_loop(sc)
+
+                if ok:
+                    alt.append(final.orbit.altitude)
+                    isp_vals.append(final.thruster.specific_impulse)
+
+            results[eff] = (np.array(alt), np.array(isp_vals))
+
+    finally:
+        simulation_logger.setLevel(prev_level)
+
+    return results
+
+
+def load_mansur_paper_dataset():
+    data = {}
+
+    with DATASET_PATH.open("r", encoding="utf-8-sig") as f:
+        rows = list(csv.reader(f))
+
+    if len(rows) < 2:
+        return data
+
+    header = rows[0]
+
+    for i in range(0, len(header), 2):
+        try:
+            eff = float(header[i].split("=")[1].strip())
+        except:
             continue
 
-        _plot_sweep_curve(axis, altitude_km, isp_s, color)
+        x, y = [], []
 
-        if paper_altitude_km.size > 0:
-            _plot_reference_curve(axis, paper_altitude_km, paper_isp_s, color)
+        for r in rows[2:]:
+            if i+1 >= len(r):
+                continue
+            if r[i] and r[i+1]:
+                x.append(float(r[i]))
+                y.append(float(r[i+1]))
 
-        ariss_h_lim = float(np.min(altitude_km))
-        mansur_h_lim = float(np.min(_rebuild_reference_curve(paper_altitude_km, paper_isp_s)[0])) if paper_altitude_km.size > 0 else None
+        data[eff] = (np.array(x), np.array(y))
 
-        legend_handles.append(
-            Line2D(
-                [0],
-                [0],
-                color=color,
-                linestyle="-",
-                linewidth=1.1,
-                marker="o",
-                markersize=5.0,
-                markerfacecolor="white",
-                markeredgecolor=color,
-                markeredgewidth=1.1,
-            )
-        )
-        legend_labels.append(rf"ARISS $\eta_c = {efficiency:.2f}$, $h_{{lim}} = {ariss_h_lim:.1f}\ \mathrm{{km}}$")
+    return data
 
-        if mansur_h_lim is not None:
-            legend_handles.append(
-                Line2D(
-                    [0],
-                    [0],
-                    color=color,
-                    linestyle="--",
-                    linewidth=1.1,
-                    marker="s",
-                    markersize=5.0,
-                    markerfacecolor="white",
-                    markeredgecolor=color,
-                    markeredgewidth=1.0,
-                )
-            )
-            legend_labels.append(rf"Mansur $\eta_c = {efficiency:.2f}$, $h_{{lim}} = {mansur_h_lim:.1f}\ \mathrm{{km}}$")
 
-    axis.set_xlabel("Converged altitude (km)")
-    axis.set_ylabel("Isp (s)")
+# ------------------------------------------------------------------------------ #
+# Plot
+# ------------------------------------------------------------------------------ #
 
-    axis.set_xlim(150, 230)
-    axis.set_ylim(2000, 6000)
+def plot_results(results, paper=None, save_path=OUTPUT_PATH, show=True):
 
-    axis.xaxis.set_minor_locator(AutoMinorLocator(2))
-    axis.yaxis.set_minor_locator(AutoMinorLocator(2))
-    style_axis(axis)
-    axis.tick_params(axis="both", which="major", width=0.9, length=5)
-    axis.tick_params(axis="both", which="minor", width=0.7, length=3)
-    if legend_handles:
-        ariss_handles = legend_handles[0::2]
-        ariss_labels = legend_labels[0::2]
-        mansur_handles = legend_handles[1::2]
-        mansur_labels = legend_labels[1::2]
-        ordered_handles = []
-        ordered_labels = []
+    apply_validation_style()
 
-        for ariss_handle, ariss_label, mansur_handle, mansur_label in zip(
-            ariss_handles,
-            ariss_labels,
-            mansur_handles,
-            mansur_labels,
-        ):
-            ordered_handles.extend([ariss_handle, mansur_handle])
-            ordered_labels.extend([ariss_label, mansur_label])
+    fig, ax = plt.subplots(figsize=(9.6, 5.4))
 
-        axis.legend(
-            ordered_handles,
-            ordered_labels,
-            loc="lower center",
-            bbox_to_anchor=(0.5, 1.04),
-            frameon=False,
-            ncol=3,
-            columnspacing=1.2,
-            handlelength=2.8,
-            handletextpad=0.5,
-            borderaxespad=0.0,
-        )
-        legend = axis.get_legend()
-        style_legend(legend)
+    handles, labels = [], []
 
-    figure.tight_layout()
-    figure.savefig(save_path, dpi=1200, bbox_inches="tight")
-    figure.savefig(VECTOR_OUTPUT_PATH, bbox_inches="tight")
-    figure.savefig(PDF_OUTPUT_PATH, bbox_inches="tight")
+    for color, eff in zip(PLOT_COLORS, COLLECTION_EFFICIENCIES):
+
+        x, y = results.get(eff, (np.array([]), np.array([])))
+        px, py = paper.get(eff, (np.array([]), np.array([]))) if paper else (np.array([]), np.array([]))
+
+        if x.size == 0:
+            continue
+
+        clean_color = _sanitize_color(color)
+
+        _plot_sweep(ax, x, y, clean_color)
+        _plot_reference(ax, px, py, clean_color)
+
+        h_lim = np.min(x)
+        handles.append(Line2D([0], [0], color=clean_color, marker="o", linestyle="-"))
+        labels.append(f"ARISS ηc={eff:.2f}, h_lim={h_lim:.1f} km")
+
+        if px.size:
+            h_lim_ref = np.min(px)
+            handles.append(Line2D([0], [0], color=clean_color, marker="s", linestyle="--"))
+            labels.append(f"Mansur ηc={eff:.2f}, h_lim={h_lim_ref:.1f} km")
+
+    ax.set_xlabel("Converged altitude (km)")
+    ax.set_ylabel("Isp (s)")
+
+    ax.set_xlim(150, 230)
+    ax.set_ylim(2000, 6000)
+
+    ax.xaxis.set_minor_locator(AutoMinorLocator(2))
+    ax.yaxis.set_minor_locator(AutoMinorLocator(2))
+
+    style_axis(ax)
+
+    # Force black axis
+    for spine in ax.spines.values():
+        spine.set_color("black")
+    ax.tick_params(colors="black")
+
+    if handles:
+        ax.legend(handles, labels, loc="lower center", bbox_to_anchor=(0.5, 1.04), ncol=3, frameon=False)
+        style_legend(ax.get_legend())
+
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=1200, bbox_inches="tight")
+    fig.savefig(VECTOR_OUTPUT_PATH, bbox_inches="tight")
+    fig.savefig(PDF_OUTPUT_PATH, bbox_inches="tight")
 
     if show and "agg" not in plt.get_backend().lower():
         plt.show()
     else:
-        plt.close(figure)
+        plt.close(fig)
 
     return save_path
 
 
 # ------------------------------------------------------------------------------ #
-# Run script
+# Entry
 # ------------------------------------------------------------------------------ #
 
 if __name__ == "__main__":
-
     results = sweep_mansur_efficiencies()
-    paper_results = load_mansur_paper_dataset()
-    output_path = plot_results(results, paper_results, save_path=OUTPUT_PATH)
-
-    print(f"Saved figure to: {output_path}")
+    paper = load_mansur_paper_dataset()
+    path = plot_results(results, paper)
+    print(f"Saved: {path}")
