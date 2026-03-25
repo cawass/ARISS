@@ -74,7 +74,7 @@ def test_refueling_model_matches_compression_power_and_tank_volume_formula() -> 
 
     expected_power = (
         m_dot_b
-        * sc.orbit.R_spec
+        * sc.orbit.R_spec * sc.orbit.gamma
         * sc.thermal.T_des
         * ((sc.refueling.p_tank / sc.orbit.p_orb) ** ((sc.orbit.gamma - 1.0) / sc.orbit.gamma) - 1.0)
         / (sc.refueling.eta_refuel * (sc.orbit.gamma - 1.0))
