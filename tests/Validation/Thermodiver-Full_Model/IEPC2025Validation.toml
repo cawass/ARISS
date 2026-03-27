@@ -52,7 +52,7 @@ wake_in = 1.0                     # [-] Exposed fraction of inlet side to atmosp
 wake_body = 1.0                   # [-] Exposed fraction of body side to atmosphere.
 wake_solar = 1.0                  # [-] Exposed fraction of solar area to atmosphere.
 wake_radiator = 1.0               # [-] Exposed fraction of radiator area to atmosphere.
-A_in = 0                     # [m^2] Total intake area facing atmospheric flow.
+A_in = 4.04                     # [m^2] Total intake area facing atmospheric flow.
 A_ref = 0                       # [m^2] Intake area allocated to refueling stream.
 A_prop = 0                     # [m^2] Intake area allocated to propulsion stream.
 A_in_drag = 0                  # [m^2] Intake area producing drag only (non-useful capture).
@@ -86,7 +86,7 @@ Mass_rad = 0.0                    # [kg] Radiator mass.
 Mass_prop = 65.7                  # [kg] Stored propulsion propellant mass.
 Mass_ADCS = 101.0                 # [kg] ADCS subsystem mass.
 Mass_payload = 24.0               # [kg] Payload mass.
-Mass_refprop = 269.5              # [kg] Refueling/propellant-processing subsystem mass.
+Mass_refprop = 284.9              # [kg] Refueling/propellant-processing subsystem mass.
 Mass_total = 200.0                # [kg] Total spacecraft mass.
 
 [power]
@@ -97,7 +97,7 @@ Power_rad = 0.0                   # [W] Thermal/radiator electrical load.
 Power_prop = 0.0                  # [W] Propulsion electrical load.
 Power_ADCS = 158.7                # [W] ADCS electrical load.
 Power_payload = 0.0               # [W] Payload electrical load.
-Power_refprop = 920.0             # [W] Refueling subsystem electrical load.
+Power_refprop = 336.5             # [W] Refueling subsystem electrical load.
 Power_total = 0.0                 # [W] Total electrical power demand.
 
 [solar]
@@ -130,10 +130,10 @@ drag_inlet_front = 0.2            # [N] Inlet-front drag force contribution.
 [refueling]
 coll_eff = 0.636                  # [-] Intake collection efficiency.
 t_refuel = 12000960.0             # [s] Nominal refueling duration.
-eta_refuel = 0.6                  # [-] Refueling compression-process efficiency.
+eta_refuel = 0.061                  # [-] Refueling compression-process efficiency.
 m_flow = 1e-3                     # [kg/s] Captured mass flow into tanks.
-p_tank = 100000.0                 # [Pa] Storage tank pressure.
-V_prop = 0.7                      # [m^3] Stored propellant tank volume.
+p_tank = 24000000.0                 # [Pa] Storage tank pressure.
+V_prop = 0.12                      # [m^3] Stored propellant tank volume.
 
 [mission_profile]
 active_refueling = true           # [bool] Enables/disables mission refueling branch.
