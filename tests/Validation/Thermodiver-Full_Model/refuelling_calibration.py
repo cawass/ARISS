@@ -50,3 +50,19 @@ eta_refuel_isothermal = 1 / Power_TD * m_dot_b * R_spec * T_des * np.log(p_tank 
 
 print(f"Power_TD_isothermal: {Power_TD_isothermal}")
 print(f"eta_refuel_isothermal: {eta_refuel_isothermal}")
+
+
+# Plot the value of R_spec as a function of altitude
+import matplotlib.pyplot as plt
+
+h_orb = np.linspace(150, 500, 100)
+R_spec = np.zeros(len(h_orb))
+for i, h in enumerate(h_orb):
+    mission_data = sample_atmosphere_at_height(h)
+    R_spec[i] = mission_data.specific_gas_constant
+
+plt.plot(h_orb, R_spec)
+plt.xlabel("Altitude [km]")
+plt.ylabel("Specific Gas Constant [J/(kg*K)]")
+plt.title("Specific Gas Constant as a function of Altitude")
+plt.show()

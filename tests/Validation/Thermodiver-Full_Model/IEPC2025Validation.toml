@@ -101,7 +101,7 @@ Power_refprop = 336.5             # [W] Refueling subsystem electrical load.
 Power_total = 0.0                 # [W] Total electrical power demand.
 
 [solar]
-av_aligment = 60             # [deg] Average panel alignment angle to Sun vector.
+av_aligment = 60.0             # [deg] Average panel alignment angle to Sun vector.
 eta_solar = 0.266                 # [-] Solar-cell conversion efficiency.
 eta_power = 0.95                  # [-] End-to-end power-chain efficiency.
 
