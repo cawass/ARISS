@@ -137,7 +137,7 @@ drag_inlet_front = 0.2            # [N] Inlet-front drag force contribution.
 [refueling]
 coll_eff = 0.45                   # [-] Intake collection efficiency.
 t_refuel = 51000000.0               # [s] Nominal refueling duration.
-eta_refuel = 0.1                  # [-] Refueling compression-process efficiency.
+eta_refuel = 0.061                  # [-] Refueling compression-process efficiency.
 m_flow = 1e-3                     # [kg/s] Captured mass flow into tanks.
 p_tank = 100000.0                 # [Pa] Storage tank pressure.
 V_prop = 0.7                      # [m^3] Stored propellant tank volume.
