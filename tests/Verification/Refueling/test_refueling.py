@@ -68,9 +68,9 @@ def test_refueling_model_matches_compression_power_and_tank_volume_formula() -> 
     object.__setattr__(sc.thermal, "T_des", 320.0)
 
     if sc.mission_profile.active_and_bypass:
-        m_dot_b = sc.refueling.m_flow + sc.thruster.m_flow
-    else:
         m_dot_b = sc.refueling.m_flow
+    else:
+        m_dot_b = sc.refueling.m_flow + sc.thruster.m_flow
 
     expected_power = (
         1 / sc.refueling.eta_refuel * m_dot_b * sc.orbit.R_spec * sc.thermal.T_des * np.log(sc.refueling.p_tank / sc.orbit.p_orb)

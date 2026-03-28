@@ -31,9 +31,9 @@ def refueling_model(sc: SpacecraftState) -> float:
         # Captured atmospheric mass flow routed to the refueling tanks.
 
         if sc.mission_profile.active_and_bypass:
-            m_dot_b = sc.refueling.m_flow + sc.thruster.m_flow
-        else:
             m_dot_b = sc.refueling.m_flow
+        else:
+            m_dot_b = sc.refueling.m_flow + sc.thruster.m_flow
 
         # Power required to compress the refueling mass flow to tank pressure (isothermal).
         sc.power.Power_refprop = 1 / sc.refueling.eta_refuel * m_dot_b * sc.orbit.R_spec * sc.thermal.T_des * np.log(sc.refueling.p_tank / sc.orbit.p_orb)

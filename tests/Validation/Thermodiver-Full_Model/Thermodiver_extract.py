@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 import pprint
 from dataclasses import asdict
+import numpy as np
 
 # ------------------------------------------------------------------------------ #
 # Path setup so the ARISS source can be imported
@@ -43,26 +44,50 @@ def extract_values():
     power_dict = asdict(final_sc.power)
     for k, v in power_dict.items():
         print(f"  {k:<20}: {v:.4f}")
-        
-    print("\n--- REFUELING & VOLUME ---")
-    ref_dict = asdict(final_sc.refueling)
-    print(f"  Tank Volume (V_prop) [m^3] : {ref_dict.get('V_prop', 0.0):.6f}")
-    print(f"  Tank Pressure (p_tank) [Pa]: {ref_dict.get('p_tank', 0.0):.2f}")
-    print(f"  Refueling m_flow [kg/s]    : {ref_dict.get('m_flow', 0.0):.6e}")
-    print(f"  Compression Power [W]      : {final_sc.power.Power_refprop:.4f}")
-    print(f"  Propellant Mass [kg]       : {final_sc.mass.Mass_prop:.4f}")
     
     print("\n--- GEOMETRY/AREAS [m^2] ---")
     geo_dict = asdict(final_sc.geometry)
-    print(f"  Intake Area (A_in)  : {geo_dict.get('A_in', 0.0):.4f}")
-    print(f"  Body Area (A_body)  : {geo_dict.get('A_body', 0.0):.4f}")
-    print(f"  Solar Area (A_solar)  : {geo_dict.get('A_solar', 0.0):.4f}")
-    print(f"  Radiator Area (A_rad)  : {geo_dict.get('A_rad', 0.0):.4f}")
+    for k, v in geo_dict.items():
+        if type(v) is str:
+            print(f"  {k:<20}: {v}")
+        elif type(v) is bool:
+            print(f"  {k:<20}: {v}")
+        else:
+            print(f"  {k:<20}: {v:.4f}")
+    # Intake diameter
+    print(F"Intake diameter: {np.sqrt(4*geo_dict.get('A_in', 0.0)/np.pi):.4f} [m]")
+    # Total spacecraft length
+    print(F"Total spacecraft length: {geo_dict.get('L_body', 0.0) + geo_dict.get('L_in', 0.0):.4f} [m]")
 
-    # print("\n" + "="*50)
-    # print(" FULL SPACECRAFT STATE COMPILED DICTIONARY ")
-    # print("="*50)
-    # pprint.pprint(asdict(final_sc), sort_dicts=False, width=100)
+    print("\n--- REFUELING ---")
+    ref_dict = asdict(final_sc.refueling)
+    for k, v in ref_dict.items():
+        if k == "m_flow":
+            print(f"  {k:<20}: {v}")
+        else:
+            print(f"  {k:<20}: {v:.4f}")
+
+    # Calculated mass flow rate from intake area, collection efficiency and atmospheric density
+    print("\n--- CALCULATED MASS FLOW RATE ---")
+    print(f"  m_flow_calc: {geo_dict.get('A_in', 0.0) * final_sc.orbit.velocity * final_sc.orbit.density * final_sc.refueling.coll_eff} [kg/s]")
+
+    print("\n--- PROPULSION ---")
+    thruster_dict = asdict(final_sc.thruster)
+    for k, v in thruster_dict.items():
+        print(f"  {k:<20}: {v:.4f}")
+
+    print("\n--- SOLAR ---")
+    solar_dict = asdict(final_sc.solar)
+    for k, v in solar_dict.items():
+        print(f"  {k:<20}: {v:.4f}")
+
+    print("\n--- ORBIT ---")
+    orbit_dict = asdict(final_sc.orbit)
+    for k, v in orbit_dict.items():
+        if type(v) is float:
+            print(f"  {k:<20}: {v:.4f}")
+        else:
+            print(f"  {k:<20}: {v}")
 
 if __name__ == "__main__":
     extract_values()

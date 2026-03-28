@@ -30,7 +30,7 @@ R_spec = 287.0                    # [J/(kg*K)] Specific gas constant.
 msis_date = "2020-01-01T00:00:00" # [ISO-8601] MSIS reference UTC date.
 msis_f107 = 0                     # [sfu] MSIS daily F10.7 solar flux.
 msis_ap = 0                       # [-] MSIS Ap geomagnetic index.
-use_average = false
+use_average = true
 
 
 [geometry]
@@ -75,8 +75,8 @@ propellant_mass = 0.0             # [kg/s] Legacy propellant flow field.
 m_flow = 1e-3                     # [kg/s] Thruster mass flow rate.
 
 [rate]
-R_mass_volume_in = 17.36           # [kg/m^3] Intake structural mass density scaling.
-R_mass_volume_body = 61.97         # [kg/m^3] Body structural mass density scaling.
+R_mass_volume_in = 10.59           # [kg/m^3] Intake structural mass density scaling.
+R_mass_volume_body = 31.97         # [kg/m^3] Body structural mass density scaling.
 R_mass_surface_solar = 1.76        # [kg/m^2] Solar-array areal mass density.
 R_mass_surface_rad = 8             # [kg/m^2] Radiator areal mass density.
 
@@ -85,10 +85,10 @@ Mass_in = 0.0                     # [kg] Intake structure mass.
 Mass_body = 0.0                   # [kg] Body structure mass.
 Mass_solar = 0.0                  # [kg] Solar-array mass.
 Mass_rad = 0.0                    # [kg] Radiator mass.
-Mass_prop = 65.67226725415337     # [kg] Stored propulsion propellant mass.
-Mass_ADCS = 100.99690638716376    # [kg] ADCS subsystem mass.
+Mass_prop = 61.7                  # [kg] Stored propulsion propellant mass.
+Mass_ADCS = 106.8                 # [kg] ADCS subsystem mass.
 Mass_payload = 23.671149934491506 # [kg] Payload mass.
-Mass_refprop =  225.9077437337881 # [kg] Refueling/propellant-processing subsystem mass.
+Mass_refprop =  221.9             # [kg] Refueling/propellant-processing subsystem mass.
 Mass_power_sys = 121.39051248457183
 Mass_total = 200.0                # [kg] Total spacecraft mass.
 
@@ -132,8 +132,8 @@ drag_inlet_front = 0.2            # [N] Inlet-front drag force contribution.
 
 [refueling]
 coll_eff = 0.636                  # [-] Intake collection efficiency.
-t_refuel = 12000000             # [s] Nominal refueling duration.
-eta_refuel = 0.061                  # [-] Refueling compression-process efficiency.
+t_refuel = 9668000             # [s] Nominal refueling duration.
+eta_refuel = 0.0384                 # [-] Refueling compression-process efficiency.
 m_flow = 1e-3                     # [kg/s] Captured mass flow into tanks.
 p_tank = 24000000.0                 # [Pa] Storage tank pressure.
 V_prop = 0.12                      # [m^3] Stored propellant tank volume.

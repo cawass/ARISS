@@ -8,19 +8,13 @@ V_tank = 0.12 # [m^3]
 m_refuel = 284.9 # [kg]
 T_des = 320 # [K]
 collection_efficiency = 0.636 # [-]
-h_orb = 188.0151 # [km]
+h_orb = 194.0151 # [km]
 
 ### Atmos/mission data
-properties = atmospheric_properties_from_height(h_orb)
-mission_data = {
-    "o_density": float(properties["o_density"]),
-    "n2_density": float(properties["n2_density"]),
-    "o2_density": float(properties["o2_density"]),
-    "specific_gas_constant": float(properties["specific_gas_constant"]),
-    "density": float(properties["density"]),
-    "temperature": float(properties["temperature"]),
-    "orbital_velocity": float(properties["orbital_velocity"]),
-}
+date = "2020-01-01T00:00:00"
+msis_f107 = 0
+msis_ap = 0
+mission_data = sample_atmosphere_at_height(h_orb, msis_date=date, msis_f107=msis_f107, msis_ap=msis_ap, use_average=True)
 
 # Calculate mole fractions to find specific heat ratio (gamma)
 n_o = mission_data["o_density"] / 15.999e-3
@@ -55,22 +49,24 @@ Power_TD = 336.5 # [W]
 Power_TD_isothermal = m_dot_b * R_spec * T_des * np.log(p_tank / p_orb)
 eta_refuel_isothermal = 1 / Power_TD * m_dot_b * R_spec * T_des * np.log(p_tank / p_orb)
 
-
+print(f"m_dot_b: {m_dot_b}")
 print(f"Power_TD_isothermal: {Power_TD_isothermal}")
 print(f"eta_refuel_isothermal: {eta_refuel_isothermal}")
 
 
 # Plot the value of R_spec as a function of altitude
-import matplotlib.pyplot as plt
+plot = False
+if plot:
+    import matplotlib.pyplot as plt
 
-h_orb = np.linspace(150, 500, 100)
-R_spec = np.zeros(len(h_orb))
-for i, h in enumerate(h_orb):
-    properties = atmospheric_properties_from_height(h)
-    R_spec[i] = float(properties["specific_gas_constant"])
+    h_orb = np.linspace(150, 500, 100)
+    R_spec = np.zeros(len(h_orb))
+    for i, h in enumerate(h_orb):
+        mission_data = sample_atmosphere_at_height(h)
+        R_spec[i] = mission_data.specific_gas_constant
 
-plt.plot(h_orb, R_spec)
-plt.xlabel("Altitude [km]")
-plt.ylabel("Specific Gas Constant [J/(kg*K)]")
-plt.title("Specific Gas Constant as a function of Altitude")
-plt.show()
+    plt.plot(h_orb, R_spec)
+    plt.xlabel("Altitude [km]")
+    plt.ylabel("Specific Gas Constant [J/(kg*K)]")
+    plt.title("Specific Gas Constant as a function of Altitude")
+    plt.show()
