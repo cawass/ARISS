@@ -1,0 +1,19 @@
+name = "CORE_18 CR AR=1 IAR=2 fixed_point_00 active_with_bypass fixed_inlet_free_body"
+
+[orbit]
+use_average = false
+latitude = 0
+longitude = 0
+
+[geometry]
+S_in = "c"
+S_body = "r"
+AR_in = 1
+AR_body = 1
+intake_area_ratio = 2
+use_intake_area_ratio = true
+fixed_body = false
+
+[mission_profile]
+active_refueling = true
+active_and_bypass = true

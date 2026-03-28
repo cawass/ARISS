@@ -58,6 +58,7 @@ HERE = Path(__file__).resolve().parent
 DATASET_PATH = HERE / "Gocee.csv"
 OUTPUT_PATH = HERE / "gocee_fig5_validation.png"
 GOCE_CONFIG_PATH = HERE / "GOCEDrag.toml"
+PAGE_FIGSIZE = (13.2, 5.4)
 
 
 # ------------------------------------------------------------------------------ #
@@ -154,6 +155,54 @@ def compute_ariss_body_cd_curve(
 # Plot
 # ------------------------------------------------------------------------------ #
 
+def _model_and_ref_at_reference_points(
+    model_x: np.ndarray,
+    model_y: np.ndarray,
+    ref_x: np.ndarray,
+    ref_y: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    model_x = np.asarray(model_x, dtype=float)
+    model_y = np.asarray(model_y, dtype=float)
+    ref_x = np.asarray(ref_x, dtype=float)
+    ref_y = np.asarray(ref_y, dtype=float)
+
+    valid_model = np.isfinite(model_x) & np.isfinite(model_y)
+    if np.count_nonzero(valid_model) < 2:
+        return None
+
+    model_x = model_x[valid_model]
+    model_y = model_y[valid_model]
+    order = np.argsort(model_x)
+    model_x = model_x[order]
+    model_y = model_y[order]
+
+    model_x_unique, unique_idx = np.unique(model_x, return_index=True)
+    model_y_unique = model_y[unique_idx]
+    if len(model_x_unique) < 2:
+        return None
+
+    line_ids = np.arange(1, len(ref_y) + 1, dtype=int)
+    valid_ref = np.isfinite(ref_x) & np.isfinite(ref_y)
+    if not np.any(valid_ref):
+        return None
+
+    ref_x = ref_x[valid_ref]
+    ref_y = ref_y[valid_ref]
+    line_ids = line_ids[valid_ref]
+
+    x_low = float(np.min(model_x_unique))
+    x_high = float(np.max(model_x_unique))
+    in_range = (ref_x >= x_low) & (ref_x <= x_high)
+    if not np.any(in_range):
+        return None
+
+    ref_x = ref_x[in_range]
+    ref_y = ref_y[in_range]
+    line_ids = line_ids[in_range]
+
+    model_at_ref = np.interp(ref_x, model_x_unique, model_y_unique)
+    return model_at_ref, ref_y, line_ids
+
 def plot_gocee_fig5(dataset: dict[str, tuple[np.ndarray, np.ndarray]], show: bool = True) -> Path:
     apply_validation_style()
     plt.rcParams.update(
@@ -167,8 +216,8 @@ def plot_gocee_fig5(dataset: dict[str, tuple[np.ndarray, np.ndarray]], show: boo
         }
     )
 
-    figure = plt.figure(figsize=(10.8, 5.7))
-    grid = figure.add_gridspec(1, 2, width_ratios=[1.0, 0.50], wspace=0.06)
+    figure = plt.figure(figsize=PAGE_FIGSIZE)
+    grid = figure.add_gridspec(1, 2, width_ratios=[1.0, 0.72], wspace=0.07)
     axis = figure.add_subplot(grid[0, 0])
     legend_axis = figure.add_subplot(grid[0, 1])
     legend_axis.axis("off")
@@ -226,6 +275,50 @@ def plot_gocee_fig5(dataset: dict[str, tuple[np.ndarray, np.ndarray]], show: boo
         )
         x_all.extend(x_k.tolist())
         y_all.extend(y_k.tolist())
+
+    print("Datapoint relative-error and correlation metrics against digitized GOCE curves:")
+    for label in ("Mansur", "Koppenwallner"):
+        if label not in dataset:
+            continue
+        x_ref, y_ref = dataset[label]
+        paired = _model_and_ref_at_reference_points(x_ariss, y_ariss, x_ref, y_ref)
+        if paired is None:
+            print(f"  {label:<14} n/a")
+            continue
+
+        model_at_ref, ref_y_used, line_ids = paired
+
+        denom_mask = np.abs(ref_y_used) > 1.0e-12
+        if np.any(denom_mask):
+            rel_error = np.abs(model_at_ref[denom_mask] - ref_y_used[denom_mask]) / np.abs(ref_y_used[denom_mask])
+            rel_line_ids = line_ids[denom_mask]
+            i_max = int(np.argmax(rel_error))
+            max_rel_error = float(rel_error[i_max])
+            max_rel_line = int(rel_line_ids[i_max])
+            mean_rel_error = float(np.mean(rel_error))
+            rel_count = int(len(rel_error))
+        else:
+            max_rel_error = float("nan")
+            max_rel_line = -1
+            mean_rel_error = float("nan")
+            rel_count = 0
+
+        if len(model_at_ref) >= 2:
+            pearson_r = float(np.corrcoef(model_at_ref, ref_y_used)[0, 1])
+        else:
+            pearson_r = float("nan")
+
+        max_rel_text = f"{max_rel_error:.6f} ({100.0 * max_rel_error:.3f}%)"
+        mean_rel_text = f"{mean_rel_error:.6f} ({100.0 * mean_rel_error:.3f}%)"
+        max_rel_line_text = str(max_rel_line) if max_rel_line > 0 else "n/a"
+
+        print(
+            f"  {label:<14} "
+            f"max_relative_error={max_rel_text} (line {max_rel_line_text}), "
+            f"mean_relative_error={mean_rel_text}, "
+            f"pearson_r={pearson_r:.6f}, "
+            f"n_rel={rel_count}, n_corr={len(model_at_ref)}"
+        )
 
     axis.set_xlabel(r"Speed ratio $S_0$")
     axis.set_ylabel(r"Drag coefficient $C_D$")
@@ -285,8 +378,8 @@ def plot_gocee_fig5(dataset: dict[str, tuple[np.ndarray, np.ndarray]], show: boo
     style_legend(legend)
     legend.get_title().set_fontweight("bold")
 
-    figure.subplots_adjust(left=0.09, right=0.98, bottom=0.14, top=0.95, wspace=0.06)
-    figure.savefig(OUTPUT_PATH, dpi=1200, bbox_inches="tight")
+    figure.subplots_adjust(left=0.08, right=0.98, bottom=0.12, top=0.95, wspace=0.07)
+    figure.savefig(OUTPUT_PATH, dpi=220, bbox_inches="tight")
 
     if show and plt.get_backend().lower() != "agg":
         plt.show()

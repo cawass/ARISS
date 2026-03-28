@@ -63,6 +63,7 @@ CONFIG_PATH = HERE / "CrandallWirz2022_6U.toml"
 DATASET_SOLAR_EFF_PATH = HERE / "Solar Cell Eff.csv"
 DATASET_ACC_COEFF_PATH = HERE / "Acc Coeff.csv"
 OUTPUT_PATH = HERE / "crandall_wirz_2022_fig26_fig27_validation.png"
+PAGE_FIGSIZE = (13.2, 5.4)
 
 TP_TARGET_MN_PER_KW = 10.0
 TP_TARGET_N_PER_W = TP_TARGET_MN_PER_KW * 1.0e-6
@@ -121,10 +122,20 @@ def load_wide_xy_dataset(path: Path) -> dict[str, tuple[np.ndarray, np.ndarray]]
     return curves
 
 
-def _dataset_case_bounds(dataset: dict[str, tuple[np.ndarray, np.ndarray]], label: str) -> tuple[float, float]:
+def _case_x_grid_from_dataset(
+    dataset: dict[str, tuple[np.ndarray, np.ndarray]],
+    label: str,
+) -> np.ndarray:
+    """Return sorted unique x-points for a case, matching paper points exactly."""
+    if label not in dataset:
+        raise ValueError(f"Missing paper dataset series for case: {label}")
+
     x_vals, _ = dataset[label]
     finite = np.isfinite(x_vals)
-    return float(np.min(x_vals[finite])), float(np.max(x_vals[finite]))
+    if not np.any(finite):
+        raise ValueError(f"No finite x-values found in paper dataset series: {label}")
+
+    return np.unique(np.sort(np.asarray(x_vals[finite], dtype=float)))
 
 
 # ------------------------------------------------------------------------------ #
@@ -137,7 +148,6 @@ def _solve_point(spacecraft, *, f107: float, solar_eff: float | None = None, acc
 
     # Keep T/P fixed at the paper condition for Fig. 26/27.
     spacecraft.thruster.specific_impulse = 2.0 * spacecraft.thruster.eff / (const.EARTH_GRAVITY * TP_TARGET_N_PER_W)
-
     if solar_eff is not None:
         spacecraft = replace(spacecraft, solar=replace(spacecraft.solar, eta_solar=float(solar_eff)))
 
@@ -163,13 +173,10 @@ def _solve_point(spacecraft, *, f107: float, solar_eff: float | None = None, acc
 
 
 def run_solar_efficiency_sweep(dataset: dict[str, tuple[np.ndarray, np.ndarray]]) -> dict[str, tuple[np.ndarray, np.ndarray]]:
-    x_min = min(_dataset_case_bounds(dataset, case["label"])[0] for case in SOLAR_CASES if case["label"] in dataset)
-    x_max = max(_dataset_case_bounds(dataset, case["label"])[1] for case in SOLAR_CASES if case["label"] in dataset)
-    x_grid = np.linspace(x_min, x_max, 24)
-
     results: dict[str, tuple[np.ndarray, np.ndarray]] = {}
     for case in SOLAR_CASES:
         sc = load_spacecraft_from_base_config(CONFIG_PATH)
+        x_grid = _case_x_grid_from_dataset(dataset, case["label"])
         y_values = []
         for eta_solar in x_grid:
             _, altitude = _solve_point(sc, f107=case["f107"], solar_eff=float(eta_solar))
@@ -178,12 +185,11 @@ def run_solar_efficiency_sweep(dataset: dict[str, tuple[np.ndarray, np.ndarray]]
     return results
 
 
-def run_accommodation_sweep() -> dict[str, tuple[np.ndarray, np.ndarray]]:
-    x_grid = np.linspace(0.0, 1.0, 26)
-
+def run_accommodation_sweep(dataset: dict[str, tuple[np.ndarray, np.ndarray]]) -> dict[str, tuple[np.ndarray, np.ndarray]]:
     results: dict[str, tuple[np.ndarray, np.ndarray]] = {}
     for case in SOLAR_CASES:
         sc = load_spacecraft_from_base_config(CONFIG_PATH)
+        x_grid = _case_x_grid_from_dataset(dataset, case["label"])
         y_values = []
         for acc in x_grid:
             _, altitude = _solve_point(sc, f107=case["f107"], acc_coeff=float(acc))
@@ -196,23 +202,94 @@ def run_accommodation_sweep() -> dict[str, tuple[np.ndarray, np.ndarray]]:
 # Metrics
 # ------------------------------------------------------------------------------ #
 
-def mape_against_reference(model_xy: tuple[np.ndarray, np.ndarray], ref_xy: tuple[np.ndarray, np.ndarray]) -> float:
+def _paired_model_reference_samples(
+    model_xy: tuple[np.ndarray, np.ndarray],
+    ref_xy: tuple[np.ndarray, np.ndarray],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
     model_x, model_y = model_xy
     ref_x, ref_y = ref_xy
 
-    valid_ref = np.isfinite(ref_x) & np.isfinite(ref_y) & (ref_y > 0.0)
-    if not np.any(valid_ref) or len(model_x) < 2:
-        return float("nan")
+    model_x = np.asarray(model_x, dtype=float)
+    model_y = np.asarray(model_y, dtype=float)
+    ref_x = np.asarray(ref_x, dtype=float)
+    ref_y = np.asarray(ref_y, dtype=float)
 
-    x_low = float(np.min(model_x))
-    x_high = float(np.max(model_x))
-    overlap = valid_ref & (ref_x >= x_low) & (ref_x <= x_high)
-    if not np.any(overlap):
-        return float("nan")
+    valid_model = np.isfinite(model_x) & np.isfinite(model_y)
+    if np.count_nonzero(valid_model) < 2:
+        return None
 
-    interp_y = np.interp(ref_x[overlap], model_x, model_y)
-    rel = np.abs(interp_y - ref_y[overlap]) / ref_y[overlap]
-    return float(100.0 * np.mean(rel))
+    model_x = model_x[valid_model]
+    model_y = model_y[valid_model]
+    order = np.argsort(model_x)
+    model_x = model_x[order]
+    model_y = model_y[order]
+
+    model_x_unique, unique_idx = np.unique(model_x, return_index=True)
+    model_y_unique = model_y[unique_idx]
+    if len(model_x_unique) < 2:
+        return None
+
+    line_ids = np.arange(1, len(ref_y) + 1, dtype=int)
+    valid_ref = np.isfinite(ref_x) & np.isfinite(ref_y)
+    if not np.any(valid_ref):
+        return None
+
+    ref_x = ref_x[valid_ref]
+    ref_y = ref_y[valid_ref]
+    line_ids = line_ids[valid_ref]
+
+    x_low = float(np.min(model_x_unique))
+    x_high = float(np.max(model_x_unique))
+    in_range = (ref_x >= x_low) & (ref_x <= x_high)
+    if not np.any(in_range):
+        return None
+
+    ref_x = ref_x[in_range]
+    ref_y = ref_y[in_range]
+    line_ids = line_ids[in_range]
+
+    model_at_ref = np.interp(ref_x, model_x_unique, model_y_unique)
+    return model_at_ref, ref_y, line_ids
+
+
+def datapoint_relative_and_corr_stats(
+    model_xy: tuple[np.ndarray, np.ndarray],
+    ref_xy: tuple[np.ndarray, np.ndarray],
+) -> tuple[float, float, int, int, float, int] | None:
+    paired = _paired_model_reference_samples(model_xy, ref_xy)
+    if paired is None:
+        return None
+
+    model_at_ref, ref_y_used, line_ids = paired
+
+    nonzero_ref = np.abs(ref_y_used) > 1.0e-12
+    if np.any(nonzero_ref):
+        relative_error = np.abs(model_at_ref[nonzero_ref] - ref_y_used[nonzero_ref]) / np.abs(ref_y_used[nonzero_ref])
+        rel_line_ids = line_ids[nonzero_ref]
+        i_max = int(np.argmax(relative_error))
+        max_relative_error = float(relative_error[i_max])
+        max_rel_line = int(rel_line_ids[i_max])
+        mean_relative_error = float(np.mean(relative_error))
+        n_rel = int(len(relative_error))
+    else:
+        max_relative_error = float("nan")
+        max_rel_line = -1
+        mean_relative_error = float("nan")
+        n_rel = 0
+
+    if len(model_at_ref) >= 2:
+        pearson_r = float(np.corrcoef(model_at_ref, ref_y_used)[0, 1])
+    else:
+        pearson_r = float("nan")
+
+    return (
+        max_relative_error,
+        mean_relative_error,
+        max_rel_line,
+        n_rel,
+        pearson_r,
+        int(len(model_at_ref)),
+    )
 
 
 # ------------------------------------------------------------------------------ #
@@ -238,8 +315,8 @@ def plot_side_by_side(
         }
     )
 
-    figure = plt.figure(figsize=(13.8, 6.0))
-    grid = figure.add_gridspec(1, 3, width_ratios=[1.0, 1.0, 0.55], wspace=0.08)
+    figure = plt.figure(figsize=PAGE_FIGSIZE)
+    grid = figure.add_gridspec(1, 3, width_ratios=[1.0, 1.0, 0.72], wspace=0.07)
     ax_left = figure.add_subplot(grid[0, 0])
     ax_right = figure.add_subplot(grid[0, 1], sharey=ax_left)
     legend_axis = figure.add_subplot(grid[0, 2])
@@ -367,8 +444,8 @@ def plot_side_by_side(
     style_legend(case_legend)
     case_legend.get_title().set_fontweight("bold")
 
-    figure.subplots_adjust(left=0.09, right=0.98, top=0.94, bottom=0.14, wspace=0.08)
-    figure.savefig(OUTPUT_PATH, dpi=1200, bbox_inches="tight")
+    figure.subplots_adjust(left=0.09, right=0.98, top=0.95, bottom=0.12, wspace=0.07)
+    figure.savefig(OUTPUT_PATH, dpi=220, bbox_inches="tight")
 
     if show and plt.get_backend().lower() != "agg":
         plt.show()
@@ -386,19 +463,54 @@ def run_crandall_wirz_fig26_fig27_validation(show: bool = True) -> Path:
     simulation_logger.setLevel(50)
     try:
         fig26_model = run_solar_efficiency_sweep(fig26_dataset)
-        fig27_model = run_accommodation_sweep()
+        fig27_model = run_accommodation_sweep(fig27_dataset)
     finally:
         simulation_logger.setLevel(old_level)
 
-    print("MAPE against digitized datasets:")
+    print("Datapoint relative-error and correlation against digitized datasets:")
+    pearson_values_fig26: list[float] = []
+    pearson_values_fig27: list[float] = []
     for case in SOLAR_CASES:
         label = case["label"]
         if label in fig26_dataset and label in fig26_model:
-            mape_26 = mape_against_reference(fig26_model[label], fig26_dataset[label])
-            print(f"  Fig26 {label:<20} {mape_26:6.2f}%")
+            stats_26 = datapoint_relative_and_corr_stats(fig26_model[label], fig26_dataset[label])
+            if stats_26 is not None:
+                max_rel, mean_rel, line_max_rel, n_rel, pearson_r, n_corr = stats_26
+                line_text = str(line_max_rel) if line_max_rel > 0 else "n/a"
+                print(
+                    f"  Fig26 {label:<20} "
+                    f"max_relative_error={max_rel:9.6f} ({100.0 * max_rel:6.3f}%) (line {line_text}), "
+                    f"mean_relative_error={mean_rel:9.6f} ({100.0 * mean_rel:6.3f}%), "
+                    f"pearson_r={pearson_r:8.6f}, n_rel={n_rel}, n_corr={n_corr}"
+                )
+                if np.isfinite(pearson_r):
+                    pearson_values_fig26.append(pearson_r)
+            else:
+                print(f"  Fig26 {label:<20} n/a")
         if label in fig27_dataset and label in fig27_model:
-            mape_27 = mape_against_reference(fig27_model[label], fig27_dataset[label])
-            print(f"  Fig27 {label:<20} {mape_27:6.2f}%")
+            stats_27 = datapoint_relative_and_corr_stats(fig27_model[label], fig27_dataset[label])
+            if stats_27 is not None:
+                max_rel, mean_rel, line_max_rel, n_rel, pearson_r, n_corr = stats_27
+                line_text = str(line_max_rel) if line_max_rel > 0 else "n/a"
+                print(
+                    f"  Fig27 {label:<20} "
+                    f"max_relative_error={max_rel:9.6f} ({100.0 * max_rel:6.3f}%) (line {line_text}), "
+                    f"mean_relative_error={mean_rel:9.6f} ({100.0 * mean_rel:6.3f}%), "
+                    f"pearson_r={pearson_r:8.6f}, n_rel={n_rel}, n_corr={n_corr}"
+                )
+                if np.isfinite(pearson_r):
+                    pearson_values_fig27.append(pearson_r)
+            else:
+                print(f"  Fig27 {label:<20} n/a")
+
+    if pearson_values_fig26:
+        print(f"  Fig26 minimum Pearson correlation coefficient: {min(pearson_values_fig26):.6f}")
+    else:
+        print("  Fig26 minimum Pearson correlation coefficient: n/a")
+    if pearson_values_fig27:
+        print(f"  Fig27 minimum Pearson correlation coefficient: {min(pearson_values_fig27):.6f}")
+    else:
+        print("  Fig27 minimum Pearson correlation coefficient: n/a")
 
     output = plot_side_by_side(fig26_model, fig27_model, fig26_dataset, fig27_dataset, show=show)
     print(f"Saved figure: {output}")

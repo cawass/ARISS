@@ -63,6 +63,7 @@ DATASET_PATH = Path(__file__).with_name("Isp Altitude Dataset.csv")
 OUTPUT_PATH = Path(__file__).with_name("mansur_efficiency_validation.png")
 VECTOR_OUTPUT_PATH = Path(__file__).with_name("mansur_efficiency_validation.svg")
 PDF_OUTPUT_PATH = Path(__file__).with_name("mansur_efficiency_validation.pdf")
+PAGE_FIGSIZE = (13.2, 5.4)
 
 COLLECTION_EFFICIENCIES = (0.35, 0.40, 0.45)
 ISP = np.linspace(2000, 6000, 40)
@@ -164,6 +165,97 @@ def _plot_reference(ax, x, y, color):
     _plot_curve(ax, x[order], y[order], color, "s", "--")
 
 
+def _paired_model_reference_samples(
+    model_x: np.ndarray,
+    model_y: np.ndarray,
+    ref_x: np.ndarray,
+    ref_y: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    model_x = np.asarray(model_x, dtype=float)
+    model_y = np.asarray(model_y, dtype=float)
+    ref_x = np.asarray(ref_x, dtype=float)
+    ref_y = np.asarray(ref_y, dtype=float)
+
+    valid_model = np.isfinite(model_x) & np.isfinite(model_y)
+    if np.count_nonzero(valid_model) < 2:
+        return None
+
+    model_x = model_x[valid_model]
+    model_y = model_y[valid_model]
+    order = np.argsort(model_x)
+    model_x = model_x[order]
+    model_y = model_y[order]
+
+    model_x_unique, unique_idx = np.unique(model_x, return_index=True)
+    model_y_unique = model_y[unique_idx]
+    if len(model_x_unique) < 2:
+        return None
+
+    line_ids = np.arange(1, len(ref_y) + 1, dtype=int)
+    valid_ref = np.isfinite(ref_x) & np.isfinite(ref_y)
+    if not np.any(valid_ref):
+        return None
+
+    ref_x = ref_x[valid_ref]
+    ref_y = ref_y[valid_ref]
+    line_ids = line_ids[valid_ref]
+
+    x_low = float(np.min(model_x_unique))
+    x_high = float(np.max(model_x_unique))
+    in_range = (ref_x >= x_low) & (ref_x <= x_high)
+    if not np.any(in_range):
+        return None
+
+    ref_x = ref_x[in_range]
+    ref_y = ref_y[in_range]
+    line_ids = line_ids[in_range]
+
+    model_at_ref = np.interp(ref_x, model_x_unique, model_y_unique)
+    return model_at_ref, ref_y, line_ids
+
+
+def _relative_and_corr_stats(
+    model_x: np.ndarray,
+    model_y: np.ndarray,
+    ref_x: np.ndarray,
+    ref_y: np.ndarray,
+) -> tuple[float, float, int, int, float, int] | None:
+    paired = _paired_model_reference_samples(model_x, model_y, ref_x, ref_y)
+    if paired is None:
+        return None
+
+    model_at_ref, ref_y_used, line_ids = paired
+
+    nonzero_ref = np.abs(ref_y_used) > 1.0e-12
+    if np.any(nonzero_ref):
+        relative_error = np.abs(model_at_ref[nonzero_ref] - ref_y_used[nonzero_ref]) / np.abs(ref_y_used[nonzero_ref])
+        rel_line_ids = line_ids[nonzero_ref]
+        i_max = int(np.argmax(relative_error))
+        max_relative_error = float(relative_error[i_max])
+        max_rel_line = int(rel_line_ids[i_max])
+        mean_relative_error = float(np.mean(relative_error))
+        n_rel = int(len(relative_error))
+    else:
+        max_relative_error = float("nan")
+        max_rel_line = -1
+        mean_relative_error = float("nan")
+        n_rel = 0
+
+    if len(model_at_ref) >= 2:
+        pearson_r = float(np.corrcoef(model_at_ref, ref_y_used)[0, 1])
+    else:
+        pearson_r = float("nan")
+
+    return (
+        max_relative_error,
+        mean_relative_error,
+        max_rel_line,
+        n_rel,
+        pearson_r,
+        int(len(model_at_ref)),
+    )
+
+
 # ------------------------------------------------------------------------------ #
 # Data
 # ------------------------------------------------------------------------------ #
@@ -248,13 +340,16 @@ def plot_results(results, paper=None, save_path=OUTPUT_PATH, show=True):
         }
     )
 
-    fig = plt.figure(figsize=(11.6, 5.8))
-    grid = fig.add_gridspec(1, 2, width_ratios=[1.0, 0.62], wspace=0.05)
+    fig = plt.figure(figsize=PAGE_FIGSIZE)
+    grid = fig.add_gridspec(1, 2, width_ratios=[1.0, 0.72], wspace=0.07)
     ax = fig.add_subplot(grid[0, 0])
     legend_axis = fig.add_subplot(grid[0, 1])
     legend_axis.axis("off")
 
     handles, labels = [], []
+
+    print("Datapoint relative-error and correlation against Mansur efficiency curves:")
+    pearson_values: list[float] = []
 
     for color, eff in zip(PLOT_COLORS, COLLECTION_EFFICIENCIES):
 
@@ -269,6 +364,22 @@ def plot_results(results, paper=None, save_path=OUTPUT_PATH, show=True):
         _plot_sweep(ax, x, y, clean_color)
         _plot_reference(ax, px, py, clean_color)
 
+        if px.size > 0 and py.size > 0:
+            stats = _relative_and_corr_stats(x, y, px, py)
+            if stats is None:
+                print(f"  eta_c={eff:.2f} n/a")
+            else:
+                max_rel, mean_rel, line_max_rel, n_rel, pearson_r, n_corr = stats
+                line_text = str(line_max_rel) if line_max_rel > 0 else "n/a"
+                print(
+                    f"  eta_c={eff:.2f} "
+                    f"max_relative_error={max_rel:10.6f} ({100.0 * max_rel:7.3f}%) (line {line_text}), "
+                    f"mean_relative_error={mean_rel:10.6f} ({100.0 * mean_rel:7.3f}%), "
+                    f"pearson_r={pearson_r:9.6f}, n_rel={n_rel}, n_corr={n_corr}"
+                )
+                if np.isfinite(pearson_r):
+                    pearson_values.append(pearson_r)
+
         h_lim = np.min(x)
         handles.append(Line2D([0], [0], color=clean_color, marker="o", linestyle="-"))
         labels.append(f"ARISS ηc={eff:.2f}, h_lim={h_lim:.1f} km")
@@ -277,6 +388,11 @@ def plot_results(results, paper=None, save_path=OUTPUT_PATH, show=True):
             h_lim_ref = np.min(px)
             handles.append(Line2D([0], [0], color=clean_color, marker="s", linestyle="--"))
             labels.append(f"Mansur ηc={eff:.2f}, h_lim={h_lim_ref:.1f} km")
+
+    if pearson_values:
+        print(f"  Minimum Pearson correlation coefficient: {min(pearson_values):.6f}")
+    else:
+        print("  Minimum Pearson correlation coefficient: n/a")
 
     ax.set_xlabel("Converged altitude (km)")
     ax.set_ylabel("Isp (s)")
@@ -313,8 +429,8 @@ def plot_results(results, paper=None, save_path=OUTPUT_PATH, show=True):
         style_legend(legend)
         legend.get_title().set_fontweight("bold")
 
-    fig.subplots_adjust(left=0.09, right=0.98, bottom=0.13, top=0.95, wspace=0.05)
-    fig.savefig(save_path, dpi=1200, bbox_inches="tight")
+    fig.subplots_adjust(left=0.08, right=0.98, bottom=0.12, top=0.95, wspace=0.07)
+    fig.savefig(save_path, dpi=220, bbox_inches="tight")
     fig.savefig(VECTOR_OUTPUT_PATH, bbox_inches="tight")
     fig.savefig(PDF_OUTPUT_PATH, bbox_inches="tight")
 

@@ -48,8 +48,9 @@ def sizing_model(sc: SpacecraftState) -> None:
     # overhead required by power-chain losses, then compute propulsion bus power
     # from the thruster efficiency.
     sc.power.Power_prop = sc.thruster.power
-    sc.power.Power_solar = sc.power.Power_total / (sc.solar.eta_power) -  sc.power.Power_total
+    Load_Power = sc.power.Power_in + sc.power.Power_body + sc.power.Power_rad + sc.power.Power_prop + sc.power.Power_ADCS + sc.power.Power_payload + sc.power.Power_refprop
+    sc.power.Power_solar = Load_Power / (sc.solar.eta_power) -  Load_Power
 
 
     # Rebuild the total spacecraft electrical demand from all subsystem terms.
-    sc.power.Power_total = sc.power.Power_in + sc.power.Power_body + sc.power.Power_solar + sc.power.Power_rad + sc.power.Power_prop + sc.power.Power_ADCS + sc.power.Power_payload + sc.power.Power_refprop
+    sc.power.Power_total = Load_Power + sc.power.Power_solar

@@ -75,6 +75,7 @@ CASE_SPECS = [
 ]
 
 OUTPUT_PATH = HERE / "crandall_wirz_2022_fig6_validation.png"
+PAGE_FIGSIZE = (13.2, 5.4)
 
 ALTITUDE_SAMPLES = 260
 NEWTON_TO_MILLINEWTON = 1.0e3
@@ -201,6 +202,7 @@ def _set_drag_force_outputs(sc) -> None:
 
 def _run_drag_sweep(config_path: Path, altitudes_km: np.ndarray) -> dict[str, np.ndarray]:
     base_sc = load_spacecraft_from_base_config(config_path)
+    base_sc.geometry.A_in_drag = base_sc.geometry.A_in
 
     density, temperature, r_specific, _, _, _ = atmos(
         altitudes_km,
@@ -254,19 +256,107 @@ def _interp_model_at_altitude(model: dict[str, np.ndarray], key: str, y_query: n
     return np.interp(y_query, y_model[order], x_model[order])
 
 
-def _component_mape_percent(model: dict[str, np.ndarray], dataset: dict[str, tuple[np.ndarray, np.ndarray]]) -> dict[str, float]:
-    errors: dict[str, float] = {}
+def _paired_model_reference_samples(
+    model_altitude: np.ndarray,
+    model_values: np.ndarray,
+    ref_altitude: np.ndarray,
+    ref_values: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    model_altitude = np.asarray(model_altitude, dtype=float)
+    model_values = np.asarray(model_values, dtype=float)
+    ref_altitude = np.asarray(ref_altitude, dtype=float)
+    ref_values = np.asarray(ref_values, dtype=float)
+
+    valid_model = np.isfinite(model_altitude) & np.isfinite(model_values)
+    if np.count_nonzero(valid_model) < 2:
+        return None
+
+    model_altitude = model_altitude[valid_model]
+    model_values = model_values[valid_model]
+    order = np.argsort(model_altitude)
+    model_altitude = model_altitude[order]
+    model_values = model_values[order]
+
+    model_altitude_unique, unique_idx = np.unique(model_altitude, return_index=True)
+    model_values_unique = model_values[unique_idx]
+    if len(model_altitude_unique) < 2:
+        return None
+
+    line_ids = np.arange(1, len(ref_values) + 1, dtype=int)
+    valid_ref = np.isfinite(ref_altitude) & np.isfinite(ref_values)
+    if not np.any(valid_ref):
+        return None
+
+    ref_altitude = ref_altitude[valid_ref]
+    ref_values = ref_values[valid_ref]
+    line_ids = line_ids[valid_ref]
+
+    altitude_low = float(np.min(model_altitude_unique))
+    altitude_high = float(np.max(model_altitude_unique))
+    in_range = (ref_altitude >= altitude_low) & (ref_altitude <= altitude_high)
+    if not np.any(in_range):
+        return None
+
+    ref_altitude = ref_altitude[in_range]
+    ref_values = ref_values[in_range]
+    line_ids = line_ids[in_range]
+    model_at_ref = np.interp(ref_altitude, model_altitude_unique, model_values_unique)
+
+    return model_at_ref, ref_values, line_ids
+
+
+def _component_relative_and_corr_stats(
+    model: dict[str, np.ndarray],
+    dataset: dict[str, tuple[np.ndarray, np.ndarray]],
+) -> dict[str, tuple[float, float, int, int, float, int]]:
+    stats: dict[str, tuple[float, float, int, int, float, int]] = {}
+
     for label, key, _, _ in COMPONENT_SPECS:
         if label not in dataset:
             continue
         x_ref, y_ref = dataset[label]
-        x_mod = _interp_model_at_altitude(model, key, y_ref)
-        valid = np.isfinite(x_ref) & np.isfinite(x_mod) & (x_ref > 0.0)
-        if not np.any(valid):
+
+        paired = _paired_model_reference_samples(
+            np.asarray(model["altitude"], dtype=float),
+            np.asarray(model[key], dtype=float),
+            np.asarray(y_ref, dtype=float),
+            np.asarray(x_ref, dtype=float),
+        )
+        if paired is None:
             continue
-        rel = np.abs(x_mod[valid] - x_ref[valid]) / x_ref[valid]
-        errors[label] = float(100.0 * np.mean(rel))
-    return errors
+
+        model_at_ref, ref_values, line_ids = paired
+
+        nonzero_ref = np.abs(ref_values) > 1.0e-12
+        if np.any(nonzero_ref):
+            relative_error = np.abs(model_at_ref[nonzero_ref] - ref_values[nonzero_ref]) / np.abs(ref_values[nonzero_ref])
+            rel_line_ids = line_ids[nonzero_ref]
+            i_max = int(np.argmax(relative_error))
+            max_rel_error = float(relative_error[i_max])
+            max_rel_line = int(rel_line_ids[i_max])
+            mean_rel_error = float(np.mean(relative_error))
+            n_rel = int(len(relative_error))
+        else:
+            max_rel_error = float("nan")
+            max_rel_line = -1
+            mean_rel_error = float("nan")
+            n_rel = 0
+
+        if len(model_at_ref) >= 2:
+            pearson_r = float(np.corrcoef(model_at_ref, ref_values)[0, 1])
+        else:
+            pearson_r = float("nan")
+
+        stats[label] = (
+            max_rel_error,
+            mean_rel_error,
+            max_rel_line,
+            n_rel,
+            pearson_r,
+            int(len(model_at_ref)),
+        )
+
+    return stats
 
 
 def _plot_case(axis, title: str, model: dict[str, np.ndarray], dataset: dict[str, tuple[np.ndarray, np.ndarray]]) -> None:
@@ -344,8 +434,8 @@ def run_crandall_wirz_validation(show: bool = True) -> Path:
 
     models = [_run_drag_sweep(spec["config"], altitudes_km) for spec in CASE_SPECS]
 
-    figure = plt.figure(figsize=(14.2, 5.9))
-    grid = figure.add_gridspec(1, 3, width_ratios=[1.0, 1.0, 0.85], wspace=0.06)
+    figure = plt.figure(figsize=PAGE_FIGSIZE)
+    grid = figure.add_gridspec(1, 3, width_ratios=[1.0, 1.0, 0.72], wspace=0.07)
     axes = [
         figure.add_subplot(grid[0, 0]),
         figure.add_subplot(grid[0, 1]),
@@ -355,11 +445,25 @@ def run_crandall_wirz_validation(show: bool = True) -> Path:
     legend_axis.axis("off")
     for axis, spec, model, dataset in zip(axes, CASE_SPECS, models, datasets):
         _plot_case(axis, spec["title"], model, dataset)
-        errors = _component_mape_percent(model, dataset)
-        print(f"\n{spec['title']} mean absolute percentage error by component:")
+        metrics = _component_relative_and_corr_stats(model, dataset)
+        print(f"\n{spec['title']} relative-error and correlation by component:")
+        pearson_values: list[float] = []
         for label, _, _, _ in COMPONENT_SPECS:
-            if label in errors:
-                print(f"  {label:<24} {errors[label]:6.2f}%")
+            if label in metrics:
+                max_rel_error, mean_rel_error, line_max_rel, n_rel, pearson_r, n_corr = metrics[label]
+                line_text = str(line_max_rel) if line_max_rel > 0 else "n/a"
+                print(
+                    f"  {label:<24} "
+                    f"max_relative_error={max_rel_error:10.6f} ({100.0 * max_rel_error:7.3f}%) (line {line_text}), "
+                    f"mean_relative_error={mean_rel_error:10.6f} ({100.0 * mean_rel_error:7.3f}%), "
+                    f"pearson_r={pearson_r:9.6f}, n_rel={n_rel}, n_corr={n_corr}"
+                )
+                if np.isfinite(pearson_r):
+                    pearson_values.append(pearson_r)
+        if pearson_values:
+            print(f"  Minimum Pearson correlation coefficient: {min(pearson_values):.6f}")
+        else:
+            print("  Minimum Pearson correlation coefficient: n/a")
 
     axes[0].set_ylabel("Altitude [km]")
     axes[0].set_ylim(altitude_min - 1.0, altitude_max + 1.0)
@@ -411,8 +515,8 @@ def run_crandall_wirz_validation(show: bool = True) -> Path:
     )
     style_legend(legend_components)
     legend_components.get_title().set_fontweight("bold")
-    figure.subplots_adjust(left=0.08, right=0.98, bottom=0.12, top=0.95, wspace=0.06)
-    figure.savefig(OUTPUT_PATH, dpi=1200, bbox_inches="tight")
+    figure.subplots_adjust(left=0.08, right=0.98, bottom=0.12, top=0.95, wspace=0.07)
+    figure.savefig(OUTPUT_PATH, dpi=220, bbox_inches="tight")
 
     if show and plt.get_backend().lower() != "agg":
         plt.show()

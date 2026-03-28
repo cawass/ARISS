@@ -69,6 +69,7 @@ def run_mansur_verification():
     print(f"Final total mass [kg]: {final_sc.mass.Mass_total:.6f}")
     print(f"Final thrust [N]: {final_sc.thruster.thrust:.6e}")
     print(f"Final drag [N]: {final_sc.drag.drag_total:.6e}")
+    print("Datapoint relative-error / Pearson metrics: n/a (no digitized datapoint dataset configured for this script)")
 
     if SHOW_UI:
         from ariss import plot_simulation_history

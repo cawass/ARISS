@@ -61,6 +61,7 @@ HERE = Path(__file__).resolve().parent
 CONFIG_PATH = HERE / "CrandallWirz2022_6U.toml"
 DATASET_PATH = HERE / "Fig 11.csv"
 OUTPUT_PATH = HERE / "crandall_wirz_2022_fig11_validation.png"
+PAGE_FIGSIZE = (13.2, 5.4)
 
 EFFICIENCY_GRID = np.linspace(0.38, 1.00, 18)
 
@@ -186,18 +187,98 @@ def run_fig11_sweep() -> dict[str, dict[str, np.ndarray]]:
 # Metrics
 # ------------------------------------------------------------------------------ #
 
-def mape_altitude_percent(model_tp: np.ndarray, model_altitude: np.ndarray, ref_tp: np.ndarray, ref_altitude: np.ndarray) -> float:
-    if len(model_tp) < 2 or len(ref_tp) == 0:
-        return float("nan")
+def _paired_model_reference_samples(
+    model_tp: np.ndarray,
+    model_altitude: np.ndarray,
+    ref_tp: np.ndarray,
+    ref_altitude: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    model_tp = np.asarray(model_tp, dtype=float)
+    model_altitude = np.asarray(model_altitude, dtype=float)
+    ref_tp = np.asarray(ref_tp, dtype=float)
+    ref_altitude = np.asarray(ref_altitude, dtype=float)
 
-    within = (ref_tp >= np.min(model_tp)) & (ref_tp <= np.max(model_tp))
-    valid = within & np.isfinite(ref_tp) & np.isfinite(ref_altitude) & (ref_altitude > 0.0)
-    if not np.any(valid):
-        return float("nan")
+    valid_model = np.isfinite(model_tp) & np.isfinite(model_altitude)
+    if np.count_nonzero(valid_model) < 2:
+        return None
 
-    model_interp = np.interp(ref_tp[valid], model_tp, model_altitude)
-    rel = np.abs(model_interp - ref_altitude[valid]) / ref_altitude[valid]
-    return float(100.0 * np.mean(rel))
+    model_tp = model_tp[valid_model]
+    model_altitude = model_altitude[valid_model]
+    order = np.argsort(model_tp)
+    model_tp = model_tp[order]
+    model_altitude = model_altitude[order]
+
+    model_tp_unique, unique_idx = np.unique(model_tp, return_index=True)
+    model_altitude_unique = model_altitude[unique_idx]
+    if len(model_tp_unique) < 2:
+        return None
+
+    line_ids = np.arange(1, len(ref_altitude) + 1, dtype=int)
+    valid_ref = np.isfinite(ref_tp) & np.isfinite(ref_altitude)
+    if not np.any(valid_ref):
+        return None
+
+    ref_tp = ref_tp[valid_ref]
+    ref_altitude = ref_altitude[valid_ref]
+    line_ids = line_ids[valid_ref]
+
+    tp_low = float(np.min(model_tp_unique))
+    tp_high = float(np.max(model_tp_unique))
+    in_range = (ref_tp >= tp_low) & (ref_tp <= tp_high)
+    if not np.any(in_range):
+        return None
+
+    ref_tp = ref_tp[in_range]
+    ref_altitude = ref_altitude[in_range]
+    line_ids = line_ids[in_range]
+
+    model_altitude_at_ref = np.interp(ref_tp, model_tp_unique, model_altitude_unique)
+    return model_altitude_at_ref, ref_altitude, line_ids
+
+
+def relative_altitude_and_corr_stats(
+    model_tp: np.ndarray,
+    model_altitude: np.ndarray,
+    ref_tp: np.ndarray,
+    ref_altitude: np.ndarray,
+) -> tuple[float, float, int, int, float, int] | None:
+    paired = _paired_model_reference_samples(model_tp, model_altitude, ref_tp, ref_altitude)
+    if paired is None:
+        return None
+
+    model_altitude_at_ref, ref_altitude_used, line_ids = paired
+
+    nonzero_ref = np.abs(ref_altitude_used) > 1.0e-12
+    if np.any(nonzero_ref):
+        relative_error = (
+            np.abs(model_altitude_at_ref[nonzero_ref] - ref_altitude_used[nonzero_ref])
+            / np.abs(ref_altitude_used[nonzero_ref])
+        )
+        rel_line_ids = line_ids[nonzero_ref]
+        i_max = int(np.argmax(relative_error))
+        max_relative_error = float(relative_error[i_max])
+        max_rel_line = int(rel_line_ids[i_max])
+        mean_relative_error = float(np.mean(relative_error))
+        n_rel = int(len(relative_error))
+    else:
+        max_relative_error = float("nan")
+        max_rel_line = -1
+        mean_relative_error = float("nan")
+        n_rel = 0
+
+    if len(model_altitude_at_ref) >= 2:
+        pearson_r = float(np.corrcoef(model_altitude_at_ref, ref_altitude_used)[0, 1])
+    else:
+        pearson_r = float("nan")
+
+    return (
+        max_relative_error,
+        mean_relative_error,
+        max_rel_line,
+        n_rel,
+        pearson_r,
+        int(len(model_altitude_at_ref)),
+    )
 
 
 # ------------------------------------------------------------------------------ #
@@ -217,8 +298,8 @@ def plot_fig11(results: dict[str, dict[str, np.ndarray]], dataset: dict[str, tup
         }
     )
 
-    figure = plt.figure(figsize=(12.6, 5.9))
-    grid = figure.add_gridspec(1, 2, width_ratios=[1.0, 0.55], wspace=0.05)
+    figure = plt.figure(figsize=PAGE_FIGSIZE)
+    grid = figure.add_gridspec(1, 2, width_ratios=[1.0, 0.72], wspace=0.07)
     axis = figure.add_subplot(grid[0, 0])
     legend_axis = figure.add_subplot(grid[0, 1])
     legend_axis.axis("off")
@@ -327,8 +408,8 @@ def plot_fig11(results: dict[str, dict[str, np.ndarray]], dataset: dict[str, tup
     style_legend(legend_cases)
     legend_cases.get_title().set_fontweight("bold")
 
-    figure.subplots_adjust(left=0.09, right=0.98, bottom=0.13, top=0.95, wspace=0.05)
-    figure.savefig(OUTPUT_PATH, dpi=1200, bbox_inches="tight")
+    figure.subplots_adjust(left=0.08, right=0.98, bottom=0.12, top=0.95, wspace=0.07)
+    figure.savefig(OUTPUT_PATH, dpi=220, bbox_inches="tight")
 
     if show and plt.get_backend().lower() != "agg":
         plt.show()
@@ -342,7 +423,8 @@ def run_crandall_wirz_fig11_validation(show: bool = True) -> Path:
     dataset = load_fig11_dataset(DATASET_PATH)
     results = run_fig11_sweep()
 
-    print("Altitude MAPE against digitized Fig. 11 curves:")
+    print("Altitude relative-error and correlation against digitized Fig. 11 curves:")
+    pearson_values: list[float] = []
     for spec in SOLAR_CASES:
         label = spec["label"]
         if label not in dataset:
@@ -351,13 +433,27 @@ def run_crandall_wirz_fig11_validation(show: bool = True) -> Path:
         alt_model = np.asarray(results[label]["altitude"], dtype=float)
         isp_model = np.asarray(results[label]["isp"], dtype=float)
         tp_ref, alt_ref = dataset[label]
-        mape = mape_altitude_percent(tp_model, alt_model, tp_ref, alt_ref)
-        if np.isfinite(mape):
-            print(f"  {label:<20} {mape:6.2f}%")
+        stats = relative_altitude_and_corr_stats(tp_model, alt_model, tp_ref, alt_ref)
+        if stats is not None:
+            max_relative_error, mean_relative_error, line_max_rel, n_rel, pearson_r, n_corr = stats
+            line_text = str(line_max_rel) if line_max_rel > 0 else "n/a"
+            print(
+                f"  {label:<20} "
+                f"max_relative_error={max_relative_error:8.6f} ({100.0 * max_relative_error:6.3f}%) (line {line_text}), "
+                f"mean_relative_error={mean_relative_error:8.6f} ({100.0 * mean_relative_error:6.3f}%), "
+                f"pearson_r={pearson_r:8.6f}, n_rel={n_rel}, n_corr={n_corr}"
+            )
+            if np.isfinite(pearson_r):
+                pearson_values.append(pearson_r)
         else:
             print(f"  {label:<20} n/a (no T/P overlap with dataset)")
         if len(isp_model) > 0:
             print(f"    Isp range [s]: {float(np.min(isp_model)):.2f} to {float(np.max(isp_model)):.2f}")
+
+    if pearson_values:
+        print(f"  Minimum Pearson correlation coefficient: {min(pearson_values):.6f}")
+    else:
+        print("  Minimum Pearson correlation coefficient: n/a")
 
     output = plot_fig11(results, dataset, show=show)
     print(f"Saved figure: {output}")

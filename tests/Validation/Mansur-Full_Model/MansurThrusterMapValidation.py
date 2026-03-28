@@ -35,6 +35,7 @@ from plot_style import PALETTE, apply_validation_style, style_axis, style_legend
 BASE_CONFIG_PATH = ROOT / "src" / "ariss" / "core" / "base_config.toml"
 CONFIG_PATH = HERE / "MansurValidation.toml"
 OUTPUT = HERE / "mansur_thruster_map_validation.png"
+PAGE_FIGSIZE = (13.2, 5.4)
 
 ETA_DATASET_PATH = HERE / "Eta Dataset.csv"
 MFLOW_DATASET_PATH = HERE / "M_flow Dataset.csv"
@@ -515,6 +516,140 @@ def _plot_mansur_family(axis, dataset, levels, color, linewidth, markers, marker
         )
 
 
+def _paired_model_reference_samples(
+    model_x: np.ndarray,
+    model_y: np.ndarray,
+    ref_x: np.ndarray,
+    ref_y: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    model_x = np.asarray(model_x, dtype=float)
+    model_y = np.asarray(model_y, dtype=float)
+    ref_x = np.asarray(ref_x, dtype=float)
+    ref_y = np.asarray(ref_y, dtype=float)
+
+    valid_model = np.isfinite(model_x) & np.isfinite(model_y)
+    if np.count_nonzero(valid_model) < 2:
+        return None
+
+    model_x = model_x[valid_model]
+    model_y = model_y[valid_model]
+    order = np.argsort(model_x)
+    model_x = model_x[order]
+    model_y = model_y[order]
+
+    model_x_unique, unique_idx = np.unique(model_x, return_index=True)
+    model_y_unique = model_y[unique_idx]
+    if len(model_x_unique) < 2:
+        return None
+
+    line_ids = np.arange(1, len(ref_y) + 1, dtype=int)
+    valid_ref = np.isfinite(ref_x) & np.isfinite(ref_y)
+    if not np.any(valid_ref):
+        return None
+
+    ref_x = ref_x[valid_ref]
+    ref_y = ref_y[valid_ref]
+    line_ids = line_ids[valid_ref]
+
+    x_low = float(np.min(model_x_unique))
+    x_high = float(np.max(model_x_unique))
+    in_range = (ref_x >= x_low) & (ref_x <= x_high)
+    if not np.any(in_range):
+        return None
+
+    ref_x = ref_x[in_range]
+    ref_y = ref_y[in_range]
+    line_ids = line_ids[in_range]
+
+    model_at_ref = np.interp(ref_x, model_x_unique, model_y_unique)
+    return model_at_ref, ref_y, line_ids
+
+
+def _relative_and_corr_stats(
+    model_x: np.ndarray,
+    model_y: np.ndarray,
+    ref_x: np.ndarray,
+    ref_y: np.ndarray,
+) -> tuple[float, float, int, int, float, int] | None:
+    paired = _paired_model_reference_samples(model_x, model_y, ref_x, ref_y)
+    if paired is None:
+        return None
+
+    model_at_ref, ref_y_used, line_ids = paired
+
+    nonzero_ref = np.abs(ref_y_used) > 1.0e-12
+    if np.any(nonzero_ref):
+        relative_error = np.abs(model_at_ref[nonzero_ref] - ref_y_used[nonzero_ref]) / np.abs(ref_y_used[nonzero_ref])
+        rel_line_ids = line_ids[nonzero_ref]
+        i_max = int(np.argmax(relative_error))
+        max_relative_error = float(relative_error[i_max])
+        max_rel_line = int(rel_line_ids[i_max])
+        mean_relative_error = float(np.mean(relative_error))
+        n_rel = int(len(relative_error))
+    else:
+        max_relative_error = float("nan")
+        max_rel_line = -1
+        mean_relative_error = float("nan")
+        n_rel = 0
+
+    if len(model_at_ref) >= 2:
+        pearson_r = float(np.corrcoef(model_at_ref, ref_y_used)[0, 1])
+    else:
+        pearson_r = float("nan")
+
+    return (
+        max_relative_error,
+        mean_relative_error,
+        max_rel_line,
+        n_rel,
+        pearson_r,
+        int(len(model_at_ref)),
+    )
+
+
+def _print_family_relative_stats(title, model_lines, dataset, levels) -> float | None:
+    print(title)
+    pearson_values: list[float] = []
+    for level in levels:
+        model_key = _find_level_key(model_lines, level)
+        data_key = _find_level_key(dataset, level)
+        if model_key is None or data_key is None:
+            print(f"  level={level:g} n/a")
+            continue
+
+        branches = sorted(model_lines[model_key], key=lambda seg: len(seg[0]), reverse=True)
+        if not branches:
+            print(f"  level={level:g} n/a")
+            continue
+
+        model_x, model_y = branches[0]
+        ref_x, ref_y = dataset[data_key]
+        ref_x, ref_y = sort_points_by_tp(ref_x, ref_y)
+        stats = _relative_and_corr_stats(model_x, model_y, ref_x, ref_y)
+        if stats is None:
+            print(f"  level={level:g} n/a")
+            continue
+
+        max_rel, mean_rel, line_max_rel, n_rel, pearson_r, n_corr = stats
+        line_text = str(line_max_rel) if line_max_rel > 0 else "n/a"
+        print(
+            f"  level={level:g} "
+            f"max_relative_error={max_rel:10.6f} ({100.0 * max_rel:7.3f}%) (line {line_text}), "
+            f"mean_relative_error={mean_rel:10.6f} ({100.0 * mean_rel:7.3f}%), "
+            f"pearson_r={pearson_r:9.6f}, n_rel={n_rel}, n_corr={n_corr}"
+        )
+        if np.isfinite(pearson_r):
+            pearson_values.append(pearson_r)
+
+    if pearson_values:
+        family_min = min(pearson_values)
+        print(f"  Minimum Pearson correlation coefficient: {family_min:.6f}")
+        return family_min
+
+    print("  Minimum Pearson correlation coefficient: n/a")
+    return None
+
+
 # ------------------------------------------------------------------------------ #
 # Main plot
 # ------------------------------------------------------------------------------ #
@@ -542,12 +677,42 @@ def plot():
     mansur_mdot = load_wide_xy_dataset(MFLOW_DATASET_PATH)
     mansur_ain = load_wide_xy_dataset(AIN_DATASET_PATH)
 
+    min_r_values = []
+    min_r_eta = _print_family_relative_stats(
+        "Datapoint relative-error and correlation (eta family):",
+        efficiency_lines,
+        mansur_eta,
+        EFF_LEVELS,
+    )
+    if min_r_eta is not None:
+        min_r_values.append(min_r_eta)
+    min_r_mdot = _print_family_relative_stats(
+        "Datapoint relative-error and correlation (m_flow family):",
+        mass_flow_lines,
+        mansur_mdot,
+        MDOT_LEVELS,
+    )
+    if min_r_mdot is not None:
+        min_r_values.append(min_r_mdot)
+    min_r_ain = _print_family_relative_stats(
+        "Datapoint relative-error and correlation (A_in family):",
+        intake_area_lines,
+        mansur_ain,
+        AIN_LEVELS,
+    )
+    if min_r_ain is not None:
+        min_r_values.append(min_r_ain)
+    if min_r_values:
+        print(f"Overall minimum Pearson correlation coefficient: {min(min_r_values):.6f}")
+    else:
+        print("Overall minimum Pearson correlation coefficient: n/a")
+
     eta_markers = build_marker_map(EFF_LEVELS)
     mdot_markers = build_marker_map(MDOT_LEVELS)
     ain_markers = build_marker_map(AIN_LEVELS)
 
-    figure = plt.figure(figsize=(13.8, 7.0))
-    grid = figure.add_gridspec(1, 2, width_ratios=[5.0, 1.8], wspace=0.03)
+    figure = plt.figure(figsize=PAGE_FIGSIZE)
+    grid = figure.add_gridspec(1, 2, width_ratios=[1.0, 0.72], wspace=0.07)
 
     axis = figure.add_subplot(grid[0, 0])
     axis.xaxis.label.set_size(12)
@@ -556,7 +721,7 @@ def plot():
     legend_axis = figure.add_subplot(grid[0, 1])
     legend_axis.axis("off")
 
-    figure.subplots_adjust(left=0.08, right=0.97, bottom=0.11, top=0.94)
+    figure.subplots_adjust(left=0.08, right=0.98, bottom=0.12, top=0.95, wspace=0.07)
 
     # Mansur first
     _plot_mansur_family(
@@ -634,8 +799,8 @@ def plot():
     axis.grid(which="major", color="0.88", linewidth=0.7)
     axis.grid(which="minor", color="0.94", linewidth=0.5)
 
-    axis.tick_params(axis="both", which="major", width=0.9, length=5)
-    axis.tick_params(axis="both", which="minor", width=0.7, length=3)
+    axis.tick_params(axis="both", which="major", width=0.9, length=5, labelsize=12)
+    axis.tick_params(axis="both", which="minor", width=0.7, length=3, labelsize=12)
 
     # ------------------------------------------------------------------ #
     # Source legend
@@ -804,7 +969,7 @@ def plot():
     style_legend(leg_ain)
     leg_ain.get_title().set_fontweight("bold")
 
-    figure.savefig(OUTPUT, dpi=1200, bbox_inches="tight")
+    figure.savefig(OUTPUT, dpi=220, bbox_inches="tight")
     plt.close(figure)
 
 

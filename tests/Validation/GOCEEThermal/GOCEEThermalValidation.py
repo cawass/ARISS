@@ -41,9 +41,14 @@ CONFIG_PATH = Path(__file__).with_name("GOCEThermal.toml")
 def run_gocee_thermal_validation(show: bool = True) -> Path:
     spacecraft = load_spacecraft_from_base_config(CONFIG_PATH)
     diagnostics = thermal_model(spacecraft)
-    print(f"Steady-state temperature:{diagnostics.T_max-273.15} C")
-    print(f"Expected steady-state temperature: 100 C")
-    print(f"Deviation: {273.15+50-diagnostics.T_max} C")
+    steady_temp_c = float(diagnostics.T_max - 273.15)
+    expected_temp_c = 100.0
+    mse = (steady_temp_c - expected_temp_c) ** 2
+
+    print(f"Steady-state temperature: {steady_temp_c:.6f} C")
+    print(f"Expected steady-state temperature: {expected_temp_c:.6f} C")
+    print("Datapoint MSE (thermal reference):")
+    print(f"  min={mse:.6f} (line 1), max={mse:.6f} (line 1), avg={mse:.6f}, n=1")
 
 if __name__ == "__main__":
     run_gocee_thermal_validation(show=True)

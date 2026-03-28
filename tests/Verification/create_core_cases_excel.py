@@ -22,6 +22,7 @@ DEFAULT_XLSX = ROOT / "tests" / "Verification" / "core_case_ranges.xlsx"
 BASE_CONFIG_PATH = ROOT / "src" / "ariss" / "core" / "base_config.toml"
 
 AR_VALUES = [2.0, 1.0, 0.5]
+INTAKE_AREA_RATIO_VALUES = [0.5, 1.0, 2.0]
 SHAPES = {
     "CC": ("c", "c"),
     "CR": ("c", "r"),
@@ -33,8 +34,9 @@ ATMOS_MODES = {
     "fixed_point_00": False,
 }
 REFUELING_MODES = {
-    "passive": False,
-    "active": True,
+    "off": {"active_refueling": False, "active_and_bypass": False},
+    "active_tank_only": {"active_refueling": True, "active_and_bypass": False},
+    "active_with_bypass": {"active_refueling": True, "active_and_bypass": True},
 }
 GEOMETRY_MODES = {
     "free_inlet_fixed_body": {"use_intake_area_ratio": False, "fixed_body": True},
@@ -50,6 +52,7 @@ class CoreCaseSpec:
     core_case: str
     shape: str
     ar: float
+    intake_area_ratio: float
     atmosphere: str
     refueling: str
     geometry_mode: str
@@ -80,7 +83,7 @@ def _build_core_case_modes() -> list[dict[str, Any]]:
     modes: list[dict[str, Any]] = []
     core_idx = 1
     for atmos_key, use_average in ATMOS_MODES.items():
-        for refuel_key, refuel_active in REFUELING_MODES.items():
+        for refuel_key, refuel_mode in REFUELING_MODES.items():
             for geom_key, geom_mode in GEOMETRY_MODES.items():
                 core_case = f"core_{core_idx:02d}"
                 modes.append(
@@ -89,7 +92,8 @@ def _build_core_case_modes() -> list[dict[str, Any]]:
                         "atmosphere": atmos_key,
                         "use_average": bool(use_average),
                         "refueling": refuel_key,
-                        "refuel_active": bool(refuel_active),
+                        "refuel_active": bool(refuel_mode["active_refueling"]),
+                        "refuel_bypass": bool(refuel_mode["active_and_bypass"]),
                         "geometry_mode": geom_key,
                         "geom_mode": geom_mode,
                     }
@@ -103,44 +107,51 @@ def _build_core_case_specs() -> list[CoreCaseSpec]:
     core_modes = _build_core_case_modes()
     for mode in core_modes:
         for ar in AR_VALUES:
-            for shape_key, (s_in, s_body) in SHAPES.items():
-                ar_key = _ar_tag(ar)
-                filename = f"case_{mode['core_case']}_{shape_key.lower()}_ar{ar_key}.toml"
-                name = (
-                    f"{mode['core_case'].upper()} {shape_key} AR={ar:g} "
-                    f"{mode['atmosphere']} {mode['refueling']} {mode['geometry_mode']}"
-                )
-                overrides = {
-                    "orbit": {
-                        "use_average": bool(mode["use_average"]),
-                        "latitude": 0.0,
-                        "longitude": 0.0,
-                    },
-                    "geometry": {
-                        "S_in": s_in,
-                        "S_body": s_body,
-                        "AR_in": float(ar),
-                        "AR_body": float(ar),
-                        "use_intake_area_ratio": bool(mode["geom_mode"]["use_intake_area_ratio"]),
-                        "fixed_body": bool(mode["geom_mode"]["fixed_body"]),
-                    },
-                    "mission_profile": {
-                        "active_refueling": bool(mode["refuel_active"]),
-                    },
-                }
-                specs.append(
-                    CoreCaseSpec(
-                        filename=filename,
-                        name=name,
-                        core_case=str(mode["core_case"]),
-                        shape=shape_key,
-                        ar=float(ar),
-                        atmosphere=str(mode["atmosphere"]),
-                        refueling=str(mode["refueling"]),
-                        geometry_mode=str(mode["geometry_mode"]),
-                        overrides=overrides,
+            for intake_area_ratio in INTAKE_AREA_RATIO_VALUES:
+                for shape_key, (s_in, s_body) in SHAPES.items():
+                    ar_key = _ar_tag(ar)
+                    iar_key = _ar_tag(intake_area_ratio)
+                    filename = (
+                        f"case_{mode['core_case']}_{shape_key.lower()}_ar{ar_key}_iar{iar_key}.toml"
                     )
-                )
+                    name = (
+                        f"{mode['core_case'].upper()} {shape_key} AR={ar:g} IAR={intake_area_ratio:g} "
+                        f"{mode['atmosphere']} {mode['refueling']} {mode['geometry_mode']}"
+                    )
+                    overrides = {
+                        "orbit": {
+                            "use_average": bool(mode["use_average"]),
+                            "latitude": 0.0,
+                            "longitude": 0.0,
+                        },
+                        "geometry": {
+                            "S_in": s_in,
+                            "S_body": s_body,
+                            "AR_in": float(ar),
+                            "AR_body": float(ar),
+                            "intake_area_ratio": float(intake_area_ratio),
+                            "use_intake_area_ratio": bool(mode["geom_mode"]["use_intake_area_ratio"]),
+                            "fixed_body": bool(mode["geom_mode"]["fixed_body"]),
+                        },
+                        "mission_profile": {
+                            "active_refueling": bool(mode["refuel_active"]),
+                            "active_and_bypass": bool(mode["refuel_bypass"]),
+                        },
+                    }
+                    specs.append(
+                        CoreCaseSpec(
+                            filename=filename,
+                            name=name,
+                            core_case=str(mode["core_case"]),
+                            shape=shape_key,
+                            ar=float(ar),
+                            intake_area_ratio=float(intake_area_ratio),
+                            atmosphere=str(mode["atmosphere"]),
+                            refueling=str(mode["refueling"]),
+                            geometry_mode=str(mode["geometry_mode"]),
+                            overrides=overrides,
+                        )
+                    )
     return specs
 
 
@@ -237,6 +248,7 @@ def run_core_cases(
                         "core_case": spec.core_case,
                         "shape": spec.shape,
                         "ar": spec.ar,
+                        "intake_area_ratio": spec.intake_area_ratio,
                         "atmosphere": spec.atmosphere,
                         "refueling": spec.refueling,
                         "geometry_mode": spec.geometry_mode,
@@ -261,6 +273,7 @@ def run_core_cases(
                         "core_case": spec.core_case,
                         "shape": spec.shape,
                         "ar": spec.ar,
+                        "intake_area_ratio": spec.intake_area_ratio,
                         "atmosphere": spec.atmosphere,
                         "refueling": spec.refueling,
                         "geometry_mode": spec.geometry_mode,
@@ -395,7 +408,7 @@ def write_excel(rows: list[dict[str, Any]], xlsx_path: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Generate core verification cases (AR, shape, atmosphere, refueling, geometry) "
+            "Generate core verification cases (AR, intake/body ratio, shape, atmosphere, refueling, geometry) "
             "and export altitude/mass/Isp ranges to Excel."
         )
     )

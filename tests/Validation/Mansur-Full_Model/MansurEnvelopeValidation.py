@@ -42,6 +42,7 @@ BASE_CONFIG_PATH = ROOT / "src/ariss/core/base_config.toml"
 CONFIG_PATH = HERE / "MansurValidation.toml"
 DATASET_PATH = HERE / "TP Dataset.csv"
 OUTPUT = HERE / "mansur_envelope_validation.png"
+PAGE_FIGSIZE = (13.2, 5.4)
 
 ALT_LEVELS = [150, 155, 160, 165, 170, 180, 190, 200, 220]
 G0 = 9.80665
@@ -102,6 +103,97 @@ def smooth_by_y(x, y, n=300):
     f = PchipInterpolator(y, x)
     ys = np.linspace(y.min(), y.max(), n)
     return f(ys), ys
+
+
+def _paired_model_reference_samples(
+    model_x: np.ndarray,
+    model_y: np.ndarray,
+    ref_x: np.ndarray,
+    ref_y: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    model_x = np.asarray(model_x, dtype=float)
+    model_y = np.asarray(model_y, dtype=float)
+    ref_x = np.asarray(ref_x, dtype=float)
+    ref_y = np.asarray(ref_y, dtype=float)
+
+    valid_model = np.isfinite(model_x) & np.isfinite(model_y)
+    if np.count_nonzero(valid_model) < 2:
+        return None
+
+    model_x = model_x[valid_model]
+    model_y = model_y[valid_model]
+    order = np.argsort(model_x)
+    model_x = model_x[order]
+    model_y = model_y[order]
+
+    model_x_unique, unique_idx = np.unique(model_x, return_index=True)
+    model_y_unique = model_y[unique_idx]
+    if len(model_x_unique) < 2:
+        return None
+
+    line_ids = np.arange(1, len(ref_y) + 1, dtype=int)
+    valid_ref = np.isfinite(ref_x) & np.isfinite(ref_y)
+    if not np.any(valid_ref):
+        return None
+
+    ref_x = ref_x[valid_ref]
+    ref_y = ref_y[valid_ref]
+    line_ids = line_ids[valid_ref]
+
+    x_low = float(np.min(model_x_unique))
+    x_high = float(np.max(model_x_unique))
+    in_range = (ref_x >= x_low) & (ref_x <= x_high)
+    if not np.any(in_range):
+        return None
+
+    ref_x = ref_x[in_range]
+    ref_y = ref_y[in_range]
+    line_ids = line_ids[in_range]
+
+    model_at_ref = np.interp(ref_x, model_x_unique, model_y_unique)
+    return model_at_ref, ref_y, line_ids
+
+
+def _relative_and_corr_stats(
+    model_x: np.ndarray,
+    model_y: np.ndarray,
+    ref_x: np.ndarray,
+    ref_y: np.ndarray,
+) -> tuple[float, float, int, int, float, int] | None:
+    paired = _paired_model_reference_samples(model_x, model_y, ref_x, ref_y)
+    if paired is None:
+        return None
+
+    model_at_ref, ref_y_used, line_ids = paired
+
+    nonzero_ref = np.abs(ref_y_used) > 1.0e-12
+    if np.any(nonzero_ref):
+        relative_error = np.abs(model_at_ref[nonzero_ref] - ref_y_used[nonzero_ref]) / np.abs(ref_y_used[nonzero_ref])
+        rel_line_ids = line_ids[nonzero_ref]
+        i_max = int(np.argmax(relative_error))
+        max_relative_error = float(relative_error[i_max])
+        max_rel_line = int(rel_line_ids[i_max])
+        mean_relative_error = float(np.mean(relative_error))
+        n_rel = int(len(relative_error))
+    else:
+        max_relative_error = float("nan")
+        max_rel_line = -1
+        mean_relative_error = float("nan")
+        n_rel = 0
+
+    if len(model_at_ref) >= 2:
+        pearson_r = float(np.corrcoef(model_at_ref, ref_y_used)[0, 1])
+    else:
+        pearson_r = float("nan")
+
+    return (
+        max_relative_error,
+        mean_relative_error,
+        max_rel_line,
+        n_rel,
+        pearson_r,
+        int(len(model_at_ref)),
+    )
 
 
 def spaced_marker_indices(x, y, n_markers=2, pad_fraction=0.14):
@@ -346,6 +438,37 @@ def plot():
     paper, _ = load_dataset(DATASET_PATH)
     ariss = extract_lines(ISP, alt, tp)
 
+    print("Datapoint relative-error and correlation against Mansur envelope contours:")
+    pearson_values: list[float] = []
+    for h in ALT_LEVELS:
+        if h not in paper or h not in ariss:
+            continue
+        ref_x, ref_y = paper[h]
+        branches = sorted(ariss[h], key=lambda b: len(b[0]), reverse=True)
+        if not branches:
+            print(f"  h={h:>3} km n/a")
+            continue
+        model_x, model_y = branches[0]
+        stats = _relative_and_corr_stats(model_x, model_y, ref_x, ref_y)
+        if stats is None:
+            print(f"  h={h:>3} km n/a")
+            continue
+        max_rel, mean_rel, line_max_rel, n_rel, pearson_r, n_corr = stats
+        line_text = str(line_max_rel) if line_max_rel > 0 else "n/a"
+        print(
+            f"  h={h:>3} km "
+            f"max_relative_error={max_rel:10.6f} ({100.0 * max_rel:7.3f}%) (line {line_text}), "
+            f"mean_relative_error={mean_rel:10.6f} ({100.0 * mean_rel:7.3f}%), "
+            f"pearson_r={pearson_r:9.6f}, n_rel={n_rel}, n_corr={n_corr}"
+        )
+        if np.isfinite(pearson_r):
+            pearson_values.append(pearson_r)
+
+    if pearson_values:
+        print(f"  Minimum Pearson correlation coefficient: {min(pearson_values):.6f}")
+    else:
+        print("  Minimum Pearson correlation coefficient: n/a")
+
     colors = {
         h: plt.cm.viridis(v)
         for h, v in zip(ALT_LEVELS, np.linspace(0.08, 0.95, len(ALT_LEVELS)))
@@ -355,8 +478,8 @@ def plot():
     marker_cycle = ["o", "s", "^", "D", "v", "P", "X", "<", ">"]
     markers = {h: m for h, m in zip(ALT_LEVELS, marker_cycle)}
 
-    fig = plt.figure(figsize=(13.2, 6.0))
-    grid = fig.add_gridspec(1, 2, width_ratios=[1.0, 0.55], wspace=0.06)
+    fig = plt.figure(figsize=PAGE_FIGSIZE)
+    grid = fig.add_gridspec(1, 2, width_ratios=[1.0, 0.72], wspace=0.07)
     ax = fig.add_subplot(grid[0, 0])
     legend_axis = fig.add_subplot(grid[0, 1])
     legend_axis.axis("off")
@@ -471,6 +594,8 @@ def plot():
         bbox_to_anchor=(0.0, 0.72),
         borderaxespad=0.0,
         frameon=False,
+        ncol=2,
+        columnspacing=0.9,
         labelspacing=0.7,
         handlelength=2.5,
         handletextpad=0.6,
@@ -478,8 +603,8 @@ def plot():
     style_legend(leg_alt)
     leg_alt.get_title().set_fontweight("bold")
 
-    fig.subplots_adjust(left=0.09, right=0.98, bottom=0.13, top=0.95, wspace=0.06)
-    fig.savefig(OUTPUT, dpi=1200, bbox_inches="tight")
+    fig.subplots_adjust(left=0.08, right=0.98, bottom=0.12, top=0.95, wspace=0.07)
+    fig.savefig(OUTPUT, dpi=220, bbox_inches="tight")
     plt.close(fig)
 
 

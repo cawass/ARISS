@@ -43,6 +43,50 @@ class MultiSensitivityResult:
     cases: dict[str, SensitivityResult]
 
 
+@dataclass
+class SensitivityRankingParameter:
+    label: str
+    variable_path: str
+
+
+@dataclass
+class SensitivityRankingItem:
+    label: str
+    variable_path: str
+    base_value: float | None
+    minus_value: float | None
+    plus_value: float | None
+    outputs_minus: dict[str, float | None]
+    outputs_plus: dict[str, float | None]
+    s_minus: dict[str, float | None]
+    s_plus: dict[str, float | None]
+    s_central: dict[str, float | None]
+    converged_minus: bool
+    converged_plus: bool
+    error_minus: str | None
+    error_plus: str | None
+
+
+@dataclass
+class SensitivityRank:
+    label: str
+    variable_path: str
+    score: float
+    signed_sensitivity: float
+    method: str
+
+
+@dataclass
+class SensitivityRankingResult:
+    perturbation: float
+    output_paths: list[str]
+    base_outputs: dict[str, float | None]
+    base_converged: bool
+    base_error: str | None
+    items: list[SensitivityRankingItem]
+    ranking: dict[str, list[SensitivityRank]]
+
+
 def get_attr(obj: Any, path: str) -> Any:
     for p in path.split("."):
         obj = getattr(obj, p)
@@ -357,6 +401,402 @@ def run_efficiency_sensitivities(
     return run_multi_sensitivity(
         cases=cases,
         output_paths=output_paths,
+        case_path=case_path,
+        base_config_path=base_config_path,
+        max_iterations=max_iterations,
+    )
+
+
+def _to_finite_float(value: Any) -> float | None:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    return numeric if np.isfinite(numeric) else None
+
+
+def _run_outputs_for_state(
+    sc,
+    output_paths: Sequence[str],
+    *,
+    max_iterations: int,
+) -> tuple[dict[str, float | None], bool, str | None]:
+    # Solve one state and collect requested outputs in display units.
+    outputs = {path: None for path in output_paths}
+    find_min_refuel_time = "refueling.t_refuel" in output_paths
+
+    try:
+        if find_min_refuel_time:
+            final_sc, converged, err_msg = _find_min_refueling_time(
+                sc,
+                max_iterations=max_iterations,
+            )
+            if final_sc is None:
+                return outputs, False, err_msg or "Refueling-time search failed."
+        else:
+            final_sc, converged, _ = _run_single_loop(
+                sc,
+                max_iterations=max_iterations,
+            )
+            err_msg = None
+
+        if not converged:
+            if err_msg is None:
+                try:
+                    final_alt = float(get_attr(final_sc, "orbit.altitude"))
+                    err_msg = f"Non-converged sizing loop (final altitude: {final_alt:.2f} km)"
+                except Exception:
+                    err_msg = "Non-converged sizing loop"
+            return outputs, False, err_msg
+
+        for path in output_paths:
+            raw_value = get_attr(final_sc, path)
+            outputs[path] = _to_finite_float(_to_output_units(path, raw_value))
+
+        return outputs, True, None
+
+    except Exception as exc:
+        return outputs, False, str(exc)
+
+
+def _normalized_sensitivity(
+    y_base: float | None,
+    y_new: float | None,
+    rel_x: float | None,
+) -> float | None:
+    if y_base is None or y_new is None or rel_x is None:
+        return None
+    if abs(y_base) <= 1.0e-20 or abs(rel_x) <= 1.0e-20:
+        return None
+    value = ((y_new - y_base) / y_base) / rel_x
+    return value if np.isfinite(value) else None
+
+
+def _central_normalized_sensitivity(
+    y_base: float | None,
+    y_minus: float | None,
+    y_plus: float | None,
+    perturbation: float,
+) -> float | None:
+    if y_base is None or y_minus is None or y_plus is None:
+        return None
+    if abs(y_base) <= 1.0e-20 or perturbation <= 0.0:
+        return None
+    value = ((y_plus - y_minus) / (2.0 * y_base)) / perturbation
+    return value if np.isfinite(value) else None
+
+
+def _pick_rank_score(
+    central: float | None,
+    minus: float | None,
+    plus: float | None,
+) -> tuple[float, float, str] | None:
+    if central is not None and np.isfinite(central):
+        return abs(central), central, "central"
+
+    side_candidates = [value for value in (minus, plus) if value is not None and np.isfinite(value)]
+    if not side_candidates:
+        return None
+
+    signed = max(side_candidates, key=lambda value: abs(value))
+    return abs(signed), signed, "one-sided"
+
+
+def _normalize_ranking_parameters(
+    parameters: Sequence[SensitivityRankingParameter | Mapping[str, Any] | str],
+) -> list[SensitivityRankingParameter]:
+    normalized: list[SensitivityRankingParameter] = []
+
+    for raw in parameters:
+        if isinstance(raw, SensitivityRankingParameter):
+            normalized.append(raw)
+            continue
+
+        if isinstance(raw, str):
+            path = raw.strip()
+            if not path:
+                raise ValueError("Ranking parameter paths cannot be empty.")
+            normalized.append(SensitivityRankingParameter(label=path, variable_path=path))
+            continue
+
+        if isinstance(raw, Mapping):
+            path = str(raw.get("variable_path", "")).strip()
+            if not path:
+                raise ValueError("Each ranking parameter mapping must include 'variable_path'.")
+            label = str(raw.get("label", path)).strip() or path
+            normalized.append(SensitivityRankingParameter(label=label, variable_path=path))
+            continue
+
+        raise TypeError(
+            "Ranking parameters must be SensitivityRankingParameter, mapping, or dotted-path string."
+        )
+
+    if not normalized:
+        raise ValueError("parameters cannot be empty.")
+
+    return normalized
+
+
+def run_sensitivity_ranking(
+    parameters: Sequence[SensitivityRankingParameter | Mapping[str, Any] | str],
+    output_paths: str | Sequence[str],
+    *,
+    perturbation: float = 0.10,
+    case_path=None,
+    base_config_path=None,
+    max_iterations: int = 200,
+) -> SensitivityRankingResult:
+    # Inputs:
+    #   parameters:
+    #       Parameters to perturb around the baseline. Each item can be:
+    #         - SensitivityRankingParameter(label, variable_path)
+    #         - {"label": "...", "variable_path": "..."}
+    #         - "dotted.path" (label defaults to the path)
+    #   output_paths:
+    #       Output(s) used to compute normalized sensitivity:
+    #       S = (delta_y / y) / (delta_x / x)
+    #   perturbation:
+    #       Relative perturbation (0.10 = +/-10%).
+    #
+    # Output:
+    #   SensitivityRankingResult with raw plus/minus values and ranked scores
+    #   by absolute normalized sensitivity for each output.
+
+    if perturbation <= 0.0:
+        raise ValueError("perturbation must be > 0.")
+
+    if isinstance(output_paths, str):
+        normalized_output_paths = [output_paths]
+    else:
+        normalized_output_paths = list(output_paths)
+
+    if not normalized_output_paths:
+        raise ValueError("output_paths cannot be empty.")
+
+    normalized_parameters = _normalize_ranking_parameters(parameters)
+
+    base_sc = load_spacecraft_from_base_config(
+        case_path=case_path,
+        base_config_path=base_config_path,
+    )
+    base_outputs, base_converged, base_error = _run_outputs_for_state(
+        deepcopy(base_sc),
+        normalized_output_paths,
+        max_iterations=max_iterations,
+    )
+
+    items: list[SensitivityRankingItem] = []
+    for parameter in normalized_parameters:
+        base_value = None
+        minus_value = None
+        plus_value = None
+        outputs_minus = {path: None for path in normalized_output_paths}
+        outputs_plus = {path: None for path in normalized_output_paths}
+        converged_minus = False
+        converged_plus = False
+        error_minus: str | None = None
+        error_plus: str | None = None
+        s_minus = {path: None for path in normalized_output_paths}
+        s_plus = {path: None for path in normalized_output_paths}
+        s_central = {path: None for path in normalized_output_paths}
+
+        try:
+            raw_base_value = get_attr(base_sc, parameter.variable_path)
+            base_value = _to_finite_float(raw_base_value)
+        except Exception as exc:
+            error_minus = f"Failed to read base value: {exc}"
+            error_plus = error_minus
+            items.append(
+                SensitivityRankingItem(
+                    label=parameter.label,
+                    variable_path=parameter.variable_path,
+                    base_value=base_value,
+                    minus_value=minus_value,
+                    plus_value=plus_value,
+                    outputs_minus=outputs_minus,
+                    outputs_plus=outputs_plus,
+                    s_minus=s_minus,
+                    s_plus=s_plus,
+                    s_central=s_central,
+                    converged_minus=converged_minus,
+                    converged_plus=converged_plus,
+                    error_minus=error_minus,
+                    error_plus=error_plus,
+                )
+            )
+            continue
+
+        if base_value is None:
+            error_minus = "Base parameter value is not a finite number."
+            error_plus = error_minus
+            items.append(
+                SensitivityRankingItem(
+                    label=parameter.label,
+                    variable_path=parameter.variable_path,
+                    base_value=base_value,
+                    minus_value=minus_value,
+                    plus_value=plus_value,
+                    outputs_minus=outputs_minus,
+                    outputs_plus=outputs_plus,
+                    s_minus=s_minus,
+                    s_plus=s_plus,
+                    s_central=s_central,
+                    converged_minus=converged_minus,
+                    converged_plus=converged_plus,
+                    error_minus=error_minus,
+                    error_plus=error_plus,
+                )
+            )
+            continue
+
+        if abs(base_value) <= 1.0e-20:
+            error_minus = "Cannot apply multiplicative perturbation to a zero baseline value."
+            error_plus = error_minus
+            items.append(
+                SensitivityRankingItem(
+                    label=parameter.label,
+                    variable_path=parameter.variable_path,
+                    base_value=base_value,
+                    minus_value=minus_value,
+                    plus_value=plus_value,
+                    outputs_minus=outputs_minus,
+                    outputs_plus=outputs_plus,
+                    s_minus=s_minus,
+                    s_plus=s_plus,
+                    s_central=s_central,
+                    converged_minus=converged_minus,
+                    converged_plus=converged_plus,
+                    error_minus=error_minus,
+                    error_plus=error_plus,
+                )
+            )
+            continue
+
+        minus_value = base_value * (1.0 - perturbation)
+        plus_value = base_value * (1.0 + perturbation)
+        rel_minus = (minus_value - base_value) / base_value
+        rel_plus = (plus_value - base_value) / base_value
+
+        sc_minus = deepcopy(base_sc)
+        set_attr(sc_minus, parameter.variable_path, minus_value)
+        outputs_minus, converged_minus, error_minus = _run_outputs_for_state(
+            sc_minus,
+            normalized_output_paths,
+            max_iterations=max_iterations,
+        )
+
+        sc_plus = deepcopy(base_sc)
+        set_attr(sc_plus, parameter.variable_path, plus_value)
+        outputs_plus, converged_plus, error_plus = _run_outputs_for_state(
+            sc_plus,
+            normalized_output_paths,
+            max_iterations=max_iterations,
+        )
+
+        for path in normalized_output_paths:
+            y_base = _to_finite_float(base_outputs.get(path))
+            y_minus = _to_finite_float(outputs_minus.get(path))
+            y_plus = _to_finite_float(outputs_plus.get(path))
+            s_minus[path] = _normalized_sensitivity(y_base, y_minus, rel_minus)
+            s_plus[path] = _normalized_sensitivity(y_base, y_plus, rel_plus)
+            s_central[path] = _central_normalized_sensitivity(
+                y_base,
+                y_minus,
+                y_plus,
+                perturbation,
+            )
+
+        items.append(
+            SensitivityRankingItem(
+                label=parameter.label,
+                variable_path=parameter.variable_path,
+                base_value=base_value,
+                minus_value=minus_value,
+                plus_value=plus_value,
+                outputs_minus=outputs_minus,
+                outputs_plus=outputs_plus,
+                s_minus=s_minus,
+                s_plus=s_plus,
+                s_central=s_central,
+                converged_minus=converged_minus,
+                converged_plus=converged_plus,
+                error_minus=error_minus,
+                error_plus=error_plus,
+            )
+        )
+
+    ranking: dict[str, list[SensitivityRank]] = {}
+    for path in normalized_output_paths:
+        ranks: list[SensitivityRank] = []
+        for item in items:
+            rank_score = _pick_rank_score(
+                item.s_central.get(path),
+                item.s_minus.get(path),
+                item.s_plus.get(path),
+            )
+            if rank_score is None:
+                continue
+
+            score, signed_sensitivity, method = rank_score
+            ranks.append(
+                SensitivityRank(
+                    label=item.label,
+                    variable_path=item.variable_path,
+                    score=score,
+                    signed_sensitivity=signed_sensitivity,
+                    method=method,
+                )
+            )
+
+        ranking[path] = sorted(
+            ranks,
+            key=lambda rank: rank.score,
+            reverse=True,
+        )
+
+    return SensitivityRankingResult(
+        perturbation=float(perturbation),
+        output_paths=normalized_output_paths,
+        base_outputs=base_outputs,
+        base_converged=base_converged,
+        base_error=base_error,
+        items=items,
+        ranking=ranking,
+    )
+
+
+def run_efficiency_sensitivity_ranking(
+    output_paths: str | Sequence[str],
+    *,
+    perturbation: float = 0.10,
+    epsilon_path: str = "geometry.epsilon_body",
+    case_path=None,
+    base_config_path=None,
+    max_iterations: int = 200,
+) -> SensitivityRankingResult:
+    # Convenience ranking for the four common efficiency-style parameters.
+    parameters = [
+        SensitivityRankingParameter(
+            label="Thruster efficiency",
+            variable_path="thruster.eff",
+        ),
+        SensitivityRankingParameter(
+            label="Collection efficiency",
+            variable_path="refueling.coll_eff",
+        ),
+        SensitivityRankingParameter(
+            label="Accommodation coefficient",
+            variable_path=epsilon_path,
+        ),
+        SensitivityRankingParameter(
+            label="Solar-cell efficiency",
+            variable_path="solar.eta_solar",
+        ),
+    ]
+    return run_sensitivity_ranking(
+        parameters=parameters,
+        output_paths=output_paths,
+        perturbation=perturbation,
         case_path=case_path,
         base_config_path=base_config_path,
         max_iterations=max_iterations,

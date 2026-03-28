@@ -38,17 +38,17 @@ MPL_RC = {
     "axes.edgecolor": "#444444",
     "axes.linewidth": 0.8,
     "axes.labelcolor": "#111111",
-    "axes.titlesize": 14,
-    "axes.labelsize": 11,
+    "axes.titlesize": 12,
+    "axes.labelsize": 12,
     "xtick.color": "#4A4A4A",
     "ytick.color": "#4A4A4A",
-    "xtick.labelsize": 9,
-    "ytick.labelsize": 9,
+    "xtick.labelsize": 12,
+    "ytick.labelsize": 12,
     "text.color": "#111111",
     "font.family": "sans-serif",
     "font.sans-serif": ["DejaVu Sans", "Arial", "Helvetica"],
     "legend.frameon": False,
-    "legend.fontsize": 10,
+    "legend.fontsize": 12,
     "grid.color": "#D8D8D8",
     "grid.linewidth": 0.6,
     "grid.alpha": 0.6,
@@ -68,7 +68,7 @@ def style_axis(axis, *, grid: bool = True, boxed: bool = False) -> None:
     else:
         axis.grid(False)
 
-    axis.tick_params(colors=PALETTE["secondary_text"], labelsize=9, width=0.8)
+    axis.tick_params(colors=PALETTE["secondary_text"], labelsize=12, width=0.8)
     axis.xaxis.label.set_color(PALETTE["primary_text"])
     axis.yaxis.label.set_color(PALETTE["primary_text"])
     axis.title.set_color(PALETTE["primary_text"])

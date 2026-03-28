@@ -435,6 +435,7 @@ class SpacecraftState:
             "thermal.epsilon_therm_rad": self.thermal.epsilon_therm_rad,
 
             "mission_profile.active_refueling": self.mission_profile.active_refueling,
+            "mission_profile.active_and_bypass": self.mission_profile.active_and_bypass,
             "mission_profile.delta_v": self.mission_profile.delta_v,
             "mission_profile.required_fuel": self.mission_profile.required_fuel,
         }
@@ -563,6 +564,7 @@ class SpacecraftState:
             "thermal.epsilon_therm_rad": {"min": 0.0, "max": 1.0},
 
             "mission_profile.active_refueling": {"kind": "bool"},
+            "mission_profile.active_and_bypass": {"kind": "bool"},
             "mission_profile.delta_v": {"min": 0.0, "max": 1.0e7},
             "mission_profile.required_fuel": {"min": 0.0, "max": 1.0e9},
         }
@@ -609,6 +611,26 @@ class SpacecraftState:
                 "Invalid geometry mode: geometry.use_intake_area_ratio and "
                 "geometry.fixed_body cannot both be false."
             )
+
+        if isinstance(self.mission_profile.active_refueling, bool) and isinstance(
+            self.mission_profile.active_and_bypass, bool
+        ):
+            allowed_refueling_modes = {
+                (False, False),  # off
+                (True, False),   # active_tank_only
+                (True, True),    # active_with_bypass
+            }
+            refueling_mode = (
+                self.mission_profile.active_refueling,
+                self.mission_profile.active_and_bypass,
+            )
+            if refueling_mode not in allowed_refueling_modes:
+                errors.append(
+                    "Invalid refueling mode: allowed modes are "
+                    "(active_refueling=false, active_and_bypass=false), "
+                    "(active_refueling=true, active_and_bypass=false), and "
+                    "(active_refueling=true, active_and_bypass=true)."
+                )
 
         if errors:
             raise ValueError("SpacecraftState bound check failed:\n - " + "\n - ".join(errors))

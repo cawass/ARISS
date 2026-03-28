@@ -35,7 +35,7 @@ A_body = 0.01
 A_in = 0.01
 A_ref = 0.0
 A_prop = 0.0035
-A_in_drag = 0.01
+A_in_drag = 0.0065
 A_rad = 0.0
 A_solar = 0.12
 t_solar = 0.00166
@@ -50,6 +50,8 @@ epsilon_rad = 0.0
 
 [thruster]
 power = 44.21                # Total DC power for the three thrusters
+specific_impulse = 2000
+eff = 0.45
 
 [solar]
 av_aligment = 0.0

@@ -61,11 +61,25 @@ def run_sensitivity(*args: Any, **kwargs: Any):
     return _run_sensitivity(*args, **kwargs)
 
 
+def run_sensitivity_ranking(*args: Any, **kwargs: Any):
+    from ariss.core.sensitivity import run_sensitivity_ranking as _run_sensitivity_ranking
+
+    return _run_sensitivity_ranking(*args, **kwargs)
+
+
+def run_efficiency_sensitivity_ranking(*args: Any, **kwargs: Any):
+    from ariss.core.sensitivity import run_efficiency_sensitivity_ranking as _run_efficiency_sensitivity_ranking
+
+    return _run_efficiency_sensitivity_ranking(*args, **kwargs)
+
+
 __all__ = [
     "SpacecraftState",
     "launch_history_ui",
     "load_spacecraft",
     "plot_simulation_history",
+    "run_efficiency_sensitivity_ranking",
     "run_sensitivity",
+    "run_sensitivity_ranking",
     "run_simulation",
 ]
