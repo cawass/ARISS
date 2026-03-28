@@ -46,7 +46,7 @@ from ariss.core.simulation import load_spacecraft_from_base_config
 from ariss.modules.Drag import drag_model
 from ariss.modules.Propulsion import _side_areas
 from ariss.utils import constants as const
-from ariss.utils.atmosphere import orbit_updates_from_height
+from ariss.utils.atmosphere import atmospheric_properties_from_height
 from plot_style import PALETTE, apply_validation_style, style_axis, style_legend
 
 
@@ -116,7 +116,7 @@ def compute_ariss_body_cd_curve(
     sc = load_spacecraft_from_base_config(config_path)
 
     # Use a GOCE-like reference atmosphere state (single point), then map S0 -> V.
-    orbit_update = orbit_updates_from_height(
+    properties = atmospheric_properties_from_height(
         sc.orbit.altitude,
         msis_date=sc.orbit.msis_date,
         msis_f107=sc.orbit.msis_f107,
@@ -125,8 +125,8 @@ def compute_ariss_body_cd_curve(
         longitude=sc.orbit.longitude,
         use_average=sc.orbit.use_average,
     )
-    sc.orbit.temperature = float(orbit_update["temperature"])
-    sc.orbit.molar_mass = float(orbit_update["molar_mass"])
+    sc.orbit.temperature = float(properties["temperature"])
+    sc.orbit.molar_mass = float(properties["molar_mass"])
 
     # Fig. 5 compares body free-molecular drag coefficient referenced to GOCE
     # front area (A_ref), including frontal and skin-friction contributions.

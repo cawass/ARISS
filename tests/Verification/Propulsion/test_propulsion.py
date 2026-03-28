@@ -32,13 +32,14 @@ from ariss.modules.Propulsion import propulsion_model
 from ariss.utils import constants as const
 
 
-def _stub_orbit_updates_from_density(_density: float, **_kwargs) -> dict[str, float]:
+def _stub_atmosphere_properties_from_density(_density: float, **_kwargs) -> dict[str, float]:
     return {
+        "altitude_km": 150.0,
         "altitude": 150.0,
         "temperature": 300.0,
         "molar_mass": 0.028,
-        "velocity": 100.0,
-        "R_spec": 287.0,
+        "orbital_velocity": 100.0,
+        "specific_gas_constant": 287.0,
     }
 
 
@@ -82,7 +83,7 @@ def test_fixed_body_ratio_mode_preserves_body_area_and_imposes_intake_ratio(monk
     # Outputs:
     #   Ensures ratio mode keeps A_body fixed and splits A_in by collection efficiency.
 
-    monkeypatch.setattr(propulsion_module, "orbit_updates_from_density", _stub_orbit_updates_from_density)
+    monkeypatch.setattr(propulsion_module, "atmosphere_properties_from_density", _stub_atmosphere_properties_from_density)
 
     sc = _build_propulsion_state()
     sc.geometry.use_intake_area_ratio = True
@@ -107,7 +108,7 @@ def test_variable_body_ratio_mode_rebuilds_body_area_from_solved_intake(monkeypa
     # Outputs:
     #   Ensures solved A_in updates A_body through the configured intake-area ratio.
 
-    monkeypatch.setattr(propulsion_module, "orbit_updates_from_density", _stub_orbit_updates_from_density)
+    monkeypatch.setattr(propulsion_module, "atmosphere_properties_from_density", _stub_atmosphere_properties_from_density)
 
     sc = _build_propulsion_state()
     sc.geometry.use_intake_area_ratio = True
@@ -130,7 +131,7 @@ def test_free_intake_mode_keeps_body_area_unchanged(monkeypatch: pytest.MonkeyPa
     # Outputs:
     #   Ensures the legacy collection-efficiency split does not modify A_body.
 
-    monkeypatch.setattr(propulsion_module, "orbit_updates_from_density", _stub_orbit_updates_from_density)
+    monkeypatch.setattr(propulsion_module, "atmosphere_properties_from_density", _stub_atmosphere_properties_from_density)
 
     sc = _build_propulsion_state()
     sc.geometry.use_intake_area_ratio = False

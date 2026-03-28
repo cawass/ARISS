@@ -47,7 +47,7 @@ from ariss.modules.Drag import drag_model   # <-- REQUIRED
 from ariss.core.spacecraft import GeometryState, SpacecraftState
 from ariss.modules.Thermal import ThermalDiagnostics, thermal_model
 from ariss.utils import constants as const
-from ariss.utils.atmosphere import atmosphere_properties_from_height, atmos
+from ariss.utils.atmosphere import atmospheric_properties_from_height
 
 def compute_drag_diagnostics(sc: SpacecraftState) -> SpacecraftState:
     """
@@ -983,14 +983,22 @@ class _HistoryPlotterUI:
         key = (str(getattr(state.orbit, "msis_date", "2000-01-01T00:00:00")), _safe_float(getattr(state.orbit, "msis_f107", 140.0)), _safe_float(getattr(state.orbit, "msis_ap", 15.0)), _safe_float(getattr(state.orbit, "latitude", 0.0)), _safe_float(getattr(state.orbit, "longitude", 0.0)), bool(getattr(state.orbit, "use_average", False)))
         if key not in self.atmosphere_profile_cache:
             altitude_km = np.linspace(80.0, 1000.0, 600)
-            total_density, _temperature, r_specific, o2_density, n2_density, o_density = atmos(altitude_km, msis_date=key[0], msis_f107=key[1], msis_ap=key[2], latitude=key[3], longitude=key[4], use_average=key[5])
+            properties = atmospheric_properties_from_height(
+                altitude_km,
+                msis_date=key[0],
+                msis_f107=key[1],
+                msis_ap=key[2],
+                latitude=key[3],
+                longitude=key[4],
+                use_average=key[5],
+            )
             self.atmosphere_profile_cache[key] = {
                 "altitude_km": np.asarray(altitude_km, dtype=float),
-                "total_density": np.maximum(np.asarray(total_density, dtype=float), 1.0e-30),
-                "r_specific": np.asarray(r_specific, dtype=float),
-                "o2_density": np.maximum(np.asarray(o2_density, dtype=float), 1.0e-30),
-                "n2_density": np.maximum(np.asarray(n2_density, dtype=float), 1.0e-30),
-                "o_density": np.maximum(np.asarray(o_density, dtype=float), 1.0e-30),
+                "total_density": np.maximum(np.asarray(properties["density"], dtype=float), 1.0e-30),
+                "r_specific": np.asarray(properties["specific_gas_constant"], dtype=float),
+                "o2_density": np.maximum(np.asarray(properties["o2_density"], dtype=float), 1.0e-30),
+                "n2_density": np.maximum(np.asarray(properties["n2_density"], dtype=float), 1.0e-30),
+                "o_density": np.maximum(np.asarray(properties["o_density"], dtype=float), 1.0e-30),
             }
         return self.atmosphere_profile_cache[key]
 
@@ -1133,7 +1141,16 @@ class _HistoryPlotterUI:
         figure.clear()
 
         try:
-            properties, profile = atmosphere_properties_from_height(altitude_km, msis_date=state.orbit.msis_date, msis_f107=state.orbit.msis_f107, msis_ap=state.orbit.msis_ap, latitude=state.orbit.latitude, longitude=state.orbit.longitude, use_average=state.orbit.use_average), self._get_atmosphere_profile(state)
+            properties = atmospheric_properties_from_height(
+                altitude_km,
+                msis_date=state.orbit.msis_date,
+                msis_f107=state.orbit.msis_f107,
+                msis_ap=state.orbit.msis_ap,
+                latitude=state.orbit.latitude,
+                longitude=state.orbit.longitude,
+                use_average=state.orbit.use_average,
+            )
+            profile = self._get_atmosphere_profile(state)
             composition_axis, r_axis = figure.subplots(2, 1, sharex=True, squeeze=True)
             _style_2d_axis(composition_axis)
             _style_2d_axis(r_axis)

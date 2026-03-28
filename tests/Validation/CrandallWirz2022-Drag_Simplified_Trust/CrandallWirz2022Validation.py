@@ -51,7 +51,7 @@ from ariss.core.simulation import load_spacecraft_from_base_config
 from ariss.modules.Drag import drag_model
 from ariss.modules.Propulsion import _panel_front_area, _side_areas
 from ariss.utils import constants as const
-from ariss.utils.atmosphere import atmos, calculate_orbital_velocity
+from ariss.utils.atmosphere import atmospheric_properties_from_height
 from plot_style import PALETTE, apply_validation_style, style_axis, style_legend
 
 
@@ -204,7 +204,7 @@ def _run_drag_sweep(config_path: Path, altitudes_km: np.ndarray) -> dict[str, np
     base_sc = load_spacecraft_from_base_config(config_path)
     base_sc.geometry.A_in_drag = base_sc.geometry.A_in
 
-    density, temperature, r_specific, _, _, _ = atmos(
+    properties = atmospheric_properties_from_height(
         altitudes_km,
         msis_date=base_sc.orbit.msis_date,
         msis_f107=base_sc.orbit.msis_f107,
@@ -213,8 +213,10 @@ def _run_drag_sweep(config_path: Path, altitudes_km: np.ndarray) -> dict[str, np
         longitude=base_sc.orbit.longitude,
         use_average=base_sc.orbit.use_average,
     )
-    velocity = calculate_orbital_velocity(altitudes_km)
-    molar_mass = const.UNIVERSAL_GAS / np.maximum(r_specific, 1.0e-30)
+    density = np.asarray(properties["density"], dtype=float)
+    temperature = np.asarray(properties["temperature"], dtype=float)
+    velocity = np.asarray(properties["orbital_velocity"], dtype=float)
+    molar_mass = np.asarray(properties["molar_mass"], dtype=float)
 
     output = {
         "altitude": np.asarray(altitudes_km, dtype=float),

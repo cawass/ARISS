@@ -34,7 +34,7 @@ from ariss.core.simulation import run_sizing_loop
 from ariss.core.spacecraft import SpacecraftState
 from ariss.modules.Drag import drag_model
 from ariss.modules.Propulsion import propulsion_model
-from ariss.utils.atmosphere import orbit_updates_from_height
+from ariss.utils.atmosphere import atmospheric_properties_from_height
 from tests.Verification._cases import (
     build_spacecraft_from_case,
     verification_case_paths,
@@ -48,12 +48,20 @@ CONFIG_PATHS = verification_case_paths(CONFIG_DIR)
 def _build_state(config_path: Path) -> SpacecraftState:
     sc = build_spacecraft_from_case(config_path)
     try:
-        updates = orbit_updates_from_height(
+        properties = atmospheric_properties_from_height(
             sc.orbit.altitude,
             msis_date=sc.orbit.msis_date,
             msis_f107=sc.orbit.msis_f107,
             msis_ap=sc.orbit.msis_ap,
         )
+        updates = {
+            "altitude": float(properties["altitude_km"]),
+            "density": float(properties["density"]),
+            "temperature": float(properties["temperature"]),
+            "molar_mass": float(properties["molar_mass"]),
+            "velocity": float(properties["orbital_velocity"]),
+            "R_spec": float(properties["specific_gas_constant"]),
+        }
     except ImportError:
         pytest.skip("pymsis is required for propulsion value tests.")
     for key, value in updates.items():
@@ -129,4 +137,3 @@ def test_converged_thrust_matches_required_drag_for_all_configs(config_path: Pat
         rel=1.0e-3,
         abs=1.0e-8,
     ), f"Thrust/load mismatch for {config_path.name}"
-

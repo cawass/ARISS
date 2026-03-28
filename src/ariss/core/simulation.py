@@ -36,7 +36,7 @@ from ariss.modules.Power import power_model
 from ariss.modules.Propulsion import propulsion_model
 from ariss.modules.Refueling import refueling_model
 from ariss.modules.Thermal import thermal_model
-from ariss.utils.atmosphere import orbit_updates_from_height
+from ariss.utils.atmosphere import atmospheric_properties_from_height
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -115,12 +115,27 @@ def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_to
     # Convergence condition:
     #   All residuals must be below their tolerances and i > 10
     #
-    # Orbit updates are computed from:
-    #   orbit_updates_from_height(h)
+    # Orbit updates are computed directly from atmospheric_properties_from_height(h).
 
     # Initialize the orbit-dependent atmospheric properties from the starting
     # mission altitude before entering the iterative sizing loop.
-    orbit_updates = orbit_updates_from_height(loop_sc.orbit.altitude, msis_date=loop_sc.orbit.msis_date, msis_f107=loop_sc.orbit.msis_f107, msis_ap=loop_sc.orbit.msis_ap, latitude=loop_sc.orbit.latitude, longitude=loop_sc.orbit.longitude, use_average=loop_sc.orbit.use_average)
+    properties = atmospheric_properties_from_height(
+        loop_sc.orbit.altitude,
+        msis_date=loop_sc.orbit.msis_date,
+        msis_f107=loop_sc.orbit.msis_f107,
+        msis_ap=loop_sc.orbit.msis_ap,
+        latitude=loop_sc.orbit.latitude,
+        longitude=loop_sc.orbit.longitude,
+        use_average=loop_sc.orbit.use_average,
+    )
+    orbit_updates = {
+        "altitude": float(properties["altitude_km"]),
+        "density": float(properties["density"]),
+        "temperature": float(properties["temperature"]),
+        "molar_mass": float(properties["molar_mass"]),
+        "velocity": float(properties["orbital_velocity"]),
+        "R_spec": float(properties["specific_gas_constant"]),
+    }
     loop_sc = replace(loop_sc, orbit=replace(loop_sc.orbit, **orbit_updates))
 
     # Prepare the iteration history and convergence trackers.

@@ -31,7 +31,7 @@ if str(SRC) not in sys.path:
 from ariss.core.spacecraft import SpacecraftState
 from ariss.modules.Drag import drag_model
 from ariss.modules.Propulsion import propulsion_model
-from ariss.utils.atmosphere import orbit_updates_from_height
+from ariss.utils.atmosphere import atmospheric_properties_from_height
 from tests.Verification._cases import (
     build_spacecraft_from_case,
     verification_case_paths,
@@ -51,12 +51,20 @@ def _build_state(config_path: Path) -> SpacecraftState:
     #   atmosphere-dependent orbit values filled from altitude.
     sc = build_spacecraft_from_case(config_path)
     try:
-        updates = orbit_updates_from_height(
+        properties = atmospheric_properties_from_height(
             sc.orbit.altitude,
             msis_date=sc.orbit.msis_date,
             msis_f107=sc.orbit.msis_f107,
             msis_ap=sc.orbit.msis_ap,
         )
+        updates = {
+            "altitude": float(properties["altitude_km"]),
+            "density": float(properties["density"]),
+            "temperature": float(properties["temperature"]),
+            "molar_mass": float(properties["molar_mass"]),
+            "velocity": float(properties["orbital_velocity"]),
+            "R_spec": float(properties["specific_gas_constant"]),
+        }
     except ImportError:
         pytest.skip("pymsis is required for drag/propulsion value tests.")
 

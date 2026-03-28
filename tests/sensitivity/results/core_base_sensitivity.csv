@@ -1,0 +1,15 @@
+input,path,base_value,minus_value,plus_value,S_h,S_t_ref,S_h_normalized,S_t_ref_normalized,error
+eta_solar,solar.eta_solar,0.2,0.18000000000000002,0.22000000000000003,-1.134121e+02,-2.160396e+00,-1.422523e-01,-5.538140e-02,
+eta_prop,thruster.eff,0.5,0.45,0.55,-4.955317e+01,-1.598933e+01,-1.553858e-01,-1.024710e+00,
+eta_coll,refueling.coll_eff,0.45,0.405,0.49500000000000005,-3.974343e+01,-3.230222e+01,-1.121625e-01,-1.863140e+00,
+eta_ref,refueling.eta_refuel,0.061,0.0549,0.0671,0.000000e+00,-6.682327e-02,0.000000e+00,-5.224660e-04,
+eta_elec,solar.eta_power,1.0,0.9,1.1,N/A,N/A,N/A,N/A,"SpacecraftState bound check failed:
+ - solar.eta_power must be between 0.0 and 1.0, got 1.1 | SpacecraftState bound check failed:
+ - solar.eta_power must be between 0.0 and 1.0, got 1.1"
+epsilon,geometry.epsilon_body,0.1,0.09000000000000001,0.11000000000000001,-1.801417e+00,-3.872409e-01,-1.129754e-03,-4.963427e-03,
+P_prop,thruster.power,2000.0,1800.0,2200.0,-1.049318e-03,-3.842313e-03,-1.316155e-02,-9.849704e-01,
+I_sp,thruster.specific_impulse,5455.0,4909.5,6000.500000000001,1.442117e-03,-1.040987e-03,4.933613e-02,-7.278474e-01,
+chi,geometry.intake_area_ratio,2.0,1.8,2.2,-6.464054e-01,-4.758986e-01,-8.107832e-03,-1.219958e-01,
+AR_in,geometry.AR_in,1.0,0.9,1.1,-1.412857e+00,-4.891464e-02,-8.860698e-03,-6.269592e-03,
+AR_solar,geometry.AR_solar,0.5,0.45,0.55,0.000000e+00,0.000000e+00,0.000000e+00,0.000000e+00,
+T_des,thermal.T_des,320.0,288.0,352.0,-1.387367e-01,-2.413886e-03,-2.784269e-01,-9.900731e-02,

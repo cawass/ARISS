@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from os import PathLike
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 from ariss.core.spacecraft import SpacecraftState
 
@@ -56,9 +56,15 @@ def run_simulation(
 
 
 def run_sensitivity(*args: Any, **kwargs: Any):
-    from ariss.core.sensitivity import run_sensitivity as _run_sensitivity
+    from ariss.core.sensitivity import run_sensitivity_analysis as _run_sensitivity
 
     return _run_sensitivity(*args, **kwargs)
+
+
+def run_core_sensitivity(*args: Any, **kwargs: Any):
+    from ariss.core.sensitivity import core_sensitivity as _run_core_sensitivity
+
+    return _run_core_sensitivity(*args, **kwargs)
 
 
 def run_sensitivity_ranking(*args: Any, **kwargs: Any):
@@ -67,10 +73,33 @@ def run_sensitivity_ranking(*args: Any, **kwargs: Any):
     return _run_sensitivity_ranking(*args, **kwargs)
 
 
-def run_efficiency_sensitivity_ranking(*args: Any, **kwargs: Any):
-    from ariss.core.sensitivity import run_efficiency_sensitivity_ranking as _run_efficiency_sensitivity_ranking
+def run_efficiency_sensitivity_ranking(
+    output_paths: str | Sequence[str],
+    *,
+    perturbation: float = 0.10,
+    epsilon_path: str = "geometry.epsilon_body",
+    case_path=None,
+    base_config_path=None,
+    max_iterations: int = 200,
+):
+    from ariss.core.sensitivity import (
+        run_sensitivity_ranking as _run_sensitivity_ranking,
+    )
 
-    return _run_efficiency_sensitivity_ranking(*args, **kwargs)
+    parameters = [
+        {"label": "Thruster efficiency", "variable_path": "thruster.eff"},
+        {"label": "Collection efficiency", "variable_path": "refueling.coll_eff"},
+        {"label": "Accommodation coefficient", "variable_path": epsilon_path},
+        {"label": "Solar-cell efficiency", "variable_path": "solar.eta_solar"},
+    ]
+    return _run_sensitivity_ranking(
+        parameters=parameters,
+        output_paths=output_paths,
+        perturbation=perturbation,
+        case_path=case_path,
+        base_config_path=base_config_path,
+        max_iterations=max_iterations,
+    )
 
 
 __all__ = [
@@ -79,6 +108,7 @@ __all__ = [
     "load_spacecraft",
     "plot_simulation_history",
     "run_efficiency_sensitivity_ranking",
+    "run_core_sensitivity",
     "run_sensitivity",
     "run_sensitivity_ranking",
     "run_simulation",

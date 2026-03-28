@@ -1,6 +1,5 @@
 import numpy as np
-import pymsis as msis
-from ariss.utils.atmosphere import sample_atmosphere_at_height
+from ariss.utils.atmosphere import atmospheric_properties_from_height
 
 ### Refuelling data from thermodiver
 
@@ -12,12 +11,21 @@ collection_efficiency = 0.636 # [-]
 h_orb = 188.0151 # [km]
 
 ### Atmos/mission data
-mission_data = sample_atmosphere_at_height(h_orb)
+properties = atmospheric_properties_from_height(h_orb)
+mission_data = {
+    "o_density": float(properties["o_density"]),
+    "n2_density": float(properties["n2_density"]),
+    "o2_density": float(properties["o2_density"]),
+    "specific_gas_constant": float(properties["specific_gas_constant"]),
+    "density": float(properties["density"]),
+    "temperature": float(properties["temperature"]),
+    "orbital_velocity": float(properties["orbital_velocity"]),
+}
 
 # Calculate mole fractions to find specific heat ratio (gamma)
-n_o = mission_data.o_density / 15.999e-3
-n_n2 = mission_data.n2_density / 28.0134e-3
-n_o2 = mission_data.o2_density / 31.9988e-3
+n_o = mission_data["o_density"] / 15.999e-3
+n_n2 = mission_data["n2_density"] / 28.0134e-3
+n_o2 = mission_data["o2_density"] / 31.9988e-3
 n_total = n_o + n_n2 + n_o2
 x_mono = n_o / n_total if n_total > 0 else 0
 
@@ -25,10 +33,10 @@ x_mono = n_o / n_total if n_total > 0 else 0
 # gamma = C_p / C_v = (5/2 * x_mono + 7/2 * x_dia) / (3/2 * x_mono + 5/2 * x_dia)
 gamma = (7 - 2 * x_mono) / (5 - 2 * x_mono) # 1.512
 
-R_spec = mission_data.specific_gas_constant
-p_orb = mission_data.density * R_spec * mission_data.temperature # [Pa]
-rho_orb = mission_data.density # [kg/m^3]
-v_orb = mission_data.orbital_velocity # [m/s]
+R_spec = mission_data["specific_gas_constant"]
+p_orb = mission_data["density"] * R_spec * mission_data["temperature"] # [Pa]
+rho_orb = mission_data["density"] # [kg/m^3]
+v_orb = mission_data["orbital_velocity"] # [m/s]
 
 print(f"gamma: {gamma}")
 print(f"R_spec: {R_spec}")
@@ -58,8 +66,8 @@ import matplotlib.pyplot as plt
 h_orb = np.linspace(150, 500, 100)
 R_spec = np.zeros(len(h_orb))
 for i, h in enumerate(h_orb):
-    mission_data = sample_atmosphere_at_height(h)
-    R_spec[i] = mission_data.specific_gas_constant
+    properties = atmospheric_properties_from_height(h)
+    R_spec[i] = float(properties["specific_gas_constant"])
 
 plt.plot(h_orb, R_spec)
 plt.xlabel("Altitude [km]")

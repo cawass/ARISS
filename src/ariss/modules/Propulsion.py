@@ -16,12 +16,11 @@
 # ============================================================================
 
 from dataclasses import dataclass
-from operator import itemgetter
 
 import numpy as np
 
 from ariss.utils import constants as const
-from ariss.utils.atmosphere import orbit_updates_from_density
+from ariss.utils.atmosphere import atmosphere_properties_from_density
 
 # ============================================================================== #
 #  HELPERS
@@ -159,7 +158,20 @@ def _update_orbit_from_density(sc) -> None:
     # Outputs:
     #   Updates altitude, temperature, molar mass, and velocity from density.
 
-    sc.orbit.altitude, sc.orbit.temperature, sc.orbit.molar_mass, sc.orbit.velocity, sc.orbit.R_spec = itemgetter("altitude", "temperature", "molar_mass", "velocity", "R_spec")(orbit_updates_from_density(sc.orbit.density,msis_date=sc.orbit.msis_date,msis_f107=sc.orbit.msis_f107,msis_ap=sc.orbit.msis_ap,latitude=sc.orbit.latitude,longitude=sc.orbit.longitude,use_average=sc.orbit.use_average,))
+    properties = atmosphere_properties_from_density(
+        sc.orbit.density,
+        msis_date=sc.orbit.msis_date,
+        msis_f107=sc.orbit.msis_f107,
+        msis_ap=sc.orbit.msis_ap,
+        latitude=sc.orbit.latitude,
+        longitude=sc.orbit.longitude,
+        use_average=sc.orbit.use_average,
+    )
+    sc.orbit.altitude = properties["altitude_km"]
+    sc.orbit.temperature = properties["temperature"]
+    sc.orbit.molar_mass = properties["molar_mass"]
+    sc.orbit.velocity = properties["orbital_velocity"]
+    sc.orbit.R_spec = properties["specific_gas_constant"]
 
 
 def _update_intake_split_from_collection_efficiency(sc) -> None:
