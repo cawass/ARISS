@@ -38,6 +38,7 @@ def _stub_orbit_updates_from_density(_density: float, **_kwargs) -> dict[str, fl
         "temperature": 300.0,
         "molar_mass": 0.028,
         "velocity": 100.0,
+        "R_spec": 287.0,
     }
 
 

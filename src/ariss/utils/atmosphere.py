@@ -125,6 +125,7 @@ class AtmosphereSample:
             "temperature": self.temperature,
             "molar_mass": self.molar_mass,
             "velocity": self.orbital_velocity,
+            "R_spec": self.specific_gas_constant,
         }
 
     def to_properties(self) -> dict[str, float]:

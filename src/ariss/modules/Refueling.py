@@ -18,6 +18,8 @@
 #  Author:         Lucas Calderon del Rio, Carlos Carrasco Requejo
 # ============================================================================
 
+import numpy as np
+
 from ariss.core.spacecraft import SpacecraftState
 
 def refueling_model(sc: SpacecraftState) -> float:
@@ -33,8 +35,8 @@ def refueling_model(sc: SpacecraftState) -> float:
         else:
             m_dot_b = sc.refueling.m_flow
 
-        # Power required to compress the refueling mass flow to tank pressure.
-        sc.power.Power_refprop = 1 / sc.refueling.eta_refuel * 1 / (sc.orbit.gamma - 1) * m_dot_b * sc.orbit.R_spec * sc.thermal.T_des * ((sc.refueling.p_tank / sc.orbit.p_orb) ** ((sc.orbit.gamma - 1) / sc.orbit.gamma) - 1)
+        # Power required to compress the refueling mass flow to tank pressure (isothermal).
+        sc.power.Power_refprop = 1 / sc.refueling.eta_refuel * m_dot_b * sc.orbit.R_spec * sc.thermal.T_des * np.log(sc.refueling.p_tank / sc.orbit.p_orb)
 
         # Ideal-gas storage volume at design temperature and tank pressure.
         sc.refueling.V_prop = sc.mass.Mass_prop * sc.orbit.R_spec * sc.thermal.T_des / sc.refueling.p_tank

@@ -89,6 +89,6 @@ def test_refueling_active_value_range(config_path: Path) -> None:
     power_refprop = refueling_model(sc)
 
     _assert_in_range("Power_refprop", power_refprop, 1, 10.0e5)
-    _assert_in_range("V_prop", sc.refueling.V_prop, 0.1, 5.0)
+    _assert_in_range("V_prop", sc.refueling.V_prop, 0.01, 10.0)
     assert sc.power.Power_refprop == pytest.approx(power_refprop, rel=1.0e-12, abs=1.0e-12)
 

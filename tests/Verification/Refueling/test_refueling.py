@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import numpy as np
 
 ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "src"
@@ -61,7 +62,6 @@ def test_refueling_model_matches_compression_power_and_tank_volume_formula() -> 
     sc.thruster.m_flow = 1.0e-4
     sc.refueling.eta_refuel = 0.25
     sc.refueling.p_tank = 1.0e5
-    sc.orbit.gamma = 1.4
     sc.orbit.R_spec = 300.0
     sc.orbit.p_orb = 50.0
     sc.mass.Mass_prop = 6.0
@@ -73,11 +73,7 @@ def test_refueling_model_matches_compression_power_and_tank_volume_formula() -> 
         m_dot_b = sc.refueling.m_flow
 
     expected_power = (
-        m_dot_b
-        * sc.orbit.R_spec
-        * sc.thermal.T_des
-        * ((sc.refueling.p_tank / sc.orbit.p_orb) ** ((sc.orbit.gamma - 1.0) / sc.orbit.gamma) - 1.0)
-        / (sc.refueling.eta_refuel * (sc.orbit.gamma - 1.0))
+        1 / sc.refueling.eta_refuel * m_dot_b * sc.orbit.R_spec * sc.thermal.T_des * np.log(sc.refueling.p_tank / sc.orbit.p_orb)
     )
     expected_volume = sc.mass.Mass_prop * sc.orbit.R_spec * sc.thermal.T_des / sc.refueling.p_tank
 
