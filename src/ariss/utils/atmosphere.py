@@ -62,6 +62,21 @@ def _resolve_msis_scalar(value: float | None, default: float) -> float:
     return resolved if np.isfinite(resolved) else default
 
 
+def _resolve_msis_activity_inputs(
+    msis_f107: float | None,
+    msis_ap: float | None,
+) -> tuple[float, float]:
+    """Resolve MSIS activity drivers, preserving explicit ``(0, 0)`` sentinel."""
+    f107_value = _resolve_msis_scalar(msis_f107, MSIS_F107)
+    ap_value = _resolve_msis_scalar(msis_ap, MSIS_AP)
+    return f107_value, ap_value
+
+
+def _use_pymsis_default_activity(f107_value: float, ap_value: float) -> bool:
+    """Return True when activity drivers should come from pymsis defaults."""
+    return np.isclose(f107_value, 0.0) and np.isclose(ap_value, 0.0)
+
+
 def _resolve_msis_latitude(value: float | None) -> float:
     return float(np.clip(_resolve_msis_scalar(value, MSIS_LATITUDE), -90.0, 90.0))
 
@@ -94,10 +109,11 @@ def _resolved_msis_inputs(
     longitude: float | None,
     use_average: bool | None,
 ) -> tuple[str, float, float, float, float, bool]:
+    f107_value, ap_value = _resolve_msis_activity_inputs(msis_f107, msis_ap)
     return (
         str(_resolve_msis_date(msis_date)),
-        _resolve_msis_scalar(msis_f107, MSIS_F107),
-        _resolve_msis_scalar(msis_ap, MSIS_AP),
+        f107_value,
+        ap_value,
         _resolve_msis_latitude(latitude),
         _resolve_msis_longitude(longitude),
         _resolve_msis_bool(use_average, False),
@@ -248,8 +264,8 @@ def atmos(
     heights_km = _as_1d_float_array(height_array_km)
     n = len(heights_km)
     date_value = _resolve_msis_date(msis_date)
-    f107_value = _resolve_msis_scalar(msis_f107, MSIS_F107)
-    ap_value = _resolve_msis_scalar(msis_ap, MSIS_AP)
+    f107_value, ap_value = _resolve_msis_activity_inputs(msis_f107, msis_ap)
+    use_pymsis_default_activity = _use_pymsis_default_activity(f107_value, ap_value)
     latitude_value = _resolve_msis_latitude(latitude)
     longitude_value = _resolve_msis_longitude(longitude)
     use_average_value = _resolve_msis_bool(use_average, False)
@@ -268,31 +284,47 @@ def atmos(
         lats = np.tile(lat_samples, n)
         lons = np.tile(lon_samples, n)
         heights = np.repeat(heights_km, sample_count)
-        f107 = np.full(total, f107_value, dtype=float)
-        f107a = np.full(total, f107_value, dtype=float)
-        ap = np.full((total, 7), ap_value, dtype=float)
 
-        print(
-            f"[ARISS] Running pymsis average atmosphere: altitudes={n}, "
-            f"lat_samples={len(MSIS_AVERAGE_LATITUDES)}, lon_samples={len(MSIS_AVERAGE_LONGITUDES)}, "
-            f"F10.7={f107_value:.1f}, Ap={ap_value:.1f}"
-        )
-        composition = msis.calculate(et, lons, lats, heights, f107s=f107, f107as=f107a, aps=ap)
+        if use_pymsis_default_activity:
+            print(
+                f"[ARISS] Running pymsis average atmosphere: altitudes={n}, "
+                f"lat_samples={len(MSIS_AVERAGE_LATITUDES)}, lon_samples={len(MSIS_AVERAGE_LONGITUDES)}, "
+                "F10.7/Ap=pymsis-default"
+            )
+            composition = msis.calculate(et, lons, lats, heights)
+        else:
+            f107 = np.full(total, f107_value, dtype=float)
+            f107a = np.full(total, f107_value, dtype=float)
+            ap = np.full((total, 7), ap_value, dtype=float)
+            print(
+                f"[ARISS] Running pymsis average atmosphere: altitudes={n}, "
+                f"lat_samples={len(MSIS_AVERAGE_LATITUDES)}, lon_samples={len(MSIS_AVERAGE_LONGITUDES)}, "
+                f"F10.7={f107_value:.1f}, Ap={ap_value:.1f}"
+            )
+            composition = msis.calculate(et, lons, lats, heights, f107s=f107, f107as=f107a, aps=ap)
         composition = np.nan_to_num(composition).reshape(n, sample_count, -1)
         composition = np.sum(composition * weights[None, :, None], axis=1)
     else:
         et = np.array([date_value for _ in range(n)])
         lons = np.full(n, longitude_value, dtype=float)
         lats = np.full(n, latitude_value, dtype=float)
-        f107 = np.full(n, f107_value, dtype=float)
-        f107a = np.full(n, f107_value, dtype=float)
-        ap = np.full((n, 7), ap_value, dtype=float)
-        print(
-            f"[ARISS] Running pymsis point atmosphere: altitudes={n}, "
-            f"lat={latitude_value:.3f}, lon={longitude_value:.3f}, "
-            f"F10.7={f107_value:.1f}, Ap={ap_value:.1f}"
-        )
-        composition = msis.calculate(et, lons, lats, heights_km, f107s=f107, f107as=f107a, aps=ap)
+        if use_pymsis_default_activity:
+            print(
+                f"[ARISS] Running pymsis point atmosphere: altitudes={n}, "
+                f"lat={latitude_value:.3f}, lon={longitude_value:.3f}, "
+                "F10.7/Ap=pymsis-default"
+            )
+            composition = msis.calculate(et, lons, lats, heights_km)
+        else:
+            f107 = np.full(n, f107_value, dtype=float)
+            f107a = np.full(n, f107_value, dtype=float)
+            ap = np.full((n, 7), ap_value, dtype=float)
+            print(
+                f"[ARISS] Running pymsis point atmosphere: altitudes={n}, "
+                f"lat={latitude_value:.3f}, lon={longitude_value:.3f}, "
+                f"F10.7={f107_value:.1f}, Ap={ap_value:.1f}"
+            )
+            composition = msis.calculate(et, lons, lats, heights_km, f107s=f107, f107as=f107a, aps=ap)
         composition = np.nan_to_num(composition)
 
     rho = composition[:, msis.Variable.MASS_DENSITY]

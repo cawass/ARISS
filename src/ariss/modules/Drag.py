@@ -130,7 +130,7 @@ def drag_model(sc: SpacecraftState) -> None:
         sc.drag.cd_rad_front = _drag_coefficient(speed_ratio, sc.geometry.epsilon_rad, sc.orbit.alpha + 0.5 * np.pi, sc.orbit.temperature, sc.thermal.T_des, 1.0) * sc.geometry.wake_radiator
         sc.drag.cd_body_side = _drag_coefficient(speed_ratio, sc.geometry.epsilon_body, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des, 1.0) * sc.geometry.wake_body
     else:
-        sc.drag.cd_inlet_side = _drag_coefficient(speed_ratio, sc.geometry.epsilon_in, sc.orbit.alpha + alpha_in, sc.orbit.temperature, sc.thermal.T_des, 1.0) 
+        sc.drag.cd_inlet_side = _drag_coefficient(speed_ratio, sc.geometry.epsilon_in, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des, 1.0) 
         sc.drag.cd_inlet_front = _drag_coefficient(speed_ratio, sc.geometry.epsilon_in_norm, sc.orbit.alpha + 0.5 * np.pi, sc.orbit.temperature, sc.thermal.T_des, 1.0) 
         sc.drag.cd_solar = _drag_coefficient(speed_ratio, sc.geometry.epsilon_solar, sc.orbit.alpha, sc.orbit.temperature, sc.thermal.T_des, 2.0) 
         sc.drag.cd_solar_front = _drag_coefficient(speed_ratio, sc.geometry.epsilon_solar, sc.orbit.alpha + 0.5 * np.pi, sc.orbit.temperature, sc.thermal.T_des, 1.0) 

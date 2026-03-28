@@ -42,15 +42,14 @@ def sizing_model(sc: SpacecraftState) -> None:
     sc.mass.Mass_rad = sc.geometry.A_rad * sc.rate.R_mass_surface_rad
 
     # Close the total mass budget used by the outer sizing loop convergence check.
-    sc.mass.Mass_total = sc.mass.Mass_in + sc.mass.Mass_body + sc.mass.Mass_solar + sc.mass.Mass_rad + sc.mass.Mass_prop + sc.mass.Mass_ADCS + sc.mass.Mass_payload + sc.mass.Mass_refprop
+    sc.mass.Mass_total = sum(v for k, v in vars(sc.mass).items() if k != "Mass_total")
 
     # Convert total delivered electrical demand into the extra solar-generation
     # overhead required by power-chain losses, then compute propulsion bus power
     # from the thruster efficiency.
     sc.power.Power_prop = sc.thruster.power
-    Load_Power = sc.power.Power_in + sc.power.Power_body + sc.power.Power_rad + sc.power.Power_prop + sc.power.Power_ADCS + sc.power.Power_payload + sc.power.Power_refprop
-    sc.power.Power_solar = Load_Power / (sc.solar.eta_power) -  Load_Power
 
+    Load_Power = sum(v for k, v in vars(sc.power).items() if k.startswith("Power_") and k not in ("Power_total", "Power_solar"))
 
-    # Rebuild the total spacecraft electrical demand from all subsystem terms.
+    sc.power.Power_solar = Load_Power / sc.solar.eta_power - Load_Power
     sc.power.Power_total = Load_Power + sc.power.Power_solar

@@ -151,6 +151,8 @@ def run_sizing_loop(loop_sc: SpacecraftState, max_iterations: int = 200, mass_to
         power_model(loop_sc)
         thermal_model(loop_sc)
 
+        
+        loop_sc.check_bounds()
         # Measure convergence by comparing the current state to the previous
         # saved iteration.
         if i > 0:

@@ -175,6 +175,8 @@ class MassState:
     Mass_ADCS: float = 20  # [kg] Input: ADCS subsystem mass.
     Mass_payload: float = 24  # [kg] Input: payload mass.
     Mass_refprop: float = 700  # [kg] Input/derived: refueling and propellant storage subsystem mass.
+    Mass_power: float = 0.0  # [kg] Derived: power system mass.
+    Mass_power_sys: float = 0.0  # [kg] Derived: power system mass.
     Mass_total: float = 0.0  # [kg] Derived: total spacecraft mass.
 
     def update(self, **kwargs: Any) -> "MassState":
@@ -375,6 +377,7 @@ class SpacecraftState:
             "mass.Mass_ADCS": self.mass.Mass_ADCS,
             "mass.Mass_payload": self.mass.Mass_payload,
             "mass.Mass_refprop": self.mass.Mass_refprop,
+            "mass.Mass_power_sys": self.mass.Mass_power_sys,
             "mass.Mass_total": self.mass.Mass_total,
 
             "power.Power_in": self.power.Power_in,
@@ -504,6 +507,7 @@ class SpacecraftState:
             "mass.Mass_ADCS": {"min": 0.0, "max": 1.0e9},
             "mass.Mass_payload": {"min": 0.0, "max": 1.0e9},
             "mass.Mass_refprop": {"min": 0.0, "max": 1.0e9},
+            "mass.Mass_power_sys": {"min": 0.0, "max": 1.0e9},
             "mass.Mass_total": {"min": 0.0, "max": 1.0e9},
 
             "power.Power_in": {"min": 0.0, "max": 1.0e9},
@@ -526,7 +530,7 @@ class SpacecraftState:
             "thruster.propulsive_ram_load": {"min": 0.0, "max": 1.0e9},
             "thruster.refueling_ram_load": {"min": 0.0, "max": 1.0e9},
             "thruster.required_load": {"min": 0.0, "max": 1.0e9},
-            "thruster.force_residual": {"min": 0.0, "max": 1.0e9},
+            "thruster.force_residual": {"min":  -1.0e9, "max": 1.0e9},
 
             "refueling.coll_eff": {"min": 0.0, "max": 1.0},
             "refueling.t_refuel": {"min": 0.0, "max": 1.0e10},
