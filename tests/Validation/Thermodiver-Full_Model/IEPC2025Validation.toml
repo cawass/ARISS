@@ -30,7 +30,7 @@ R_spec = 287.0                    # [J/(kg*K)] Specific gas constant.
 msis_date = "2020-01-01T00:00:00" # [ISO-8601] MSIS reference UTC date.
 msis_f107 = 0                     # [sfu] MSIS daily F10.7 solar flux.
 msis_ap = 0                       # [-] MSIS Ap geomagnetic index.
-use_average = false
+use_average = true
 
 
 [geometry]
@@ -132,8 +132,8 @@ drag_inlet_front = 0.2            # [N] Inlet-front drag force contribution.
 
 [refueling]
 coll_eff = 0.636                  # [-] Intake collection efficiency.
-t_refuel = 11168000             # [s] Nominal refueling duration.
-eta_refuel = 0.061                  # [-] Refueling compression-process efficiency.
+t_refuel = 9668000             # [s] Nominal refueling duration.
+eta_refuel = 0.0384                 # [-] Refueling compression-process efficiency.
 m_flow = 1e-3                     # [kg/s] Captured mass flow into tanks.
 p_tank = 24000000.0                 # [Pa] Storage tank pressure.
 V_prop = 0.12                      # [m^3] Stored propellant tank volume.
