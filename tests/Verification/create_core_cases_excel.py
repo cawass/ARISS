@@ -17,7 +17,7 @@ if str(ROOT) not in sys.path:
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-CORE_CONFIG_DIR = ROOT / "tests" / "Verification" / "configs" / "core_cases"
+CORE_CONFIG_DIR = ROOT / "tests" / "Verification" / "configs"
 DEFAULT_XLSX = ROOT / "tests" / "Verification" / "core_case_ranges.xlsx"
 BASE_CONFIG_PATH = ROOT / "src" / "ariss" / "core" / "base_config.toml"
 

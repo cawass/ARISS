@@ -1,11 +1,22 @@
-"""
-ARISS Physical Constants
----------------------------------
+# ============================================================================== #
+#       ___    ____  ____  _____ _____
+#      /   |  / __ \/  _// ___// ___/
+#     / /| | / /_/ // / \__ \ \__ \
+#    / ___ |/ _, _// / ___/ /___/ /
+#   /_/  |_/_/ |_/___//____//____/
+#
+#        ARISS - Atmospheric Refueling Iterative System Solver
+# ============================================================================== #
+#  Description:
+#      
+# This module centrally stores all fundamental physical, planetary, 
+# and mathematical constants used throughout the ARISS simulation modules
+#
+#  Project:        ARISS
+#  Module:         atmosphere.py
+#  Author:         Lucas Calderon del Rio, Carlos Carrasco Requejo
+# ============================================================================
 
-This module centrally stores all fundamental physical, planetary, 
-and mathematical constants used throughout the ARISS simulation modules.
-
-"""
 
 from typing import Final
 

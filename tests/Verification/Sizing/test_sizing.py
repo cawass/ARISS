@@ -73,7 +73,6 @@ def test_sizing_model_rebuilds_power_budget_from_losses_and_thruster_power() -> 
     sc = SpacecraftState()
     object.__setattr__(sc.solar, "eta_power", 0.8)
     sc.thruster.power = 500.0
-    sc.power.Power_total = 1000.0
     sc.power.Power_in = 10.0
     sc.power.Power_body = 20.0
     sc.power.Power_rad = 30.0
@@ -83,6 +82,11 @@ def test_sizing_model_rebuilds_power_budget_from_losses_and_thruster_power() -> 
 
     sizing_model(sc)
 
-    assert sc.power.Power_prop == pytest.approx(500.0, rel=1.0e-12, abs=1.0e-12)
-    assert sc.power.Power_solar == pytest.approx(250.0, rel=1.0e-12, abs=1.0e-12)
-    assert sc.power.Power_total == pytest.approx(960.0, rel=1.0e-12, abs=1.0e-12)
+    expected_prop = 500.0
+    expected_load = expected_prop + 10.0 + 20.0 + 30.0 + 40.0 + 50.0 + 60.0
+    expected_solar = expected_load / 0.8 - expected_load
+    expected_total = expected_load + expected_solar
+
+    assert sc.power.Power_prop == pytest.approx(expected_prop, abs=1.0e-12)
+    assert sc.power.Power_solar == pytest.approx(expected_solar, rel=1.0e-12, abs=1.0e-12)
+    assert sc.power.Power_total == pytest.approx(expected_total, rel=1.0e-12, abs=1.0e-12)

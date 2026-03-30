@@ -45,3 +45,13 @@ addopts = [
     "--strict-markers",
     "--strict-config",
 ]
+
+[tool.coverage.run]
+omit = [
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+omit = [
+    "*/__init__.py",
+]

@@ -125,7 +125,7 @@ class GeometryState:
     epsilon_body: float = 0.1  # [-] Input: body wall accommodation coefficient for drag.
     epsilon_solar: float = 0.1  # [-] Input: solar array accommodation coefficient for drag.
     epsilon_rad: float = 0.1  # [-] Input: radiator accommodation coefficient for drag.
-    epsilon_in_norm: float = 0.9  # [-] Input: inlet normal-face accommodation coefficient.
+    epsilon_in_norm: float = 0.1  # [-] Input: inlet normal-face accommodation coefficient.
 
     wake_in: float = 1  # [-] Input: inlet wake factor applied to side drag.
     wake_body: float = 1  # [-] Input: body wake factor applied to side drag.
@@ -192,7 +192,7 @@ class PowerState:
     Power_solar: float = 0.0  # [W] Derived: solar power generation or allocation.
     Power_rad: float = 0.0  # [W] Derived: radiator subsystem power.
     Power_prop: float = 0.0  # [W] Derived: propulsion subsystem power.
-    Power_ADCS: float = 2000.0  # [W] Input: ADCS power demand.
+    Power_ADCS: float = 0.0  # [W] Input: ADCS power demand.
     Power_payload: float = 0.0  # [W] Input: payload power demand.
     Power_refprop: float = 0.0  # [W] Derived: refueling and propellant processing power.
     Power_total: float = 0.0  # [W] Derived: total spacecraft power demand.

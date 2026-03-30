@@ -41,16 +41,16 @@ from ariss.core.simulation import run_sizing_loop
 # Configuration
 # ------------------------------------------------------------------------------ #
 
-CONFIG_PATH = Path(__file__).with_name("MansurValidation.toml")
+CONFIG_PATH = Path(__file__).with_name("MansurValidation3000W.toml")
 
 MAX_ITERATIONS = 200
 MASS_TOLERANCE = 1e-3
 
-SHOW_UI = True
+SHOW_UI = False
 
 
 # ------------------------------------------------------------------------------ #
-# Run the Mansur validation case
+# Run the Mansur base validation case
 # ------------------------------------------------------------------------------ #
 
 def run_mansur_verification():

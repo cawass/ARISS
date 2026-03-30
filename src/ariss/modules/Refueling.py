@@ -15,7 +15,7 @@
 #
 #  Project:        ARISS
 #  Module:         Refueling.py
-#  Author:         Lucas Calderon del Rio, Carlos Carrasco Requejo
+#  Author:         Lucas Calderon del Rio
 # ============================================================================
 
 import numpy as np

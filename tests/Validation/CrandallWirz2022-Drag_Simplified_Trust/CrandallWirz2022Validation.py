@@ -17,17 +17,13 @@
 
 from __future__ import annotations
 
-import csv
 import sys
 from copy import deepcopy
 from pathlib import Path
 
 import matplotlib
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.lines import Line2D
-from matplotlib.ticker import MultipleLocator
 
 
 # ------------------------------------------------------------------------------ #
@@ -52,7 +48,10 @@ from ariss.modules.Drag import drag_model
 from ariss.modules.Propulsion import _panel_front_area, _side_areas
 from ariss.utils import constants as const
 from ariss.utils.atmosphere import atmospheric_properties_from_height
-from plot_style import PALETTE, apply_validation_style, style_axis, style_legend
+from ariss.utils.ploting import plot_validation_crandall_fig6_drag
+from csv_helper import load_wide_xy_csv
+from ariss.utils.ploting import PALETTE
+from validation_metrics import datapoint_relative_and_corr_stats, minimum_finite
 
 
 # ------------------------------------------------------------------------------ #
@@ -94,45 +93,14 @@ COMPONENT_SPECS = [
 # ------------------------------------------------------------------------------ #
 
 def _load_digitized_dataset(path: Path) -> dict[str, tuple[np.ndarray, np.ndarray]]:
-    rows = list(csv.reader(path.open("r", encoding="utf-8-sig")))
-    if len(rows) < 3:
-        raise ValueError(f"Dataset {path} has insufficient rows.")
-
-    header = rows[0]
-    result: dict[str, tuple[np.ndarray, np.ndarray]] = {}
-
-    for column in range(0, len(header), 2):
-        label = header[column].strip() if column < len(header) else ""
-        if not label:
-            continue
-        if label == "SA Skin Friction":
-            label = "SA Skin Friction Drag"
-
-        x_vals: list[float] = []
-        y_vals: list[float] = []
-        for row in rows[2:]:
-            if column + 1 >= len(row):
-                continue
-            x_text = row[column].strip()
-            y_text = row[column + 1].strip()
-            if not x_text or not y_text:
-                continue
-            try:
-                x_value = float(x_text)
-                y_value = float(y_text)
-            except ValueError:
-                continue
-            if np.isfinite(x_value) and np.isfinite(y_value):
-                x_vals.append(x_value)
-                y_vals.append(y_value)
-
-        if x_vals:
-            x_array = np.asarray(x_vals, dtype=float)
-            y_array = np.asarray(y_vals, dtype=float)
-            order = np.argsort(y_array)
-            result[label] = (x_array[order], y_array[order])
-
-    return result
+    return load_wide_xy_csv(
+        path,
+        sort_by="y",
+        min_rows=3,
+        label_transform=lambda label: (
+            "SA Skin Friction Drag" if str(label).strip() == "SA Skin Friction" else str(label).strip()
+        ),
+    )
 
 
 def _normalize_altitude_orientation(
@@ -248,181 +216,11 @@ def _run_drag_sweep(config_path: Path, altitudes_km: np.ndarray) -> dict[str, np
 
 
 # ------------------------------------------------------------------------------ #
-# Plotting and metrics
+# Metrics
 # ------------------------------------------------------------------------------ #
-
-def _interp_model_at_altitude(model: dict[str, np.ndarray], key: str, y_query: np.ndarray) -> np.ndarray:
-    y_model = np.asarray(model["altitude"], dtype=float)
-    x_model = np.asarray(model[key], dtype=float)
-    order = np.argsort(y_model)
-    return np.interp(y_query, y_model[order], x_model[order])
-
-
-def _paired_model_reference_samples(
-    model_altitude: np.ndarray,
-    model_values: np.ndarray,
-    ref_altitude: np.ndarray,
-    ref_values: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
-    model_altitude = np.asarray(model_altitude, dtype=float)
-    model_values = np.asarray(model_values, dtype=float)
-    ref_altitude = np.asarray(ref_altitude, dtype=float)
-    ref_values = np.asarray(ref_values, dtype=float)
-
-    valid_model = np.isfinite(model_altitude) & np.isfinite(model_values)
-    if np.count_nonzero(valid_model) < 2:
-        return None
-
-    model_altitude = model_altitude[valid_model]
-    model_values = model_values[valid_model]
-    order = np.argsort(model_altitude)
-    model_altitude = model_altitude[order]
-    model_values = model_values[order]
-
-    model_altitude_unique, unique_idx = np.unique(model_altitude, return_index=True)
-    model_values_unique = model_values[unique_idx]
-    if len(model_altitude_unique) < 2:
-        return None
-
-    line_ids = np.arange(1, len(ref_values) + 1, dtype=int)
-    valid_ref = np.isfinite(ref_altitude) & np.isfinite(ref_values)
-    if not np.any(valid_ref):
-        return None
-
-    ref_altitude = ref_altitude[valid_ref]
-    ref_values = ref_values[valid_ref]
-    line_ids = line_ids[valid_ref]
-
-    altitude_low = float(np.min(model_altitude_unique))
-    altitude_high = float(np.max(model_altitude_unique))
-    in_range = (ref_altitude >= altitude_low) & (ref_altitude <= altitude_high)
-    if not np.any(in_range):
-        return None
-
-    ref_altitude = ref_altitude[in_range]
-    ref_values = ref_values[in_range]
-    line_ids = line_ids[in_range]
-    model_at_ref = np.interp(ref_altitude, model_altitude_unique, model_values_unique)
-
-    return model_at_ref, ref_values, line_ids
-
-
-def _component_relative_and_corr_stats(
-    model: dict[str, np.ndarray],
-    dataset: dict[str, tuple[np.ndarray, np.ndarray]],
-) -> dict[str, tuple[float, float, int, int, float, int]]:
-    stats: dict[str, tuple[float, float, int, int, float, int]] = {}
-
-    for label, key, _, _ in COMPONENT_SPECS:
-        if label not in dataset:
-            continue
-        x_ref, y_ref = dataset[label]
-
-        paired = _paired_model_reference_samples(
-            np.asarray(model["altitude"], dtype=float),
-            np.asarray(model[key], dtype=float),
-            np.asarray(y_ref, dtype=float),
-            np.asarray(x_ref, dtype=float),
-        )
-        if paired is None:
-            continue
-
-        model_at_ref, ref_values, line_ids = paired
-
-        nonzero_ref = np.abs(ref_values) > 1.0e-12
-        if np.any(nonzero_ref):
-            relative_error = np.abs(model_at_ref[nonzero_ref] - ref_values[nonzero_ref]) / np.abs(ref_values[nonzero_ref])
-            rel_line_ids = line_ids[nonzero_ref]
-            i_max = int(np.argmax(relative_error))
-            max_rel_error = float(relative_error[i_max])
-            max_rel_line = int(rel_line_ids[i_max])
-            mean_rel_error = float(np.mean(relative_error))
-            n_rel = int(len(relative_error))
-        else:
-            max_rel_error = float("nan")
-            max_rel_line = -1
-            mean_rel_error = float("nan")
-            n_rel = 0
-
-        if len(model_at_ref) >= 2:
-            pearson_r = float(np.corrcoef(model_at_ref, ref_values)[0, 1])
-        else:
-            pearson_r = float("nan")
-
-        stats[label] = (
-            max_rel_error,
-            mean_rel_error,
-            max_rel_line,
-            n_rel,
-            pearson_r,
-            int(len(model_at_ref)),
-        )
-
-    return stats
-
-
-def _plot_case(axis, title: str, model: dict[str, np.ndarray], dataset: dict[str, tuple[np.ndarray, np.ndarray]]) -> None:
-    x_lower = np.inf
-    x_upper = 0.0
-
-    for label, key, color, marker in COMPONENT_SPECS:
-        x_model = np.asarray(model[key], dtype=float)
-        y_model = np.asarray(model["altitude"], dtype=float)
-        valid_model = np.isfinite(x_model) & np.isfinite(y_model) & (x_model > 0.0)
-        axis.plot(x_model[valid_model], y_model[valid_model], color=color, lw=2.0, zorder=2)
-
-        if np.any(valid_model):
-            x_lower = min(x_lower, float(np.min(x_model[valid_model])))
-            x_upper = max(x_upper, float(np.max(x_model[valid_model])))
-
-        if label in dataset:
-            x_ref, y_ref = dataset[label]
-            valid_ref = np.isfinite(x_ref) & np.isfinite(y_ref) & (x_ref > 0.0)
-            axis.plot(
-                x_ref[valid_ref],
-                y_ref[valid_ref],
-                linestyle=(0, (4, 2)),
-                lw=1.2,
-                color=color,
-                marker=marker,
-                markersize=5.4,
-                markerfacecolor="white",
-                markeredgecolor=color,
-                markeredgewidth=1.0,
-                zorder=3,
-            )
-            if np.any(valid_ref):
-                x_lower = min(x_lower, float(np.min(x_ref[valid_ref])))
-                x_upper = max(x_upper, float(np.max(x_ref[valid_ref])))
-
-    axis.set_title(title)
-    axis.set_xscale("log")
-    axis.set_xlabel("Drag [mN]")
-    style_axis(axis)
-    axis.tick_params(axis="both", which="both", labelsize=12)
-    axis.xaxis.label.set_size(12)
-    axis.yaxis.label.set_size(12)
-    axis.title.set_size(12)
-    axis.yaxis.set_major_locator(MultipleLocator(10))
-    axis.yaxis.set_minor_locator(MultipleLocator(5))
-
-    if np.isfinite(x_lower) and np.isfinite(x_upper) and x_upper > x_lower > 0.0:
-        axis.set_xlim(0.9 * x_lower, 1.15 * x_upper)
 
 
 def run_crandall_wirz_validation(show: bool = True) -> Path:
-    apply_validation_style()
-    plt.rcParams.update(
-        {
-            "font.size": 12,
-            "axes.titlesize": 12,
-            "axes.labelsize": 12,
-            "xtick.labelsize": 12,
-            "ytick.labelsize": 12,
-            "legend.fontsize": 12,
-        }
-    )
-
     datasets: list[dict[str, tuple[np.ndarray, np.ndarray]]] = []
     for spec in CASE_SPECS:
         dataset = _load_digitized_dataset(spec["dataset"])
@@ -435,19 +233,21 @@ def run_crandall_wirz_validation(show: bool = True) -> Path:
     altitudes_km = np.linspace(altitude_min, altitude_max, ALTITUDE_SAMPLES)
 
     models = [_run_drag_sweep(spec["config"], altitudes_km) for spec in CASE_SPECS]
+    for spec, model, dataset in zip(CASE_SPECS, models, datasets):
+        metrics: dict[str, tuple[float, float, int, int, float, int]] = {}
+        for label, key, _, _ in COMPONENT_SPECS:
+            if label not in dataset:
+                continue
+            x_ref, y_ref = dataset[label]
+            stats_for_component = datapoint_relative_and_corr_stats(
+                np.asarray(model["altitude"], dtype=float),
+                np.asarray(model[key], dtype=float),
+                np.asarray(y_ref, dtype=float),
+                np.asarray(x_ref, dtype=float),
+            )
+            if stats_for_component is not None:
+                metrics[label] = stats_for_component
 
-    figure = plt.figure(figsize=PAGE_FIGSIZE)
-    grid = figure.add_gridspec(1, 3, width_ratios=[1.0, 1.0, 0.72], wspace=0.07)
-    axes = [
-        figure.add_subplot(grid[0, 0]),
-        figure.add_subplot(grid[0, 1]),
-    ]
-    axes[1].sharey(axes[0])
-    legend_axis = figure.add_subplot(grid[0, 2])
-    legend_axis.axis("off")
-    for axis, spec, model, dataset in zip(axes, CASE_SPECS, models, datasets):
-        _plot_case(axis, spec["title"], model, dataset)
-        metrics = _component_relative_and_corr_stats(model, dataset)
         print(f"\n{spec['title']} relative-error and correlation by component:")
         pearson_values: list[float] = []
         for label, _, _, _ in COMPONENT_SPECS:
@@ -462,72 +262,27 @@ def run_crandall_wirz_validation(show: bool = True) -> Path:
                 )
                 if np.isfinite(pearson_r):
                     pearson_values.append(pearson_r)
-        if pearson_values:
-            print(f"  Minimum Pearson correlation coefficient: {min(pearson_values):.6f}")
+        min_pearson = minimum_finite(pearson_values)
+        if min_pearson is not None:
+            print(f"  Minimum Pearson correlation coefficient: {min_pearson:.6f}")
         else:
             print("  Minimum Pearson correlation coefficient: n/a")
 
-    axes[0].set_ylabel("Altitude [km]")
-    axes[0].set_ylim(altitude_min - 1.0, altitude_max + 1.0)
-
-    component_handles = [
-        Line2D([0], [0], color=color, lw=2.0, label=label)
-        for label, _, color, _ in COMPONENT_SPECS
-    ]
-    source_handles = [
-        Line2D([0], [0], color=PALETTE["secondary_text"], lw=2.0, label="ARISS drag-only model"),
-        Line2D(
-            [0],
-            [0],
-            marker="o",
-            color=PALETTE["secondary_text"],
-            markerfacecolor="white",
-            markersize=6,
-            lw=1.2,
-            ls=(0, (4, 2)),
-            label="Crandall-Wirz Data",
-        ),
-    ]
-
-    legend_source = legend_axis.legend(
-        handles=source_handles,
-        title="Source",
-        loc="upper left",
-        bbox_to_anchor=(0.0, 0.95),
-        frameon=False,
-        borderaxespad=0.0,
-        labelspacing=0.8,
-        handlelength=2.4,
-        handletextpad=0.6,
+    output = plot_validation_crandall_fig6_drag(
+        models,
+        datasets,
+        case_specs=CASE_SPECS,
+        component_specs=COMPONENT_SPECS,
+        altitude_min=altitude_min,
+        altitude_max=altitude_max,
+        output_path=OUTPUT_PATH,
+        page_figsize=PAGE_FIGSIZE,
+        show=show,
     )
-    style_legend(legend_source)
-    legend_source.get_title().set_fontweight("bold")
-    legend_axis.add_artist(legend_source)
-
-    legend_components = legend_axis.legend(
-        handles=component_handles,
-        title="Components",
-        loc="upper left",
-        bbox_to_anchor=(0.0, 0.62),
-        frameon=False,
-        borderaxespad=0.0,
-        labelspacing=0.8,
-        handlelength=2.4,
-        handletextpad=0.6,
-    )
-    style_legend(legend_components)
-    legend_components.get_title().set_fontweight("bold")
-    figure.subplots_adjust(left=0.08, right=0.98, bottom=0.12, top=0.95, wspace=0.07)
-    figure.savefig(OUTPUT_PATH, dpi=220, bbox_inches="tight")
-
-    if show and plt.get_backend().lower() != "agg":
-        plt.show()
-    else:
-        plt.close(figure)
-
-    print(f"\nSaved figure: {OUTPUT_PATH}")
-    return OUTPUT_PATH
+    print(f"\nSaved figure: {output}")
+    return output
 
 
 if __name__ == "__main__":
     run_crandall_wirz_validation(show=True)
+

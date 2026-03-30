@@ -39,7 +39,7 @@ AR_rad = 1.0
 # Circular cross section with d = 4L/28.2 at L=5.26 m -> A = pi d^2 / 4
 A_body = 0.4372030023764446
 A_in = 0.4372030023764446
-A_ref = 0.4372030023764446
+A_ref = 0
 A_prop = 0.0
 A_in_drag = 0.4372030023764446
 A_solar = 0.0

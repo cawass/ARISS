@@ -18,8 +18,8 @@ if str(SRC) not in sys.path:
 
 import matplotlib.pyplot as plt
 
-from ariss.core.sensitivity import evaluate, finite, get_path, set_path
-from ariss.core.simulation import load_spacecraft_from_base_config
+from ariss.core.sensitivity import find_min_refuel_time, get_path, set_path
+from ariss.core.simulation import load_spacecraft_from_base_config, run_sizing_loop
 from ariss.utils.ploting import (
     PLOT_GEOMETRY_ASPECT_RATIO_BARS,
     PLOT_MULTI_SENSITIVITY_SIDE_BY_SIDE,
@@ -28,13 +28,21 @@ from ariss.utils.ploting import (
     run_original_sensitivity_cases,
 )
 
-PARAMETERS: list[tuple[str, str]] = [
+DRAG_EPSILON_PATHS = [
+    "geometry.epsilon_in",
+    "geometry.epsilon_body",
+    "geometry.epsilon_solar",
+    "geometry.epsilon_rad",
+    "geometry.epsilon_in_norm",
+]
+
+PARAMETERS: list[tuple[str, str | list[str]]] = [
     ("eta_solar", "solar.eta_solar"),
     ("eta_prop", "thruster.eff"),
     ("eta_coll", "refueling.coll_eff"),
     ("eta_ref", "refueling.eta_refuel"),
     ("eta_elec", "solar.eta_power"),
-    ("epsilon", "geometry.epsilon_body"),
+    ("epsilon", DRAG_EPSILON_PATHS),
     ("P_prop", "thruster.power"),
     ("I_sp", "thruster.specific_impulse"),
     ("chi", "geometry.intake_area_ratio"),
@@ -110,6 +118,48 @@ def _save_plot(path: Path, fig) -> None:
     plt.close(fig)
 
 
+def _evaluate_outputs(
+    sc: Any,
+    output_paths: list[str],
+    *,
+    max_iterations: int,
+    mode: str,
+) -> dict[str, Any]:
+    try:
+        if mode == "refuel_search":
+            final_sc, ok, error = find_min_refuel_time(sc, max_iterations=max_iterations)
+        else:
+            final_sc, ok, _ = run_sizing_loop(sc, max_iterations=max_iterations)
+            error = None
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": str(exc),
+            "outputs": {path: None for path in output_paths},
+        }
+
+    if not ok or final_sc is None:
+        return {
+            "ok": False,
+            "error": error or "Sizing loop did not converge.",
+            "outputs": {path: None for path in output_paths},
+        }
+
+    outputs: dict[str, Any] = {}
+    for path in output_paths:
+        value = get_path(final_sc, path)
+        if path == OUTPUT_TREF and value is not None:
+            outputs[path] = float(value) / (30.4375 * 24.0 * 3600.0)
+        else:
+            outputs[path] = value
+
+    return {
+        "ok": True,
+        "error": None,
+        "outputs": outputs,
+    }
+
+
 def _compute_ranking_rows(
     case_path: Path | None,
     *,
@@ -118,20 +168,33 @@ def _compute_ranking_rows(
 ) -> list[dict[str, Any]]:
     base_sc = load_spacecraft_from_base_config(case_path=case_path)
 
-    base_h_run = evaluate(deepcopy(base_sc), [OUTPUT_H], max_iterations=max_iterations, mode="direct")
-    base_t_run = evaluate(deepcopy(base_sc), [OUTPUT_TREF], max_iterations=max_iterations, mode="refuel_search")
-    y0_h = finite(base_h_run["outputs"][OUTPUT_H])
-    y0_t = finite(base_t_run["outputs"][OUTPUT_TREF])
+    base_h_run = _evaluate_outputs(
+        deepcopy(base_sc),
+        [OUTPUT_H],
+        max_iterations=max_iterations,
+        mode="direct",
+    )
+    base_t_run = _evaluate_outputs(
+        deepcopy(base_sc),
+        [OUTPUT_TREF],
+        max_iterations=max_iterations,
+        mode="refuel_search",
+    )
+    y0_h = _to_finite_float(base_h_run["outputs"][OUTPUT_H])
+    y0_t = _to_finite_float(base_t_run["outputs"][OUTPUT_TREF])
 
     rows: list[dict[str, Any]] = []
-    for label, path in PARAMETERS:
+    for label, path_spec in PARAMETERS:
+        paths = [path_spec] if isinstance(path_spec, str) else [str(path) for path in path_spec]
+        path_label = ", ".join(paths)
+
         try:
-            x0 = _to_finite_float(get_path(base_sc, path))
+            base_values = [_to_finite_float(get_path(base_sc, path)) for path in paths]
         except Exception as exc:
             rows.append(
                 {
                     "input": label,
-                    "path": path,
+                    "path": path_label,
                     "base_value": None,
                     "minus_value": None,
                     "plus_value": None,
@@ -144,12 +207,12 @@ def _compute_ranking_rows(
             )
             continue
 
-        if x0 is None or abs(x0) <= 1.0e-20:
+        if any(value is None or abs(float(value)) <= 1.0e-20 for value in base_values):
             rows.append(
                 {
                     "input": label,
-                    "path": path,
-                    "base_value": x0,
+                    "path": path_label,
+                    "base_value": "; ".join(f"{path}={value}" for path, value in zip(paths, base_values)),
                     "minus_value": None,
                     "plus_value": None,
                     "S_h": "N/A",
@@ -161,26 +224,29 @@ def _compute_ranking_rows(
             )
             continue
 
-        x_minus = x0 * (1.0 - perturbation)
-        x_plus = x0 * (1.0 + perturbation)
+        base_values_float = [float(value) for value in base_values]
+        minus_values = [value * (1.0 - perturbation) for value in base_values_float]
+        plus_values = [value * (1.0 + perturbation) for value in base_values_float]
 
         sc_minus = deepcopy(base_sc)
         sc_plus = deepcopy(base_sc)
-        set_path(sc_minus, path, x_minus)
-        set_path(sc_plus, path, x_plus)
+        for path, minus_value in zip(paths, minus_values):
+            set_path(sc_minus, path, minus_value)
+        for path, plus_value in zip(paths, plus_values):
+            set_path(sc_plus, path, plus_value)
 
-        minus_h = evaluate(sc_minus, [OUTPUT_H], max_iterations=max_iterations, mode="direct")
-        plus_h = evaluate(sc_plus, [OUTPUT_H], max_iterations=max_iterations, mode="direct")
-        minus_t = evaluate(sc_minus, [OUTPUT_TREF], max_iterations=max_iterations, mode="refuel_search")
-        plus_t = evaluate(sc_plus, [OUTPUT_TREF], max_iterations=max_iterations, mode="refuel_search")
+        minus_h = _evaluate_outputs(sc_minus, [OUTPUT_H], max_iterations=max_iterations, mode="direct")
+        plus_h = _evaluate_outputs(sc_plus, [OUTPUT_H], max_iterations=max_iterations, mode="direct")
+        minus_t = _evaluate_outputs(sc_minus, [OUTPUT_TREF], max_iterations=max_iterations, mode="refuel_search")
+        plus_t = _evaluate_outputs(sc_plus, [OUTPUT_TREF], max_iterations=max_iterations, mode="refuel_search")
 
-        y_minus_h = finite(minus_h["outputs"][OUTPUT_H])
-        y_plus_h = finite(plus_h["outputs"][OUTPUT_H])
-        y_minus_t = finite(minus_t["outputs"][OUTPUT_TREF])
-        y_plus_t = finite(plus_t["outputs"][OUTPUT_TREF])
+        y_minus_h = _to_finite_float(minus_h["outputs"][OUTPUT_H])
+        y_plus_h = _to_finite_float(plus_h["outputs"][OUTPUT_H])
+        y_minus_t = _to_finite_float(minus_t["outputs"][OUTPUT_TREF])
+        y_plus_t = _to_finite_float(plus_t["outputs"][OUTPUT_TREF])
 
-        s_h = _central_derivative(x_minus, x_plus, y_minus_h, y_plus_h)
-        s_t = _central_derivative(x_minus, x_plus, y_minus_t, y_plus_t)
+        s_h = _central_derivative(minus_values[0], plus_values[0], y_minus_h, y_plus_h)
+        s_t = _central_derivative(minus_values[0], plus_values[0], y_minus_t, y_plus_t)
         s_h_norm = _central_normalized(y0_h, y_minus_h, y_plus_h, perturbation)
         s_t_norm = _central_normalized(y0_t, y_minus_t, y_plus_t, perturbation)
 
@@ -188,10 +254,10 @@ def _compute_ranking_rows(
         rows.append(
             {
                 "input": label,
-                "path": path,
-                "base_value": x0,
-                "minus_value": x_minus,
-                "plus_value": x_plus,
+                "path": path_label,
+                "base_value": "; ".join(f"{path}={value:.6g}" for path, value in zip(paths, base_values_float)),
+                "minus_value": "; ".join(f"{path}={value:.6g}" for path, value in zip(paths, minus_values)),
+                "plus_value": "; ".join(f"{path}={value:.6g}" for path, value in zip(paths, plus_values)),
                 "S_h": _fmt(s_h),
                 "S_t_ref": _fmt(s_t),
                 "S_h_normalized": _fmt(s_h_norm),
@@ -212,6 +278,8 @@ def run_case(
     max_iterations: int,
     show_plots: bool,
 ) -> tuple[Path, Path, Path]:
+    title_prefix = "" if case_name == "core_base_sensitivity" else f"{case_name} - "
+
     left_data, right_data = run_original_sensitivity_cases(
         case_path=case_path,
         max_iterations=max_iterations,
@@ -228,9 +296,10 @@ def run_case(
         right_output=OUTPUT_TREF,
         left_log_y=False,
         right_log_y=True,
-        left_title=f"{case_name} - Orbit altitude",
-        right_title=f"{case_name} - Refueling time",
+        left_title=f"{title_prefix}Orbit altitude",
+        right_title=f"{title_prefix}Refueling time",
         x_label="Parameter value [-]",
+        paper_style=True,
         show=show_plots,
     )
     side_plot_path = output_dir / f"{case_name}_sensitivity_curves.png"
@@ -239,8 +308,8 @@ def run_case(
     fig_geom, _ = plot_by_index(
         PLOT_GEOMETRY_ASPECT_RATIO_BARS,
         geometry_data,
-        title_left=f"{case_name} - No refueling",
-        title_right=f"{case_name} - With refueling",
+        title_left=f"{title_prefix}No refueling",
+        title_right=f"{title_prefix}With refueling",
         show=show_plots,
     )
     geom_plot_path = output_dir / f"{case_name}_geometry_sensitivity.png"

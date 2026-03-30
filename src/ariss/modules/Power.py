@@ -29,8 +29,6 @@ def _is_round(shape_code: str) -> bool:
 
 
 def _section_dims(area: float, aspect_ratio: float, shape_code: str) -> tuple[float, float]:
-    if area <= 0.0 or aspect_ratio <= 0.0:
-        return 0.0, 0.0
     if _is_round(shape_code):
         height = np.sqrt(4.0 * area / (np.pi * aspect_ratio))
     else:

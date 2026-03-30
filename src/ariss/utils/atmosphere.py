@@ -12,6 +12,7 @@
 #
 #  Project:        ARISS
 #  Module:         atmosphere.py
+#  Author:         Carlos Carrasco Requejo, Lucas Calderon del Rio
 # ============================================================================
 
 from __future__ import annotations
