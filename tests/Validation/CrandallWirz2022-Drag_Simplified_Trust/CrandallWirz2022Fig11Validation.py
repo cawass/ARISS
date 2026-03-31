@@ -108,6 +108,7 @@ def run_case_for_solar_flux(f107_value: float) -> tuple[np.ndarray, np.ndarray, 
             continue
 
         tp_mn_per_kw = 1.0e6 * float(final_sc.thruster.thrust) / float(final_sc.thruster.power)
+        print(tp_mn_per_kw)
 
         if np.isfinite(tp_mn_per_kw) and np.isfinite(final_sc.orbit.altitude):
             tp_vals.append(tp_mn_per_kw)
@@ -156,6 +157,7 @@ def run_crandall_wirz_fig11_validation(show: bool = True) -> Path:
         label = spec["label"]
         if label not in dataset:
             continue
+
         tp_model = np.asarray(results[label]["tp"], dtype=float)
         alt_model = np.asarray(results[label]["altitude"], dtype=float)
         isp_model = np.asarray(results[label]["isp"], dtype=float)

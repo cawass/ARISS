@@ -126,23 +126,34 @@ def _case_x_grid_from_dataset(
 
 def _solve_point(spacecraft, *, f107: float, solar_eff: float | None = None, acc_coeff: float | None = None) -> tuple[float, float]:
     spacecraft.orbit.msis_f107 = float(f107)
-    spacecraft.geometry.use_intake_area_ratio = False
 
-    # Keep T/P fixed at the paper condition for Fig. 26/27.
-    spacecraft.thruster.specific_impulse = 2.0 * spacecraft.thruster.eff / (const.EARTH_GRAVITY * TP_TARGET_N_PER_W)
     if solar_eff is not None:
         spacecraft = replace(spacecraft, solar=replace(spacecraft.solar, eta_solar=float(solar_eff)))
+        for _ in range(10):
+            final_sc, _, _ = run_sizing_loop(
+                        spacecraft,
+                        max_iterations=MAX_ITERATIONS,
+                        mass_tolerance=MASS_TOLERANCE,
+                    )
+            spacecraft.thruster.eff = TP_TARGET_MN_PER_KW* final_sc.thruster.specific_impulse * const.EARTH_GRAVITY / (2 * 10**6)
 
     if acc_coeff is not None:
         # Use the project convention directly:
         #   0 -> diffusive, 1 -> specular.
         epsilon_kernel = float(np.clip(acc_coeff, 0.0, 1.0))
+       
         spacecraft.geometry.epsilon_body = epsilon_kernel
         spacecraft.geometry.epsilon_solar = epsilon_kernel
         spacecraft.geometry.epsilon_rad = epsilon_kernel
         spacecraft.geometry.epsilon_in = epsilon_kernel
         spacecraft.geometry.epsilon_in_norm = epsilon_kernel
-
+        for _ in range(10):
+            final_sc, _, _ = run_sizing_loop(
+                        spacecraft,
+                        max_iterations=MAX_ITERATIONS,
+                        mass_tolerance=MASS_TOLERANCE,
+                    )
+            spacecraft.thruster.eff = TP_TARGET_MN_PER_KW* final_sc.thruster.specific_impulse * const.EARTH_GRAVITY / (2 * 10**6)
     with redirect_stdout(io.StringIO()):
         final_sc, _, _ = run_sizing_loop(
             spacecraft,
@@ -151,6 +162,7 @@ def _solve_point(spacecraft, *, f107: float, solar_eff: float | None = None, acc
         )
 
     tp_value = 1.0e6 * float(final_sc.thruster.thrust) / float(final_sc.thruster.power)
+    print(final_sc.thruster.eff, tp_value)
     altitude_value = float(final_sc.orbit.altitude)
     return tp_value, altitude_value
 

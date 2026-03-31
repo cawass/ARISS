@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 import io
 from copy import deepcopy
 from pathlib import Path
@@ -34,15 +34,15 @@ from validation_metrics import datapoint_relative_and_corr_stats, minimum_finite
 
 HERE = Path(__file__).resolve().parent
 BASE_CONFIG_PATH = ROOT / "src/ariss/core/base_config.toml"
-CONFIG_PATH = HERE / "MansurValidation3000W.toml"
+CONFIG_PATH = HERE / "MansurValidation1000W.toml"
 DATASET_PATH = HERE / "TP Dataset.csv"
 OUTPUT = HERE / "mansur_envelope_validation.png"
 PAGE_FIGSIZE = (15.84, 5.4)
 MATPLOTLIB_ONLY = True
 
 ALT_LEVELS = [150, 155, 160, 165, 170, 180, 190, 200, 220]
-SWEEP_ISP_POINTS = 36
-SWEEP_ETA_POINTS = 36
+SWEEP_ISP_POINTS = 60
+SWEEP_ETA_POINTS = 60
 MAX_ITERATIONS = 120
 PRINT_PROGRESS_EVERY_ROWS = 4
 
@@ -118,8 +118,6 @@ def run_sweep():
                 print(f"  row {i + 1:>3}/{len(isp_vals)} | elapsed {elapsed:6.1f}s")
             for j, eff in enumerate(eta):
                 sc = deepcopy(base)
-                sc.geometry.use_intake_area_ratio = False
-                sc.geometry.fixed_body = True
                 sc.thruster.specific_impulse = isp
                 sc.thruster.eff = eff
 
