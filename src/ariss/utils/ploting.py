@@ -536,7 +536,7 @@ def build_original_sensitivity_cases(
     definitions = [
         ("Thruster efficiency", ["thruster.eff"]),
         ("Collection efficiency", ["refueling.coll_eff"]),
-        ("Accommodation coefficient", [str(path) for path in accommodation_paths]),
+        ("Specular reflection fraction", [str(path) for path in accommodation_paths]),
         ("Solar-cell efficiency", ["solar.eta_solar"]),
     ]
 
@@ -1671,7 +1671,7 @@ def plot_validation_crandall_fig26_fig27(
         style_validation_axis(axis, x_minor_divisions=2, y_minor_divisions=2)
 
     axes[0].set_xlabel("Solar-cell efficiency (-)")
-    axes[1].set_xlabel("Accommodation coefficient (-)")
+    axes[1].set_xlabel("Specular reflection fraction (-)")
     figure.supylabel("Minimum operating altitude (km)", x=0.04)
 
     y_all: list[float] = []

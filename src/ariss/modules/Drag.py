@@ -28,7 +28,7 @@ from ariss.utils import constants as const
 def _drag_coefficient(speed_ratio: float, epsilon: float, alpha: float, orb_temp: float, wall_temp: float, multiplier: float) -> float:
     # Inputs:
     #   speed_ratio: free-molecular speed ratio.
-    #   epsilon: accommodation coefficient of the evaluated surface.
+    #   epsilon: specular reflection fraction of the evaluated surface.
     #   alpha: incidence angle [rad].
     #   orb_temp: freestream temperature [K].
     #   wall_temp: wall/reference temperature [K].

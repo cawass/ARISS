@@ -121,11 +121,11 @@ class GeometryState:
     AR_solar: float = 5  # [-] Input: solar array planform aspect ratio.
     AR_rad: float = 5  # [-] Input: radiator planform aspect ratio.
 
-    epsilon_in: float = 0.1  # [-] Input: inlet wall accommodation coefficient for side drag.
-    epsilon_body: float = 0.1  # [-] Input: body wall accommodation coefficient for drag.
-    epsilon_solar: float = 0.1  # [-] Input: solar array accommodation coefficient for drag.
-    epsilon_rad: float = 0.1  # [-] Input: radiator accommodation coefficient for drag.
-    epsilon_in_norm: float = 0.1  # [-] Input: inlet normal-face accommodation coefficient.
+    epsilon_in: float = 0.1  # [-] Input: inlet wall specular reflection fraction for side drag.
+    epsilon_body: float = 0.1  # [-] Input: body wall specular reflection fraction for drag.
+    epsilon_solar: float = 0.1  # [-] Input: solar array specular reflection fraction for drag.
+    epsilon_rad: float = 0.1  # [-] Input: radiator specular reflection fraction for drag.
+    epsilon_in_norm: float = 0.1  # [-] Input: inlet normal-face specular reflection fraction.
 
     wake_in: float = 1  # [-] Input: inlet wake factor applied to side drag.
     wake_body: float = 1  # [-] Input: body wake factor applied to side drag.

@@ -237,7 +237,7 @@ Main inputs:
 - `fixed_body` `[bool]`: whether body area is fixed in ratio mode
 - `intake_area_ratio` `[-]`: intake-to-body frontal area ratio
 - `AR_in`, `AR_body`, `AR_solar`, `AR_rad` `[-]`: aspect ratios of the intake, body, solar array, and radiator, respectively
-- `epsilon_in`, `epsilon_body`, `epsilon_solar`, `epsilon_rad`, `epsilon_in_norm` `[-]`: drag accommodation-related coefficients used by the drag model for the intake side-walls, body side-walls, solar array, radiator, and the intake normal/front-face, respectively.
+- `epsilon_in`, `epsilon_body`, `epsilon_solar`, `epsilon_rad`, `epsilon_in_norm` `[-]`: drag specular reflection fractions used by the drag model for the intake side-walls, body side-walls, solar array, radiator, and the intake normal/front-face, respectively.
 - `wake_in`, `wake_body`, `wake_solar`, `wake_radiator` `[-]`: exposed fractions or wake factors
 - `A_in`, `A_body`, `A_solar`, `A_rad` `[m^2]`: frontal or planform areas for the intake, body, solar array, and radiator, respectively
 - `t_solar`, `t_rad` `[m]`: panel thicknesses used for frontal-edge drag for the solar array and radiator, respectively

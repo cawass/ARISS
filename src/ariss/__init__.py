@@ -89,7 +89,7 @@ def run_efficiency_sensitivity_ranking(
     parameters = [
         {"label": "Thruster efficiency", "variable_path": "thruster.eff"},
         {"label": "Collection efficiency", "variable_path": "refueling.coll_eff"},
-        {"label": "Accommodation coefficient", "variable_path": epsilon_path},
+        {"label": "Specular reflection fraction", "variable_path": epsilon_path},
         {"label": "Solar-cell efficiency", "variable_path": "solar.eta_solar"},
     ]
     return _run_sensitivity_ranking(
